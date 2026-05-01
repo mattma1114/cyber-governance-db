@@ -4,36 +4,52 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { AppThemeProvider } from "./contexts/AppThemeContext";
+import { Navbar } from "./components/Navbar";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Home from "./pages/Home";
+import Cases from "./pages/Cases";
+import CaseDetail from "./pages/CaseDetail";
+import Platforms from "./pages/Platforms";
+import PlatformDetail from "./pages/PlatformDetail";
+import About from "./pages/About";
+import Admin from "./pages/Admin";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+      <Route path="/cases" component={Cases} />
+      <Route path="/cases/:id" component={CaseDetail} />
+      <Route path="/platforms" component={Platforms} />
+      <Route path="/platforms/:id" component={PlatformDetail} />
+      <Route path="/about" component={About} />
+      <Route path="/admin">
+        <ProtectedRoute requireAdmin>
+          <Admin />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+      <ThemeProvider defaultTheme="light">
+        <AppThemeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <div className="flex flex-col min-h-screen">
+              <Navbar />
+              <main className="flex-1">
+                <Router />
+              </main>
+            </div>
+          </TooltipProvider>
+        </AppThemeProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
