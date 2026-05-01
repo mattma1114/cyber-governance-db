@@ -97,4 +97,62 @@ describe("platforms router", () => {
     const result = await caller.platforms.list({});
     expect(Array.isArray(result)).toBe(true);
   });
+
+  it("listAdmin rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.platforms.listAdmin()).rejects.toThrow();
+  });
+
+  it("create rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.platforms.create({ id: "test", name: "Test Platform" })
+    ).rejects.toThrow();
+  });
+
+  it("update rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.platforms.update({ id: "test", name: "Updated" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("topics admin mutations", () => {
+  it("create rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.topics.create({ id: "test", label: "Test Topic" })
+    ).rejects.toThrow();
+  });
+
+  it("update rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.topics.update({ id: "test", label: "Updated" })
+    ).rejects.toThrow();
+  });
+
+  it("delete rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.topics.delete({ id: "test" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("jurisdictions admin mutations", () => {
+  it("create rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.jurisdictions.create({ id: "test", label: "Test" })
+    ).rejects.toThrow();
+  });
+
+  it("delete rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.jurisdictions.delete({ id: "test" })
+    ).rejects.toThrow();
+  });
 });

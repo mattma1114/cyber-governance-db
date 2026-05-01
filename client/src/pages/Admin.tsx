@@ -18,7 +18,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
-  Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle
+  Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
+  Tag, Globe, X
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
@@ -155,6 +156,274 @@ function CaseForm({
   );
 }
 
+// ── Simple Tag Form (Topics & Jurisdictions) ─────────────────────────────────
+function SimpleTagForm({ initial, fields, onSave, onCancel, saving }: {
+  initial?: any; fields: string[];
+  onSave: (d: any) => void; onCancel: () => void; saving: boolean;
+}) {
+  const LABELS: Record<string, string> = { id: "ID（唯一标识）", label: "中文名称", labelEn: "英文名称", color: "颜色（HEX）", flag: "旗帜 Emoji", desc: "描述" };
+  const [form, setForm] = useState<Record<string, string>>(
+    Object.fromEntries(fields.map((f) => [f, initial?.[f] ?? ""]))
+  );
+  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  return (
+    <div className="space-y-3">
+      {fields.map((f) => (
+        <div key={f} className="space-y-1.5">
+          <Label>{LABELS[f] ?? f}</Label>
+          <Input value={form[f]} onChange={(e) => set(f, e.target.value)} disabled={f === "id" && !!initial} />
+        </div>
+      ))}
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>取消</Button>
+        <Button onClick={() => onSave(form)} disabled={saving}>{saving ? "保存中…" : "保存"}</Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+// ── Platform Form ─────────────────────────────────────────────────────────────
+const PORTRAIT_DIMS = [
+  { key: "structure", label: "平台结构" },
+  { key: "contentSource", label: "内容来源" },
+  { key: "networkEffect", label: "网络效应" },
+  { key: "businessModel", label: "商业模式" },
+  { key: "openness", label: "开放程度" },
+  { key: "crossBorder", label: "跨境特征" },
+  { key: "governance", label: "治理机制" },
+];
+
+function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
+  initial?: any; onSave: (d: any) => void; onCancel: () => void; saving: boolean;
+  jurisdictions?: Array<{ id: string; label: string; flag?: string | null }>;
+}) {
+  const isEdit = !!initial;
+  const initPortrait = initial?.portrait
+    ? (typeof initial.portrait === "string" ? JSON.parse(initial.portrait) : initial.portrait)
+    : {};
+  const initJuris: string[] = initial?.jurisdiction
+    ? (typeof initial.jurisdiction === "string" ? JSON.parse(initial.jurisdiction) : initial.jurisdiction)
+    : [];
+  const initTimeline: Array<{ date: string; event: string }> = initial?.timeline
+    ? (typeof initial.timeline === "string" ? JSON.parse(initial.timeline) : initial.timeline)
+    : [];
+  const initRules: Array<{ date: string; title: string; type: string; url: string }> = initial?.rules
+    ? (typeof initial.rules === "string" ? JSON.parse(initial.rules) : initial.rules)
+    : [];
+
+  const [basic, setBasic] = useState({
+    id: initial?.id ?? "",
+    name: initial?.name ?? "",
+    company: initial?.company ?? "",
+    hq: initial?.hq ?? "",
+    founded: initial?.founded?.toString() ?? "",
+    color: initial?.color ?? "",
+    abbr: initial?.abbr ?? "",
+    description: initial?.description ?? "",
+    isActive: initial?.isActive ?? true,
+  });
+  const [jurisSel, setJurisSel] = useState<string[]>(initJuris);
+  const [types, setTypes] = useState<string>(initPortrait.types?.join(", ") ?? "");
+  const [portrait, setPortrait] = useState<Record<string, string>>(
+    Object.fromEntries(PORTRAIT_DIMS.map((d) => [d.key, initPortrait[d.key] ?? ""]))
+  );
+  const [timeline, setTimeline] = useState<Array<{ date: string; event: string }>>(initTimeline);
+  const [rules, setRules] = useState<Array<{ date: string; title: string; type: string; url: string }>>(initRules);
+  const [formTab, setFormTab] = useState("basic");
+
+  const setB = (k: string, v: any) => setBasic((p) => ({ ...p, [k]: v }));
+  const toggleJuris = (id: string) => setJurisSel((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+
+  const buildPayload = () => ({
+    id: basic.id,
+    name: basic.name,
+    company: basic.company,
+    hq: basic.hq,
+    founded: basic.founded ? parseInt(basic.founded) : undefined,
+    color: basic.color,
+    abbr: basic.abbr,
+    description: basic.description,
+    isActive: basic.isActive,
+    jurisdiction: jurisSel,
+    portrait: { ...portrait, types: types.split(",").map((t) => t.trim()).filter(Boolean) },
+    timeline,
+    rules,
+  });
+
+  return (
+    <div className="max-h-[70vh] overflow-y-auto pr-1">
+      <Tabs value={formTab} onValueChange={setFormTab}>
+        <TabsList className="mb-4 w-full">
+          <TabsTrigger value="basic" className="flex-1">基本信息</TabsTrigger>
+          <TabsTrigger value="portrait" className="flex-1">结构画像</TabsTrigger>
+          <TabsTrigger value="timeline" className="flex-1">时间线</TabsTrigger>
+          <TabsTrigger value="rules" className="flex-1">规则文件</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="basic" className="space-y-3">
+          {!isEdit && (
+            <div className="space-y-1.5">
+              <Label>ID（唯一标识，如 tiktok）</Label>
+              <Input value={basic.id} onChange={(e) => setB("id", e.target.value)} placeholder="tiktok" />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>平台名称</Label>
+              <Input value={basic.name} onChange={(e) => setB("name", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>缩写</Label>
+              <Input value={basic.abbr} onChange={(e) => setB("abbr", e.target.value)} placeholder="TK" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>母公司</Label>
+              <Input value={basic.company} onChange={(e) => setB("company", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>总部</Label>
+              <Input value={basic.hq} onChange={(e) => setB("hq", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>成立年份</Label>
+              <Input value={basic.founded} onChange={(e) => setB("founded", e.target.value)} type="number" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>品牌色（HEX）</Label>
+              <div className="flex gap-2">
+                <Input value={basic.color} onChange={(e) => setB("color", e.target.value)} placeholder="#1a73e8" />
+                {basic.color && <div className="w-9 h-9 rounded border shrink-0" style={{ background: basic.color }} />}
+              </div>
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label>平台简介</Label>
+              <Textarea value={basic.description} onChange={(e) => setB("description", e.target.value)} rows={3} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>平台类型（逗号分隔）</Label>
+            <Input value={types} onChange={(e) => setTypes(e.target.value)} placeholder="社交媒体, 短视频" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>司法辖区</Label>
+            <div className="flex flex-wrap gap-2">
+              {jurisdictions?.map((j) => (
+                <button
+                  key={j.id}
+                  type="button"
+                  onClick={() => toggleJuris(j.id)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-xs border transition-colors",
+                    jurisSel.includes(j.id)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted"
+                  )}
+                >
+                  {j.flag} {j.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={basic.isActive} onCheckedChange={(v) => setB("isActive", v)} />
+            <Label>已激活（公开展示）</Label>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="portrait" className="space-y-3">
+          <p className="text-xs text-muted-foreground">填写平台七大结构维度画像，每项支持 Markdown 格式。</p>
+          {PORTRAIT_DIMS.map((d) => (
+            <div key={d.key} className="space-y-1.5">
+              <Label>{d.label}</Label>
+              <Textarea
+                value={portrait[d.key]}
+                onChange={(e) => setPortrait((p) => ({ ...p, [d.key]: e.target.value }))}
+                rows={2}
+                placeholder={`描述平台的${d.label}特征…`}
+              />
+            </div>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="timeline" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">平台发展历史时间线</p>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setTimeline((p) => [...p, { date: "", event: "" }])}>
+              <Plus className="w-3.5 h-3.5" />新增
+            </Button>
+          </div>
+          {timeline.map((item, i) => (
+            <div key={i} className="flex gap-2 items-start">
+              <Input
+                className="w-28 shrink-0"
+                value={item.date}
+                onChange={(e) => setTimeline((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}
+                placeholder="2012"
+              />
+              <Input
+                value={item.event}
+                onChange={(e) => setTimeline((p) => p.map((x, j) => j === i ? { ...x, event: e.target.value } : x))}
+                placeholder="事件描述"
+              />
+              <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-destructive" onClick={() => setTimeline((p) => p.filter((_, j) => j !== i))}>
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="rules" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">平台规则文件列表</p>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setRules((p) => [...p, { date: "", title: "", type: "", url: "" }])}>
+              <Plus className="w-3.5 h-3.5" />新增
+            </Button>
+          </div>
+          {rules.map((item, i) => (
+            <div key={i} className="border border-border rounded-lg p-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  className="w-28 shrink-0"
+                  value={item.date}
+                  onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}
+                  placeholder="2023-01"
+                />
+                <Input
+                  value={item.type}
+                  onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
+                  placeholder="类型（如隐私政策）"
+                />
+                <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-destructive" onClick={() => setRules((p) => p.filter((_, j) => j !== i))}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <Input
+                value={item.title}
+                onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
+                placeholder="文件标题"
+              />
+              <Input
+                value={item.url}
+                onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, url: e.target.value } : x))}
+                placeholder="https://..."
+              />
+            </div>
+          ))}
+        </TabsContent>
+      </Tabs>
+
+      <div className="pt-3 border-t border-border mt-3">
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>取消</Button>
+          <Button onClick={() => onSave(buildPayload())} disabled={saving || !basic.id || !basic.name}>
+            {saving ? "保存中…" : "保存"}
+          </Button>
+        </DialogFooter>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Admin Page ────────────────────────────────────────────────────────────
 export default function Admin() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -168,6 +437,11 @@ export default function Admin() {
   // Case dialog
   const [caseDialog, setCaseDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id?: number; title?: string }>({ open: false });
+  // Platform dialog
+  const [platformDialog, setPlatformDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
+  // Topic/Jurisdiction dialog
+  const [topicDialog, setTopicDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
+  const [jurisDialog, setJurisDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -180,6 +454,39 @@ export default function Admin() {
   });
 
   const { data: platforms, isLoading: platformsLoading } = trpc.platforms.list.useQuery({});
+
+  const createTopic = trpc.topics.create.useMutation({
+    onSuccess: () => { toast.success("专题已创建"); utils.topics.list.invalidate(); setTopicDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateTopic = trpc.topics.update.useMutation({
+    onSuccess: () => { toast.success("专题已更新"); utils.topics.list.invalidate(); setTopicDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteTopic = trpc.topics.delete.useMutation({
+    onSuccess: () => { toast.success("专题已删除"); utils.topics.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const createJuris = trpc.jurisdictions.create.useMutation({
+    onSuccess: () => { toast.success("辖区已创建"); utils.jurisdictions.list.invalidate(); setJurisDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateJuris = trpc.jurisdictions.update.useMutation({
+    onSuccess: () => { toast.success("辖区已更新"); utils.jurisdictions.list.invalidate(); setJurisDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteJuris = trpc.jurisdictions.delete.useMutation({
+    onSuccess: () => { toast.success("辖区已删除"); utils.jurisdictions.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const createPlatform = trpc.platforms.create.useMutation({
+    onSuccess: () => { toast.success("平台已创建"); utils.platforms.list.invalidate(); setPlatformDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updatePlatform = trpc.platforms.update.useMutation({
+    onSuccess: () => { toast.success("平台已更新"); utils.platforms.list.invalidate(); setPlatformDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const createCase = trpc.cases.create.useMutation({
     onSuccess: () => {
@@ -310,6 +617,10 @@ export default function Admin() {
               <LayoutGrid className="w-3.5 h-3.5" />
               平台管理
             </TabsTrigger>
+            <TabsTrigger value="taxonomy" className="gap-1.5">
+              <Tag className="w-3.5 h-3.5" />
+              专题/辖区
+            </TabsTrigger>
           </TabsList>
 
           {/* Cases Tab */}
@@ -428,7 +739,7 @@ export default function Admin() {
           <TabsContent value="platforms">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-muted-foreground">共 {platforms?.length ?? 0} 个平台</p>
-              <Button size="sm" className="gap-1.5" onClick={() => toast.info("平台编辑功能即将上线")}>
+              <Button size="sm" className="gap-1.5" onClick={() => setPlatformDialog({ open: true })}>
                 <Plus className="w-4 h-4" />
                 新增平台
               </Button>
@@ -470,7 +781,7 @@ export default function Admin() {
                               variant="ghost"
                               size="icon"
                               className="w-7 h-7"
-                              onClick={() => toast.info("平台编辑功能即将上线")}
+                              onClick={() => setPlatformDialog({ open: true, editing: p })}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
@@ -493,8 +804,140 @@ export default function Admin() {
               </div>
             )}
           </TabsContent>
+
+          {/* Topics & Jurisdictions Tab */}
+          <TabsContent value="taxonomy">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Topics */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-sm flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" />研究专题</h3>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => setTopicDialog({ open: true })}>
+                    <Plus className="w-3.5 h-3.5" />新增
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">名称</th>
+                        <th className="text-left px-3 py-2.5 font-medium text-muted-foreground w-16">颜色</th>
+                        <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-20">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topics?.map((t: any, i: number) => (
+                        <tr key={t.id} className={cn("border-t border-border hover:bg-muted/30", i % 2 ? "bg-muted/10" : "")}>
+                          <td className="px-3 py-2.5">
+                            <div className="font-medium text-sm">{t.label}</div>
+                            <div className="text-xs text-muted-foreground">{t.id}</div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {t.color && <div className="w-5 h-5 rounded-full border" style={{ background: t.color }} />}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="w-6 h-6" onClick={() => setTopicDialog({ open: true, editing: t })}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="w-6 h-6 text-destructive hover:text-destructive" onClick={() => deleteTopic.mutate({ id: t.id })}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {/* Jurisdictions */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-sm flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" />司法辖区</h3>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => setJurisDialog({ open: true })}>
+                    <Plus className="w-3.5 h-3.5" />新增
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">名称</th>
+                        <th className="text-left px-3 py-2.5 font-medium text-muted-foreground w-16">旗帜</th>
+                        <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-20">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {jurisdictions?.map((j: any, i: number) => (
+                        <tr key={j.id} className={cn("border-t border-border hover:bg-muted/30", i % 2 ? "bg-muted/10" : "")}>
+                          <td className="px-3 py-2.5">
+                            <div className="font-medium text-sm">{j.label}</div>
+                            <div className="text-xs text-muted-foreground">{j.id}</div>
+                          </td>
+                          <td className="px-3 py-2.5 text-lg">{j.flag}</td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="w-6 h-6" onClick={() => setJurisDialog({ open: true, editing: j })}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="w-6 h-6 text-destructive hover:text-destructive" onClick={() => deleteJuris.mutate({ id: j.id })}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Topic Dialog */}
+      <Dialog open={topicDialog.open} onOpenChange={(o) => setTopicDialog({ open: o })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{topicDialog.editing ? "编辑专题" : "新增专题"}</DialogTitle></DialogHeader>
+          <SimpleTagForm
+            initial={topicDialog.editing}
+            fields={["id", "label", "labelEn", "color"]}
+            onSave={(d) => topicDialog.editing ? updateTopic.mutate(d) : createTopic.mutate(d)}
+            onCancel={() => setTopicDialog({ open: false })}
+            saving={createTopic.isPending || updateTopic.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Jurisdiction Dialog */}
+      <Dialog open={jurisDialog.open} onOpenChange={(o) => setJurisDialog({ open: o })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{jurisDialog.editing ? "编辑辖区" : "新增辖区"}</DialogTitle></DialogHeader>
+          <SimpleTagForm
+            initial={jurisDialog.editing}
+            fields={["id", "label", "labelEn", "flag"]}
+            onSave={(d) => jurisDialog.editing ? updateJuris.mutate(d) : createJuris.mutate(d)}
+            onCancel={() => setJurisDialog({ open: false })}
+            saving={createJuris.isPending || updateJuris.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Platform Edit Dialog */}
+      <Dialog open={platformDialog.open} onOpenChange={(o) => setPlatformDialog({ open: o })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{platformDialog.editing ? "编辑平台" : "新增平台"}</DialogTitle></DialogHeader>
+          <PlatformForm
+            initial={platformDialog.editing}
+            jurisdictions={jurisdictions ?? []}
+            onSave={(d) => platformDialog.editing ? updatePlatform.mutate(d) : createPlatform.mutate(d)}
+            onCancel={() => setPlatformDialog({ open: false })}
+            saving={createPlatform.isPending || updatePlatform.isPending}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Case Create/Edit Dialog */}
       <Dialog open={caseDialog.open} onOpenChange={(o) => setCaseDialog({ open: o })}>
