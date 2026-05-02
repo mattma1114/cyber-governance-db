@@ -70,9 +70,9 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero + Stats */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-background border-b border-border">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-background border-b border-border min-h-[calc(100vh-3.5rem)] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--brand-subtle),transparent_60%)]" />
-        <div className="container relative py-16 md:py-24">
+        <div className="container relative py-12 md:py-16 flex-1 flex flex-col justify-center">
           {/* Title + Description */}
           <div className="max-w-2xl mb-10">
             <div className="flex items-center gap-2 mb-4">
@@ -109,7 +109,7 @@ export default function Home() {
             )}
           </div>
           {/* Scroll hint */}
-          <div className="flex justify-center mt-10 pb-2">
+          <div className="flex justify-center mt-8 pb-0">
             <div className="flex flex-col items-center gap-1 text-muted-foreground/50 select-none" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite' }}>
               <span className="text-[11px] tracking-wide">向下滑动</span>
               <ChevronDown className="w-5 h-5" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite 0.15s' }} />
