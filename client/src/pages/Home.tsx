@@ -212,11 +212,7 @@ export default function Home() {
             <span className="text-border">|</span>
             <span>浙江传媒学院</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/about" className="hover:text-foreground transition-colors">关于</Link>
-            <Link href="/cases" className="hover:text-foreground transition-colors">案例数据库</Link>
-            <Link href="/platforms" className="hover:text-foreground transition-colors">平台画像库</Link>
-          </div>
+
         </div>
       </footer>
     </div>
