@@ -15,7 +15,7 @@ export default function Platforms() {
   const [inputVal, setInputVal] = useState("");
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const { data: platforms, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined });

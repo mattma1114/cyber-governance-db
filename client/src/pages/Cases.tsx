@@ -36,7 +36,7 @@ export default function Cases() {
     params.get("jurisdiction") ? [params.get("jurisdiction")!] : []
   );
   const [page, setPage] = useState(1);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
