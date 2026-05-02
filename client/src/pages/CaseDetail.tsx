@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,147 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, Globe, Tag, BookOpen,
-  Sparkles, Scale, FileText, Gavel
+  Sparkles, Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
+import { toast } from "sonner";
+
+// ── Citation formats ──────────────────────────────────────────────────────────
+type CitationStyle = "gb" | "apa" | "mla";
+
+function buildCitation(
+  style: CitationStyle,
+  opts: {
+    title: string;
+    titleEn?: string | null;
+    source?: string | null;
+    sourceUrl?: string | null;
+    date?: string | null;
+    jurisLabel?: string;
+    typeLabel?: string;
+  }
+): string {
+  const { title, titleEn, source, sourceUrl, date, jurisLabel, typeLabel } = opts;
+  const year = date ? new Date(date).getFullYear() : new Date().getFullYear();
+  const accessDate = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+  const db = "互联网平台治理数据库";
+  const org = "浙江传媒学院";
+
+  if (style === "gb") {
+    // GB/T 7714-2015
+    let cite = `${source ?? org}. ${title}[EB/OL]. `;
+    if (jurisLabel) cite += `${jurisLabel}, `;
+    cite += `${year}`;
+    if (sourceUrl) cite += `. ${sourceUrl}`;
+    cite += `. (${accessDate}检索自${db})`;
+    return cite;
+  }
+
+  if (style === "apa") {
+    // APA 7th
+    let cite = `${source ?? org}. (${year}). `;
+    cite += titleEn ? `${titleEn}` : title;
+    if (jurisLabel) cite += ` [${jurisLabel} ${typeLabel ?? "case"}]`;
+    cite += `. ${db}.`;
+    if (sourceUrl) cite += ` ${sourceUrl}`;
+    return cite;
+  }
+
+  // MLA 9th
+  let cite = `"${titleEn ?? title}." `;
+  cite += `${source ?? org}, ${year}`;
+  if (jurisLabel) cite += `, ${jurisLabel}`;
+  cite += `. ${db}, ${org}`;
+  if (sourceUrl) cite += `. ${sourceUrl}`;
+  cite += `. Accessed ${accessDate}.`;
+  return cite;
+}
+
+// ── Citation Box Component ────────────────────────────────────────────────────
+function CitationBox({ c, jurisLabel, typeLabel }: {
+  c: { title: string; titleEn?: string | null; source?: string | null; sourceUrl?: string | null; date?: string | null };
+  jurisLabel?: string;
+  typeLabel?: string;
+}) {
+  const [style, setStyle] = useState<CitationStyle>("gb");
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const citation = buildCitation(style, { ...c, jurisLabel, typeLabel });
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(citation);
+    setCopied(true);
+    toast.success("引用格式已复制到剪贴板");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const styles: { key: CitationStyle; label: string }[] = [
+    { key: "gb", label: "GB/T 7714" },
+    { key: "apa", label: "APA 7th" },
+    { key: "mla", label: "MLA 9th" },
+  ];
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Quote className="w-4 h-4 text-primary" />
+            学术引用
+          </CardTitle>
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            {open ? <><ChevronUp className="w-3.5 h-3.5" />收起</> : <><ChevronDown className="w-3.5 h-3.5" />展开</>}
+          </button>
+        </div>
+      </CardHeader>
+      {open && (
+        <CardContent className="pt-0">
+          {/* Style switcher */}
+          <div className="flex gap-1.5 mb-3">
+            {styles.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setStyle(s.key)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs font-medium transition-colors border",
+                  style === s.key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Citation text */}
+          <div className="relative">
+            <div className="bg-muted/60 rounded-lg px-4 py-3 pr-12 text-sm leading-relaxed font-mono text-foreground/90 select-all">
+              {citation}
+            </div>
+            <button
+              onClick={handleCopy}
+              className="absolute top-2.5 right-2.5 p-1.5 rounded-md hover:bg-background border border-border transition-colors"
+              title="复制引用"
+            >
+              {copied
+                ? <Check className="w-3.5 h-3.5 text-green-500" />
+                : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-2">
+            点击文本框可全选，或使用右上角按钮一键复制
+          </p>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 // ── Related Cases Component ────────────────────────────────────────────────────
 function RelatedCases({ caseId, topicId, jurisdictionId }: { caseId: number; topicId: string; jurisdictionId: string }) {
@@ -223,6 +361,13 @@ export default function CaseDetail() {
               </div>
             </div>
           )}
+
+          {/* Citation */}
+          <CitationBox
+            c={c}
+            jurisLabel={juris?.label}
+            typeLabel={TYPE_LABELS[c.type]?.label}
+          />
         </div>
 
         {/* Related Cases */}
