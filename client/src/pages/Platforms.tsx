@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List } from "lucide-react";
+import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { truncate, cn } from "@/lib/utils";
 
 export default function Platforms() {
@@ -16,6 +16,7 @@ export default function Platforms() {
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const { data: platforms, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined });
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -113,7 +114,21 @@ export default function Platforms() {
       <div className="container py-6">
         <div className="flex gap-6">
           {/* ── Left: Sidebar Filters ── */}
-          <aside className="w-56 shrink-0 flex flex-col gap-4">
+          <aside className={cn(
+            "shrink-0 flex flex-col gap-4 transition-all duration-200",
+            sidebarOpen ? "w-56" : "w-8"
+          )}>
+            {/* Collapse toggle */}
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="flex items-center justify-center w-7 h-7 rounded-md border border-border hover:bg-muted transition-colors self-end shrink-0 mt-0.5"
+              title={sidebarOpen ? "折叠筛选栏" : "展开筛选栏"}
+            >
+              {sidebarOpen
+                ? <PanelLeftClose className="w-3.5 h-3.5 text-muted-foreground" />
+                : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+            {sidebarOpen && (<>
             {/* Search */}
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -225,6 +240,7 @@ export default function Platforms() {
                 })}
               </div>
             </div>
+            </>)}
           </aside>
 
           {/* ── Right: Results ── */}

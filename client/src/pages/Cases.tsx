@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Search, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -36,6 +36,7 @@ export default function Cases() {
   );
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -113,7 +114,22 @@ export default function Cases() {
       <div className="container py-6">
         <div className="flex gap-6">
           {/* ── Left sidebar filters ── */}
-          <aside className="hidden md:flex flex-col gap-5 w-52 shrink-0">
+          <aside className={cn(
+            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200",
+            sidebarOpen ? "w-52" : "w-8"
+          )}>            {/* Collapse toggle button */}
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="flex items-center justify-center w-7 h-7 rounded-md border border-border hover:bg-muted transition-colors self-end shrink-0 mt-0.5"
+              title={sidebarOpen ? "折叠筛选栏" : "展开筛选栏"}
+            >
+              {sidebarOpen
+                ? <PanelLeftClose className="w-3.5 h-3.5 text-muted-foreground" />
+                : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+
+            {/* Sidebar content — hidden when collapsed */}
+            {sidebarOpen && (<>
             {/* Page title */}
             <div className="pb-1">
               <h1 className="text-xl font-bold mb-0.5">案例数据库</h1>
@@ -264,6 +280,7 @@ export default function Cases() {
                 })}
               </div>
             </div>
+            </>)}
           </aside>
 
           {/* ── Right: results ── */}
