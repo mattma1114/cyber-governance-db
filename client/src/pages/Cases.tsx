@@ -172,6 +172,37 @@ export default function Cases() {
               </Button>
             )}
 
+            {/* Active filter tags - shown below clear button */}
+            {hasFilters && (
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {selectedTypes.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
+                    {CASE_TYPES.find((t) => t.value === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedTopics.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
+                    {topics?.find((t) => t.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedJurisdictions.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
+                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
+                    {jurisdictions?.find((j) => j.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {keyword && (
+                  <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
+                    "{keyword}"
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                )}
+              </div>
+            )}
+
             <Separator />
 
             {/* Case Type */}
@@ -390,56 +421,12 @@ export default function Cases() {
                 </Drawer.Portal>
               </Drawer.Root>
             </div>
-            {/* Active filter tags + count */}
+            {/* Result count + view toggle */}
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm text-muted-foreground">
                   {isLoading ? "加载中…" : `共 ${data?.total ?? 0} 条结果`}
                 </p>
-                {selectedTypes.map((v) => (
-                  <Badge
-                    key={v}
-                    variant="secondary"
-                    className="gap-1 cursor-pointer text-xs"
-                    onClick={() => toggleType(v)}
-                  >
-                    {CASE_TYPES.find((t) => t.value === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedTopics.map((v) => (
-                  <Badge
-                    key={v}
-                    variant="secondary"
-                    className="gap-1 cursor-pointer text-xs"
-                    onClick={() => toggleTopic(v)}
-                  >
-                    {topics?.find((t) => t.id === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedJurisdictions.map((v) => (
-                  <Badge
-                    key={v}
-                    variant="secondary"
-                    className="gap-1 cursor-pointer text-xs"
-                    onClick={() => toggleJurisdiction(v)}
-                  >
-                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
-                    {jurisdictions?.find((j) => j.id === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {keyword && (
-                  <Badge
-                    variant="secondary"
-                    className="gap-1 cursor-pointer text-xs"
-                    onClick={() => { setKeyword(""); setInputVal(""); }}
-                  >
-                    "{keyword}"
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                )}
               </div>
               {/* View toggle */}
               <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
