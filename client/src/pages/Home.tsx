@@ -88,14 +88,7 @@ export default function Home() {
               覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
               反垄断与内容治理四大专题。
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="outline" size="lg" className="gap-2">
-                <Link href="/platforms">
-                  <LayoutGrid className="w-4 h-4" />
-                  查看平台画像库
-                </Link>
-              </Button>
-            </div>
+
           </div>
           {/* Scroll hint */}
           <div className="flex justify-center mt-10 pb-2">
