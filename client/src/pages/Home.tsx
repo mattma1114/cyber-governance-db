@@ -75,11 +75,7 @@ export default function Home() {
         <div className="container relative py-16 md:py-24">
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 mb-4">
-              <Badge variant="secondary" className="text-xs gap-1.5">
-                <Globe className="w-3 h-3" />
-                浙江传媒学院
-              </Badge>
-              <Badge variant="outline" className="text-xs" style={{fontWeight: '400', textAlign: 'left'}}>
+              <Badge variant="outline" className="text-xs">
                 全球平台治理研究
               </Badge>
             </div>
