@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Search, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Drawer } from "vaul";
+import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -37,6 +38,7 @@ export default function Cases() {
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -141,7 +143,7 @@ export default function Cases() {
             {/* Search */}
             <div>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
                   className="pl-8 h-8 text-sm"
                   placeholder="搜索案例…"
@@ -285,6 +287,109 @@ export default function Cases() {
 
           {/* ── Right: results ── */}
           <div className="flex-1 min-w-0">
+            {/* Mobile filter drawer trigger */}
+            <div className="flex md:hidden items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground">
+                {isLoading ? "加载中…" : `共 ${data?.total ?? 0} 条结果`}
+              </p>
+              <Drawer.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+                <Drawer.Trigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-sm">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    筛选
+                    {activeTagCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{activeTagCount}</Badge>
+                    )}
+                  </Button>
+                </Drawer.Trigger>
+                <Drawer.Portal>
+                  <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
+                  <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl max-h-[85vh] flex flex-col">
+                    <div className="mx-auto w-12 h-1.5 bg-muted rounded-full mt-3 mb-2 shrink-0" />
+                    <div className="px-4 pb-2 flex items-center justify-between shrink-0">
+                      <h2 className="text-base font-semibold">筛选条件</h2>
+                      <div className="flex items-center gap-2">
+                        {hasFilters && (
+                          <Button variant="ghost" size="sm" onClick={() => { clearFilters(); setDrawerOpen(false); }} className="text-xs gap-1 text-muted-foreground">
+                            <RotateCcw className="w-3 h-3" />清除
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => setDrawerOpen(false)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto px-4 pb-8 flex flex-col gap-5">
+                      {/* Search */}
+                      <div className="relative">
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input className="pl-8 h-9 text-sm" placeholder="搜索案例…" value={inputVal}
+                          onChange={(e) => setInputVal(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { handleSearch(); setDrawerOpen(false); } }} />
+                      </div>
+                      <Separator />
+                      {/* Case Type */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">案例类型</p>
+                        <div className="flex flex-wrap gap-2">
+                          {CASE_TYPES.map((t) => {
+                            const active = selectedTypes.includes(t.value);
+                            const count = stats ? (stats[t.value] ?? 0) as number : null;
+                            return (
+                              <button key={t.value} onClick={() => toggleType(t.value)}
+                                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors",
+                                  active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted")}>
+                                {t.label}
+                                {count !== null && <span className="text-xs opacity-70">{count}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Separator />
+                      {/* Topics */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">研究专题</p>
+                        <div className="flex flex-wrap gap-2">
+                          {topics?.map((t) => {
+                            const active = selectedTopics.includes(t.id);
+                            const count: number = stats?.byTopic?.find((r: any) => r.topicId === t.id)?.count ?? 0;
+                            return (
+                              <button key={t.id} onClick={() => toggleTopic(t.id)}
+                                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors",
+                                  active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted")}>
+                                {t.label}
+                                <span className="text-xs opacity-70">{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Separator />
+                      {/* Jurisdictions */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">司法辖区</p>
+                        <div className="flex flex-wrap gap-2">
+                          {jurisdictions?.map((j) => {
+                            const active = selectedJurisdictions.includes(j.id);
+                            const count: number = stats?.byJurisdiction?.find((r: any) => r.jurisdictionId === j.id)?.count ?? 0;
+                            return (
+                              <button key={j.id} onClick={() => toggleJurisdiction(j.id)}
+                                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors",
+                                  active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted")}>
+                                <span>{j.flag}</span>{j.label}
+                                <span className="text-xs opacity-70">{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Button className="w-full mt-2" onClick={() => setDrawerOpen(false)}>应用筛选</Button>
+                    </div>
+                  </Drawer.Content>
+                </Drawer.Portal>
+              </Drawer.Root>
+            </div>
             {/* Active filter tags + count */}
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
@@ -364,7 +469,7 @@ export default function Cases() {
             {/* Mobile search bar */}
             <div className="flex gap-2 mb-4 md:hidden">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
                   placeholder="搜索案例…"
@@ -385,7 +490,7 @@ export default function Cases() {
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-20 text-muted-foreground">
-                <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <SearchIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p>未找到符合条件的案例</p>
                 <Button variant="link" onClick={clearFilters}>清除筛选条件</Button>
               </div>
