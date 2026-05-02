@@ -107,7 +107,7 @@ export default function Home() {
           {/* Scroll hint */}
           <div className="flex justify-center mt-10 pb-2">
             <div className="flex flex-col items-center gap-1 text-muted-foreground/50 select-none" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite' }}>
-              <span className="text-[11px] tracking-widest uppercase">scroll</span>
+              <span className="text-[11px] tracking-wide">向下滑动</span>
               <ChevronDown className="w-5 h-5" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite 0.15s' }} />
             </div>
           </div>
