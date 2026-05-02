@@ -212,7 +212,9 @@ export default function Home() {
             <span className="text-border">|</span>
             <span>浙江传媒学院</span>
           </div>
-
+          <div className="flex items-center gap-4">
+            <Link href="/legal" className="hover:text-foreground transition-colors text-xs">法律声明</Link>
+          </div>
         </div>
       </footer>
     </div>

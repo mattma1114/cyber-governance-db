@@ -14,6 +14,7 @@ import Platforms from "./pages/Platforms";
 import PlatformDetail from "./pages/PlatformDetail";
 import About from "./pages/About";
 import Admin from "./pages/Admin";
+import Legal from "./pages/Legal";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/platforms" component={Platforms} />
       <Route path="/platforms/:id" component={PlatformDetail} />
       <Route path="/about" component={About} />
+      <Route path="/legal" component={Legal} />
       <Route path="/admin">
         <ProtectedRoute requireAdmin>
           <Admin />
