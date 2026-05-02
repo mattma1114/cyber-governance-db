@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, Database, LayoutGrid, Scale, Gavel, FileText, Globe, TrendingUp, BookOpen } from "lucide-react";
+import { ArrowRight, Database, LayoutGrid, Scale, Gavel, FileText, Globe, TrendingUp, BookOpen, ChevronDown } from "lucide-react";
 import { TYPE_BADGE_CLASS, TYPE_LABELS, formatDate, truncate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +102,13 @@ export default function Home() {
                   查看平台画像库
                 </Link>
               </Button>
+            </div>
+          </div>
+          {/* Scroll hint */}
+          <div className="flex justify-center mt-10 pb-2">
+            <div className="flex flex-col items-center gap-1 text-muted-foreground/50 select-none" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite' }}>
+              <span className="text-[11px] tracking-widest uppercase">scroll</span>
+              <ChevronDown className="w-5 h-5" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite 0.15s' }} />
             </div>
           </div>
         </div>

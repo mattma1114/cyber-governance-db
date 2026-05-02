@@ -248,6 +248,11 @@
   --sidebar-ring: oklch(62% 0.18 192);
 }
 
+@keyframes scrollHintBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.45; }
+  50% { transform: translateY(7px); opacity: 0.9; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
