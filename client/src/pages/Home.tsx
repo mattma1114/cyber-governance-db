@@ -89,13 +89,6 @@ export default function Home() {
               反垄断与内容治理四大专题。
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg" className="gap-2">
-                <Link href="/cases">
-                  <Database className="w-4 h-4" />
-                  浏览案例数据库
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </Button>
               <Button asChild variant="outline" size="lg" className="gap-2">
                 <Link href="/platforms">
                   <LayoutGrid className="w-4 h-4" />
