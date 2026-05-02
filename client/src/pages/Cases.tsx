@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Search, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -35,6 +35,7 @@ export default function Cases() {
     params.get("jurisdiction") ? [params.get("jurisdiction")!] : []
   );
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -299,6 +300,29 @@ export default function Cases() {
                   </Badge>
                 )}
               </div>
+              {/* View toggle */}
+              <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={cn(
+                    "p-1.5 rounded transition-colors",
+                    viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="分块视图"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "p-1.5 rounded transition-colors",
+                    viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="列表视图"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Mobile search bar */}
@@ -316,11 +340,11 @@ export default function Cases() {
               <Button onClick={handleSearch} size="sm">搜索</Button>
             </div>
 
-            {/* Grid */}
+            {/* Grid / List */}
             {isLoading ? (
-              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className={viewMode === "grid" ? "grid sm:grid-cols-2 xl:grid-cols-3 gap-3" : "flex flex-col gap-2"}>
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="h-52 rounded-xl" />
+                  <Skeleton key={i} className={viewMode === "grid" ? "h-52 rounded-xl" : "h-24 rounded-lg"} />
                 ))}
               </div>
             ) : filteredItems.length === 0 ? (
@@ -329,15 +353,15 @@ export default function Cases() {
                 <p>未找到符合条件的案例</p>
                 <Button variant="link" onClick={clearFilters}>清除筛选条件</Button>
               </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            ) : viewMode === "grid" ? (
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {filteredItems.map((c) => {
                   const topic = topics?.find((t) => t.id === c.topicId);
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
                   return (
                     <Link key={c.id} href={`/cases/${c.id}`}>
                       <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
-                        <CardContent className="p-5 flex flex-col gap-3 h-full">
+                        <CardContent className="p-4 flex flex-col gap-2 h-full">
                           <div className="flex items-start justify-between gap-2">
                             <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
                               {TYPE_LABELS[c.type]?.label}
@@ -350,10 +374,10 @@ export default function Cases() {
                           {c.titleEn && (
                             <p className="text-xs text-muted-foreground italic line-clamp-1">{c.titleEn}</p>
                           )}
-                          <p className="text-xs text-muted-foreground line-clamp-3 flex-1">
-                            {truncate(c.abstract || c.aiSummary || "", 130)}
+                          <p className="text-xs text-muted-foreground line-clamp-5 flex-1">
+                            {truncate(c.abstract || c.aiSummary || "", 280)}
                           </p>
-                          <div className="flex items-center justify-between mt-auto">
+                          <div className="flex items-center justify-between mt-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               {juris && (
                                 <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -378,11 +402,58 @@ export default function Cases() {
                   );
                 })}
               </div>
+            ) : (
+              /* List view */
+              <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
+                {filteredItems.map((c) => {
+                  const topic = topics?.find((t) => t.id === c.topicId);
+                  const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
+                  return (
+                    <Link key={c.id} href={`/cases/${c.id}`}>
+                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group">
+                        <div className="flex items-start gap-3">
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
+                                {TYPE_LABELS[c.type]?.label}
+                              </Badge>
+                              {juris && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <span>{juris.flag}</span>{juris.label}
+                                </span>
+                              )}
+                              {topic && (
+                                <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                  {topic.label}
+                                </Badge>
+                              )}
+                              <span className="text-xs text-muted-foreground ml-auto">{c.date}</span>
+                            </div>
+                            <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                              {c.title}
+                            </h3>
+                            {c.titleEn && (
+                              <p className="text-xs text-muted-foreground italic line-clamp-1">{c.titleEn}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground line-clamp-3">
+                              {truncate(c.abstract || c.aiSummary || "", 300)}
+                            </p>
+                          </div>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 mt-1">
+                            <Eye className="w-3 h-3" />
+                            {c.views ?? 0}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
+              <div className="flex items-center justify-center gap-2 mt-6">
                 <Button
                   variant="outline"
                   size="icon"
