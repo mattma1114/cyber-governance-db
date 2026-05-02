@@ -39,6 +39,9 @@ export default function Cases() {
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
+  const { data: statsRaw } = trpc.cases.stats.useQuery();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stats = statsRaw as any;
 
   // For multi-select, we send the first selected value to the backend
   // (backend supports single filter; multi-select handled client-side for UX)
@@ -164,6 +167,7 @@ export default function Cases() {
               <div className="flex flex-col gap-1">
                 {CASE_TYPES.map((t) => {
                   const active = selectedTypes.includes(t.value);
+                  const count = stats ? (stats[t.value] ?? 0) as number : null;
                   return (
                     <button
                       key={t.value}
@@ -176,7 +180,12 @@ export default function Cases() {
                       )}
                     >
                       <span>{t.label}</span>
-                      {active && <X className="w-3 h-3 opacity-70" />}
+                      <span className={cn(
+                        "text-xs tabular-nums shrink-0",
+                        active ? "opacity-80" : "text-muted-foreground"
+                      )}>
+                        {active ? <X className="w-3 h-3 opacity-70" /> : count !== null ? count : ""}
+                      </span>
                     </button>
                   );
                 })}
@@ -194,6 +203,7 @@ export default function Cases() {
               <div className="flex flex-col gap-1">
                 {topics?.map((t) => {
                   const active = selectedTopics.includes(t.id);
+                  const count: number = stats?.byTopic?.find((r: any) => r.topicId === t.id)?.count ?? 0;
                   return (
                     <button
                       key={t.id}
@@ -205,8 +215,13 @@ export default function Cases() {
                           : "hover:bg-muted text-foreground"
                       )}
                     >
-                      <span className="line-clamp-1">{t.label}</span>
-                      {active && <X className="w-3 h-3 opacity-70 shrink-0" />}
+                      <span className="line-clamp-1 flex-1">{t.label}</span>
+                      <span className={cn(
+                        "text-xs tabular-nums shrink-0 ml-1",
+                        active ? "opacity-80" : "text-muted-foreground"
+                      )}>
+                        {active ? <X className="w-3 h-3 opacity-70" /> : count}
+                      </span>
                     </button>
                   );
                 })}
@@ -224,6 +239,7 @@ export default function Cases() {
               <div className="flex flex-col gap-1">
                 {jurisdictions?.map((j) => {
                   const active = selectedJurisdictions.includes(j.id);
+                  const count: number = stats?.byJurisdiction?.find((r: any) => r.jurisdictionId === j.id)?.count ?? 0;
                   return (
                     <button
                       key={j.id}
@@ -235,11 +251,16 @@ export default function Cases() {
                           : "hover:bg-muted text-foreground"
                       )}
                     >
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
                         <span>{j.flag}</span>
                         <span className="line-clamp-1">{j.label}</span>
                       </span>
-                      {active && <X className="w-3 h-3 opacity-70 shrink-0" />}
+                      <span className={cn(
+                        "text-xs tabular-nums shrink-0 ml-1",
+                        active ? "opacity-80" : "text-muted-foreground"
+                      )}>
+                        {active ? <X className="w-3 h-3 opacity-70" /> : count}
+                      </span>
                     </button>
                   );
                 })}
