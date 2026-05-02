@@ -99,7 +99,7 @@ export default function PlatformDetail() {
   return (
     <div className="min-h-screen">
       {/* Breadcrumb */}
-      <div className="border-b border-border bg-muted/30">
+      <div className="border-b border-border bg-white">
         <div className="container py-3">
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/platforms">

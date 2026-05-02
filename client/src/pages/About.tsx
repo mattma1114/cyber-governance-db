@@ -26,7 +26,7 @@ export default function About() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-background">
+      <div className="border-b border-border bg-white">
         <div className="container py-12">
           <Badge variant="secondary" className="mb-4 gap-1.5">
             <Building2 className="w-3 h-3" />
@@ -166,7 +166,7 @@ export default function About() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-muted/30 py-8 mt-12">
+      <footer className="border-t border-border bg-white py-8 mt-12">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4" />

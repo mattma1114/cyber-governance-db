@@ -572,7 +572,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-border bg-muted/30">
+      <div className="border-b border-border bg-white">
         <div className="container py-6">
           <div className="flex items-center justify-between">
             <div>

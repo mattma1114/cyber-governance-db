@@ -101,7 +101,7 @@ export default function Platforms() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-border bg-muted/30">
+      <div className="border-b border-border bg-white">
         <div className="container py-8">
           <h1 className="text-2xl font-bold mb-1">平台画像库</h1>
           <p className="text-muted-foreground text-sm">

@@ -42,3 +42,8 @@
 - [x] 后端 tRPC 路由单元测试（auth/cases/topics/platforms）- 7 tests passed
 - [x] 受保护路由验证（ProtectedRoute 组件）
 - [x] TypeScript 编译（仅剩框架层 storageProxy.ts 1个错误，非业务代码）
+
+## AI 辅助录入
+- [ ] 后端添加 cases.extractFromText tRPC 接口（调用 LLM 提取结构化字段）
+- [ ] 前端 Admin.tsx 案例表单添加"AI 辅助填充"面板（粘贴原文 → 解析 → 自动填充）
+- [ ] 添加对应 vitest 测试

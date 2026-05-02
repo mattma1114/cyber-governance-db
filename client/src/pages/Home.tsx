@@ -70,7 +70,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero + Stats */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-background border-b border-border min-h-[calc(100vh-3.5rem)] flex flex-col justify-center">
+      <section className="relative overflow-hidden bg-white border-b border-border min-h-[calc(100vh-3.5rem)] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--brand-subtle),transparent_60%)]" />
         <div className="container relative py-12 md:py-16 flex-1 flex flex-col justify-center">
           {/* Title + Description */}
@@ -204,7 +204,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-muted/30 py-8">
+      <footer className="border-t border-border bg-white py-8">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4" />
