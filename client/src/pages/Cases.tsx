@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Drawer } from "vaul";
-import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from "lucide-react";
+import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -39,6 +39,8 @@ export default function Cases() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"date" | "views">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -55,7 +57,25 @@ export default function Cases() {
     type: selectedTypes.length === 1 ? selectedTypes[0] : undefined,
     topicId: selectedTopics.length === 1 ? selectedTopics[0] : undefined,
     jurisdictionId: selectedJurisdictions.length === 1 ? selectedJurisdictions[0] : undefined,
+    sortBy,
+    sortDir,
   });
+
+  // Toggle sort: same column → flip direction; different column → set new column with desc
+  const handleSort = (col: "date" | "views") => {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortBy(col);
+      setSortDir("desc");
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ col }: { col: "date" | "views" }) => {
+    if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
+    return sortDir === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />;
+  };
 
   // Client-side multi-filter when multiple values selected
   const filteredItems = data?.items.filter((c) => {
@@ -428,6 +448,26 @@ export default function Cases() {
                   {isLoading ? "加载中…" : `共 ${data?.total ?? 0} 条结果`}
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                {/* Sort selector for grid view */}
+                {viewMode === "grid" && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <ArrowUpDown className="w-3 h-3" />
+                    <button
+                      className={cn("px-1.5 py-0.5 rounded hover:bg-muted transition-colors", sortBy === "date" && "text-foreground font-medium")}
+                      onClick={() => handleSort("date")}
+                    >
+                      日期{sortBy === "date" && (sortDir === "desc" ? "↓" : "↑")}
+                    </button>
+                    <span className="opacity-30">|</span>
+                    <button
+                      className={cn("px-1.5 py-0.5 rounded hover:bg-muted transition-colors", sortBy === "views" && "text-foreground font-medium")}
+                      onClick={() => handleSort("views")}
+                    >
+                      热度{sortBy === "views" && (sortDir === "desc" ? "↓" : "↑")}
+                    </button>
+                  </div>
+                )}
               {/* View toggle */}
               <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
                 <button
@@ -531,8 +571,29 @@ export default function Cases() {
                 })}
               </div>
             ) : (
-              /* List view */
               <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
+                {/* Sort header */}
+                <div className="px-4 py-2 bg-muted/30 flex items-center gap-2 text-xs text-muted-foreground select-none">
+                  <span className="flex-1">标题 / 摘要</span>
+                  <button
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted transition-colors",
+                      sortBy === "date" && "text-foreground font-medium"
+                    )}
+                    onClick={() => handleSort("date")}
+                  >
+                    日期 <SortIcon col="date" />
+                  </button>
+                  <button
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted transition-colors",
+                      sortBy === "views" && "text-foreground font-medium"
+                    )}
+                    onClick={() => handleSort("views")}
+                  >
+                    浏览量 <SortIcon col="views" />
+                  </button>
+                </div>
                 {filteredItems.map((c) => {
                   const topic = topics?.find((t) => t.id === c.topicId);
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
@@ -607,5 +668,6 @@ export default function Cases() {
         </div>
       </div>
     </div>
+  </div>
   );
 }

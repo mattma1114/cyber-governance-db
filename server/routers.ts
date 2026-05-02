@@ -134,11 +134,13 @@ export const appRouter = router({
         jurisdictionId: z.string().optional(),
         keyword: z.string().optional(),
         status: z.string().optional(),
+        sortBy: z.enum(["date", "views"]).default("date"),
+        sortDir: z.enum(["asc", "desc"]).default("desc"),
       }))
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return { items: [], total: 0, page: 1, pageSize: 12 };
-        const { page, pageSize, type, topicId, jurisdictionId, keyword, status } = input;
+        const { page, pageSize, type, topicId, jurisdictionId, keyword, status, sortBy, sortDir } = input;
         const offset = (page - 1) * pageSize;
 
         const conditions = [];
@@ -158,8 +160,10 @@ export const appRouter = router({
         }
 
         const where = conditions.length > 0 ? and(...conditions) : undefined;
+        const sortCol = sortBy === "views" ? cases.views : cases.createdAt;
+        const orderFn = sortDir === "asc" ? asc : desc;
         const [items, countResult] = await Promise.all([
-          db.select().from(cases).where(where).orderBy(desc(cases.createdAt)).limit(pageSize).offset(offset),
+          db.select().from(cases).where(where).orderBy(orderFn(sortCol)).limit(pageSize).offset(offset),
           db.select({ count: sql<number>`count(*)` }).from(cases).where(where),
         ]);
 
