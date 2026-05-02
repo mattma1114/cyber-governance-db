@@ -118,8 +118,32 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Coverage */}
+      {/* Recent Cases */}
       <section className="container pb-10">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold">最新收录</h2>
+          <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground">
+            <Link href="/cases">
+              查看全部
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </Button>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {recentCases?.items ? (
+            recentCases.items.map((c) => (
+              <CaseCard key={c.id} c={c} topics={topics} jurisdictions={jurisdictions} />
+            ))
+          ) : (
+            Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-48 rounded-xl" />
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* Coverage */}
+      <section className="container pb-16">
         <div className="grid md:grid-cols-2 gap-6">
           {/* Jurisdictions */}
           <div className="rounded-xl border border-border bg-card p-6">
@@ -176,30 +200,6 @@ export default function Home() {
               })}
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Recent Cases */}
-      <section className="container pb-16">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">最新收录</h2>
-          <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground">
-            <Link href="/cases">
-              查看全部
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </Button>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recentCases?.items ? (
-            recentCases.items.map((c) => (
-              <CaseCard key={c.id} c={c} topics={topics} jurisdictions={jurisdictions} />
-            ))
-          ) : (
-            Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 rounded-xl" />
-            ))
-          )}
         </div>
       </section>
 
