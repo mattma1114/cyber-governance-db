@@ -79,7 +79,7 @@ export default function Home() {
                 <Globe className="w-3 h-3" />
                 浙江传媒学院
               </Badge>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs" style={{fontWeight: '400', textAlign: 'left'}}>
                 全球平台治理研究
               </Badge>
             </div>
