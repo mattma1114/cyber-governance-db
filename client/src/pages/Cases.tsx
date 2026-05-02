@@ -110,20 +110,18 @@ export default function Cases() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <div className="border-b border-border bg-muted/30">
-        <div className="container py-8">
-          <h1 className="text-2xl font-bold mb-1">案例数据库</h1>
-          <p className="text-muted-foreground text-sm">
-            收录全球互联网平台治理领域司法案例、监管执法与立法政策
-          </p>
-        </div>
-      </div>
-
       <div className="container py-6">
         <div className="flex gap-6">
           {/* ── Left sidebar filters ── */}
           <aside className="hidden md:flex flex-col gap-5 w-52 shrink-0">
+            {/* Page title */}
+            <div className="pb-1">
+              <h1 className="text-xl font-bold mb-0.5">案例数据库</h1>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                司法案例、监管执法与立法政策
+              </p>
+            </div>
+            <Separator />
             {/* Search */}
             <div>
               <div className="relative">
