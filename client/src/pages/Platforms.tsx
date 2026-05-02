@@ -112,10 +112,10 @@ export default function Platforms() {
       </div>
 
       <div className="container py-6">
-        <div className="flex gap-6">
+        <div className="flex gap-6 items-start">
           {/* ── Left: Sidebar Filters ── */}
           <aside className={cn(
-            "shrink-0 flex flex-col gap-4 transition-all duration-200",
+            "shrink-0 flex flex-col gap-4 transition-all duration-200 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto",
             sidebarOpen ? "w-56" : "w-8"
           )}>
             {/* Collapse toggle */}

@@ -114,10 +114,10 @@ export default function Cases() {
   return (
     <div className="min-h-screen">
       <div className="container py-6">
-        <div className="flex gap-6">
+        <div className="flex gap-6 items-start">
           {/* ── Left sidebar filters ── */}
           <aside className={cn(
-            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200",
+            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto",
             sidebarOpen ? "w-52" : "w-8"
           )}>            {/* Collapse toggle button */}
             <button
