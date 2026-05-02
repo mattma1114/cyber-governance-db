@@ -73,41 +73,40 @@ export default function Home() {
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-background border-b border-border">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--brand-subtle),transparent_60%)]" />
         <div className="container relative py-16 md:py-24">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-12">
-            {/* Left: Title + Description */}
-            <div className="flex-1 max-w-xl">
-              <div className="flex items-center gap-2 mb-4">
-                <Badge variant="outline" className="text-xs">
-                  全球平台治理研究
-                </Badge>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight mb-4">
-                互联网平台
-                <span className="text-primary block">治理数据库</span>
-              </h1>
-              <p className="text-base text-muted-foreground leading-relaxed max-w-lg">
-                系统收录全球互联网平台治理领域的司法案例、监管执法与立法政策，
-                覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
-                反垂断与内容治理四大专题。
-              </p>
+          {/* Title + Description */}
+          <div className="max-w-2xl mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant="outline" className="text-xs">
+                全球平台治理研究
+              </Badge>
             </div>
-            {/* Right: Stats */}
-            <div className="flex-shrink-0 w-full md:w-auto">
-              <div className="grid grid-cols-2 gap-x-10 gap-y-2 md:grid-cols-2">
-                {stats ? (
-                  <>
-                    <StatCard label="收录案例总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
-                    <StatCard label="司法案例" value={stats.judicial} icon={<Gavel className="w-3.5 h-3.5" />} />
-                    <StatCard label="监管执法" value={stats.regulatory} icon={<Scale className="w-3.5 h-3.5" />} />
-                    <StatCard label="立法政策" value={stats.legislation} icon={<FileText className="w-3.5 h-3.5" />} />
-                  </>
-                ) : (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 rounded-lg" />
-                  ))
-                )}
-              </div>
-            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight mb-4">
+              互联网平台
+              <span className="text-primary block">治理数据库</span>
+            </h1>
+            <p className="text-base text-muted-foreground leading-relaxed">
+              系统收录全球互联网平台治理领域的司法案例、监管执法与立法政策，
+              覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
+              反垂断与内容治理四大专题。
+            </p>
+          </div>
+          {/* Stats: horizontal, evenly distributed */}
+          <div className="flex flex-row items-start justify-between gap-4 border-t border-border pt-6 mb-2">
+            {stats ? (
+              <>
+                <StatCard label="收录案例总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
+                <div className="w-px self-stretch bg-border" />
+                <StatCard label="司法案例" value={stats.judicial} icon={<Gavel className="w-3.5 h-3.5" />} />
+                <div className="w-px self-stretch bg-border" />
+                <StatCard label="监管执法" value={stats.regulatory} icon={<Scale className="w-3.5 h-3.5" />} />
+                <div className="w-px self-stretch bg-border" />
+                <StatCard label="立法政策" value={stats.legislation} icon={<FileText className="w-3.5 h-3.5" />} />
+              </>
+            ) : (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 flex-1 rounded-lg" />
+              ))
+            )}
           </div>
           {/* Scroll hint */}
           <div className="flex justify-center mt-10 pb-2">
