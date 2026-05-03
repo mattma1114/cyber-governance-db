@@ -73,43 +73,69 @@ export default function Home() {
       <section className="relative overflow-hidden bg-white border-b border-border min-h-[calc(100vh-3.5rem)] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--brand-subtle),transparent_60%)]" />
         <div className="container relative py-12 md:py-16 flex-1 flex flex-col justify-center">
-          {/* Title + Description */}
-          <div className="max-w-2xl mb-10">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="outline" className="text-xs">
-                全球平台治理研究
-              </Badge>
+          {/* Two-column hero: left=text, right=stats */}
+          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16">
+            {/* Left: title + description */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-4">
+                <Badge variant="outline" className="text-xs">
+                  全球平台治理研究
+                </Badge>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight mb-4">
+                互联网平台
+                <span className="text-primary block">治理数据库</span>
+              </h1>
+              <p className="text-base text-muted-foreground leading-relaxed">
+                系统收录全球互联网平台治理领域的司法案例、监管执法与立法政策，
+                覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
+                反垄断与内容治理四大专题。
+              </p>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight mb-4">
-              互联网平台
-              <span className="text-primary block">治理数据库</span>
-            </h1>
-            <p className="text-base text-muted-foreground leading-relaxed">
-              系统收录全球互联网平台治理领域的司法案例、监管执法与立法政策，
-              覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
-              反垂断与内容治理四大专题。
-            </p>
-          </div>
-          {/* Stats: horizontal, evenly distributed */}
-          <div className="flex flex-row items-start justify-between gap-4 border-t border-border pt-6 mb-2">
-            {stats ? (
-              <>
-                <StatCard label="收录案例总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
-                <div className="w-px self-stretch bg-border" />
-                <StatCard label="司法案例" value={stats.judicial} icon={<Gavel className="w-3.5 h-3.5" />} />
-                <div className="w-px self-stretch bg-border" />
-                <StatCard label="监管执法" value={stats.regulatory} icon={<Scale className="w-3.5 h-3.5" />} />
-                <div className="w-px self-stretch bg-border" />
-                <StatCard label="立法政策" value={stats.legislation} icon={<FileText className="w-3.5 h-3.5" />} />
-              </>
-            ) : (
-              Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 flex-1 rounded-lg" />
-              ))
-            )}
+            {/* Right: stats grid */}
+            <div className="w-full md:w-auto md:min-w-[340px] shrink-0">
+              {stats ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2 flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-5 py-4">
+                    <BookOpen className="w-5 h-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">收录案例总数</p>
+                      <p className="text-3xl font-bold text-foreground tabular-nums">{stats.total}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-4">
+                    <Gavel className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">司法案例</p>
+                      <p className="text-2xl font-bold text-foreground tabular-nums">{stats.judicial}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-4">
+                    <Scale className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">监管执法</p>
+                      <p className="text-2xl font-bold text-foreground tabular-nums">{stats.regulatory}</p>
+                    </div>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-4">
+                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">立法政策</p>
+                      <p className="text-2xl font-bold text-foreground tabular-nums">{stats.legislation}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className={`h-20 rounded-xl ${i === 0 || i === 3 ? 'col-span-2' : ''}`} />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           {/* Scroll hint */}
-          <div className="flex justify-center mt-8 pb-0">
+          <div className="flex justify-center mt-12 pb-0">
             <div className="flex flex-col items-center gap-1 text-muted-foreground/50 select-none" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite' }}>
               <span className="text-[11px] tracking-wide">向下滑动</span>
               <ChevronDown className="w-5 h-5" style={{ animation: 'scrollHintBounce 2s ease-in-out infinite 0.15s' }} />
