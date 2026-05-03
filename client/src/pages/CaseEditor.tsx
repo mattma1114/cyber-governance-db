@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -13,18 +12,68 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   ArrowLeft, Sparkles, Loader2, Link2, CheckCircle2, AlertCircle,
-  FileText, Tag, Globe, Calendar, BookOpen, Lightbulb, Brain,
-  Save, Eye, EyeOff, X, Plus, ShieldCheck, LogIn, AlertTriangle
+  FileText, Tag, Globe, Calendar, BookOpen, Lightbulb,
+  Save, Eye, X, Plus, ShieldCheck, AlertTriangle, ScrollText
 } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Underline Input ────────────────────────────────────────────────────────────
+// All text inputs use bottom-border-only style (no box)
+function UInput({
+  value, onChange, placeholder, disabled, className, type, onKeyDown,
+}: {
+  value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string; disabled?: boolean; className?: string;
+  type?: string; onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <input
+      type={type ?? "text"}
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={cn(
+        "w-full bg-transparent border-0 border-b border-border/60 rounded-none px-0 py-2",
+        "text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary",
+        "transition-colors disabled:opacity-50",
+        className
+      )}
+    />
+  );
+}
+
+// ── Underline Textarea ─────────────────────────────────────────────────────────
+function UTextarea({
+  value, onChange, placeholder, rows, className,
+}: {
+  value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string; rows?: number; className?: string;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={rows ?? 4}
+      className={cn(
+        "w-full bg-transparent border-0 border-b border-border/60 rounded-none px-0 py-2",
+        "text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary",
+        "transition-colors resize-none",
+        className
+      )}
+    />
+  );
+}
+
+// ── Section ────────────────────────────────────────────────────────────────────
 function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 border-b border-border/40 pb-2">
         <span className="text-primary">{icon}</span>
         <h3 className="font-semibold text-sm text-foreground/80 uppercase tracking-wide">{title}</h3>
       </div>
@@ -35,20 +84,20 @@ function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: 
 
 function FieldRow({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-sm font-medium">
+    <div className="space-y-0.5">
+      <Label className="text-xs font-medium text-muted-foreground">
         {label}
         {required && <span className="text-destructive ml-1">*</span>}
       </Label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground/70 pt-0.5">{hint}</p>}
     </div>
   );
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 interface CaseEditorProps {
-  editId?: number; // if provided, load existing case for editing
+  editId?: number;
 }
 
 export default function CaseEditor({ editId }: CaseEditorProps) {
@@ -81,7 +130,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
     sourceUrl: "",
     abstract: "",
     aiSummary: "",
-    aiAnalysis: "",
+    fullText: "",        // 原文全文
     tags: [] as string[],
     language: "zh",
     status: "draft" as "published" | "draft",
@@ -102,7 +151,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
         sourceUrl: existingCase.sourceUrl ?? "",
         abstract: existingCase.abstract ?? "",
         aiSummary: existingCase.aiSummary ?? "",
-        aiAnalysis: existingCase.aiAnalysis ?? "",
+        fullText: (existingCase as any).fullText ?? "",
         tags: Array.isArray(existingCase.tags) ? existingCase.tags : [],
         language: existingCase.language ?? "zh",
         status: existingCase.status ?? "draft",
@@ -111,35 +160,22 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
   }, [existingCase]);
 
   // ── AI writing state ─────────────────────────────────────────────────────
-  const [aiWriting, setAiWriting] = useState<{ summary: boolean; analysis: boolean }>({ summary: false, analysis: false });
+  const [aiWriting, setAiWriting] = useState(false);
 
-  // Check if Firecrawl is configured
-  const { data: firecrawlSetting } = trpc.settings.list.useQuery();
-  const hasFirecrawl = firecrawlSetting?.some((s: any) => s.key === "firecrawl_api_key" && s.hasValue) ?? false;
-  const hasAiWriting = firecrawlSetting?.some((s: any) => s.key === "openai_api_key" && s.hasValue) ?? false;
+  // Check if services are configured
+  const { data: settingsList } = trpc.settings.list.useQuery();
+  const hasFirecrawl = settingsList?.some((s: any) => s.key === "firecrawl_api_key" && s.hasValue) ?? false;
+  const hasAiWriting = settingsList?.some((s: any) => s.key === "openai_api_key" && s.hasValue) ?? false;
 
   // AI generate summary
   const generateSummary = trpc.ai.generateContent.useMutation({
     onSuccess: (res: { content: string }) => {
       setF("aiSummary", res.content);
-      setAiWriting((p) => ({ ...p, summary: false }));
+      setAiWriting(false);
       toast.success("内容解读已生成，请检查并修改");
     },
     onError: (e: any) => {
-      setAiWriting((p) => ({ ...p, summary: false }));
-      toast.error(`AI 生成失败：${e.message}`);
-    },
-  });
-
-  // AI generate analysis
-  const generateAnalysis = trpc.ai.generateContent.useMutation({
-    onSuccess: (res: { content: string }) => {
-      setF("aiAnalysis", res.content);
-      setAiWriting((p) => ({ ...p, analysis: false }));
-      toast.success("法律分析已生成，请检查并修改");
-    },
-    onError: (e: any) => {
-      setAiWriting((p) => ({ ...p, analysis: false }));
+      setAiWriting(false);
       toast.error(`AI 生成失败：${e.message}`);
     },
   });
@@ -158,7 +194,6 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
         sourceUrl: d.sourceUrl || prev.sourceUrl,
         abstract: d.abstract || prev.abstract,
         aiSummary: d.aiSummary || prev.aiSummary,
-        aiAnalysis: d.aiAnalysis || prev.aiAnalysis,
         tags: d.tags?.length ? d.tags : prev.tags,
         language: d.language || prev.language,
         topicId: d.topicId || prev.topicId,
@@ -205,9 +240,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
 
   const addTag = () => {
     const t = tagInput.trim();
-    if (t && !form.tags.includes(t)) {
-      setF("tags", [...form.tags, t]);
-    }
+    if (t && !form.tags.includes(t)) setF("tags", [...form.tags, t]);
     setTagInput("");
   };
 
@@ -273,29 +306,6 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
               <p className="text-xs text-muted-foreground">互联网平台治理数据库 · 管理后台</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={form.status === "published" ? "default" : "secondary"} className="text-xs">
-              {form.status === "published" ? "已发布" : "草稿"}
-            </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSave(false)}
-              disabled={isSaving}
-            >
-              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
-              保存草稿
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => handleSave(true)}
-              disabled={isSaving}
-              className="gap-1.5"
-            >
-              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
-              保存并发布
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -309,7 +319,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
         )}>
           <div className="flex items-start gap-3 mb-4">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Sparkles className="w-4.5 h-4.5 text-primary" />
+              <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
               <h2 className="font-semibold text-sm">AI 自动填充</h2>
@@ -319,8 +329,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
             </div>
             {aiMode === "done" && (
               <div className="ml-auto flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
-                已填充
+                <CheckCircle2 className="w-4 h-4" />已填充
               </div>
             )}
           </div>
@@ -328,19 +337,19 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
           {!hasFirecrawl && (
             <div className="mb-3 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>Firecrawl API Key 未配置，无法使用 URL 自动填充功能。请前往管理员后台 → API 配置进行配置。</span>
+              <span>Firecrawl API Key 未配置，无法使用 URL 自动填充。请前往管理员后台 → API 配置进行配置。</span>
             </div>
           )}
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
+              <UInput
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && hasFirecrawl && handleAiExtract()}
                 placeholder="https://example.com/case-article"
-                className="pl-9"
                 disabled={aiMode === "loading" || !hasFirecrawl}
+                className="pl-8"
               />
             </div>
             <Button
@@ -372,28 +381,27 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
         {/* ── Form ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Main content */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-10">
 
             {/* Basic Info */}
             <SectionCard icon={<FileText className="w-4 h-4" />} title="基本信息">
               <FieldRow label="案例标题（中文）" required>
-                <Input
+                <UInput
                   value={form.title}
                   onChange={(e) => setF("title", e.target.value)}
                   placeholder="如：欧盟委员会对 Meta 数据跨境传输案"
-                  className={cn(!form.title && "border-destructive/40")}
                 />
               </FieldRow>
               <FieldRow label="案例标题（英文）" hint="如有英文原名请填写">
-                <Input
+                <UInput
                   value={form.titleEn}
                   onChange={(e) => setF("titleEn", e.target.value)}
                   placeholder="e.g. EU Commission v. Meta Data Transfer Case"
                 />
               </FieldRow>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <FieldRow label="日期" required>
-                  <Input
+                  <UInput
                     value={form.date}
                     onChange={(e) => setF("date", e.target.value)}
                     placeholder="YYYY-MM-DD"
@@ -401,7 +409,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
                 </FieldRow>
                 <FieldRow label="原文语言">
                   <Select value={form.language} onValueChange={(v) => setF("language", v)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="border-0 border-b border-border/60 rounded-none px-0 h-9 focus:ring-0 shadow-none bg-transparent">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -415,16 +423,16 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
                   </Select>
                 </FieldRow>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <FieldRow label="来源机构">
-                  <Input
+                  <UInput
                     value={form.source}
                     onChange={(e) => setF("source", e.target.value)}
                     placeholder="如：欧盟委员会"
                   />
                 </FieldRow>
                 <FieldRow label="来源 URL">
-                  <Input
+                  <UInput
                     value={form.sourceUrl}
                     onChange={(e) => setF("sourceUrl", e.target.value)}
                     placeholder="https://..."
@@ -436,7 +444,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
             {/* Abstract */}
             <SectionCard icon={<BookOpen className="w-4 h-4" />} title="案例摘要">
               <FieldRow label="摘要" hint="200-500字，概述案例背景、主要事实和结果">
-                <Textarea
+                <UTextarea
                   value={form.abstract}
                   onChange={(e) => setF("abstract", e.target.value)}
                   rows={5}
@@ -445,75 +453,57 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
               </FieldRow>
             </SectionCard>
 
-            {/* AI Summary */}
+            {/* Content Summary */}
             <SectionCard icon={<Lightbulb className="w-4 h-4" />} title="内容解读">
               <FieldRow label="内容解读" hint="300-800字，详细描述监管动态、处罚内容、事件经过">
-                <div className="space-y-2">
-                  <Textarea
-                    value={form.aiSummary}
-                    onChange={(e) => setF("aiSummary", e.target.value)}
-                    rows={8}
-                    placeholder="详细描述案例的主要事实、监管机构的调查过程、处罚决定及金额、平台的回应措施等…"
-                  />
+                <UTextarea
+                  value={form.aiSummary}
+                  onChange={(e) => setF("aiSummary", e.target.value)}
+                  rows={8}
+                  placeholder="详细描述案例的主要事实、监管机构的调查过程、处罚决定及金额、平台的回应措施等…"
+                />
+                <div className="pt-2">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="gap-1.5 text-xs"
-                    disabled={aiWriting.summary || !form.abstract || !hasAiWriting}
+                    className="gap-1.5 text-xs h-7 px-2 text-primary hover:text-primary"
+                    disabled={aiWriting || !form.abstract || !hasAiWriting}
                     onClick={() => {
                       if (!hasAiWriting) { toast.error("请先在管理员后台配置 AI 写作 API Key"); return; }
-                      setAiWriting((p) => ({ ...p, summary: true }));
+                      setAiWriting(true);
                       generateSummary.mutate({ type: "summary", title: form.title, abstract: form.abstract, type_: form.type });
                     }}
                   >
-                    {aiWriting.summary ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    {aiWriting.summary ? "AI 生成中…" : "AI 辅助写作"}
+                    {aiWriting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {aiWriting ? "AI 生成中…" : "AI 辅助写作"}
                     {!hasAiWriting && <span className="text-amber-500 ml-1">(需配置)</span>}
                   </Button>
                 </div>
               </FieldRow>
             </SectionCard>
 
-            {/* AI Analysis */}
-            <SectionCard icon={<Brain className="w-4 h-4" />} title="法律分析">
-              <FieldRow label="法律分析" hint="300-800字，分析法律依据、合规启示、行业影响">
-                <div className="space-y-2">
-                  <Textarea
-                    value={form.aiAnalysis}
-                    onChange={(e) => setF("aiAnalysis", e.target.value)}
-                    rows={8}
-                    placeholder="分析本案适用的法律法规、监管机构的法律依据、对平台合规的启示意义、对行业的影响…"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs"
-                    disabled={aiWriting.analysis || (!form.abstract && !form.aiSummary) || !hasAiWriting}
-                    onClick={() => {
-                      if (!hasAiWriting) { toast.error("请先在管理员后台配置 AI 写作 API Key"); return; }
-                      setAiWriting((p) => ({ ...p, analysis: true }));
-                      generateAnalysis.mutate({ type: "analysis", title: form.title, abstract: form.abstract, aiSummary: form.aiSummary, type_: form.type });
-                    }}
-                  >
-                    {aiWriting.analysis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
-                    {aiWriting.analysis ? "AI 生成中…" : "AI 辅助分析"}
-                    {!hasAiWriting && <span className="text-amber-500 ml-1">(需配置)</span>}
-                  </Button>
-                </div>
+            {/* Full Text */}
+            <SectionCard icon={<ScrollText className="w-4 h-4" />} title="原文全文">
+              <FieldRow label="原文全文" hint="粘贴案例原始文件全文（可选）">
+                <UTextarea
+                  value={form.fullText}
+                  onChange={(e) => setF("fullText", e.target.value)}
+                  rows={12}
+                  placeholder="粘贴原文全文内容…"
+                />
               </FieldRow>
             </SectionCard>
           </div>
 
           {/* Right: Metadata */}
-          <div className="space-y-6">
+          <div className="space-y-8">
 
             {/* Classification */}
             <SectionCard icon={<Tag className="w-4 h-4" />} title="分类信息">
               <FieldRow label="案例类型" required>
                 <Select value={form.type} onValueChange={(v) => setF("type", v)}>
-                  <SelectTrigger className={cn(!form.type && "border-destructive/40")}>
+                  <SelectTrigger className="border-0 border-b border-border/60 rounded-none px-0 h-9 focus:ring-0 shadow-none bg-transparent">
                     <SelectValue placeholder="选择类型" />
                   </SelectTrigger>
                   <SelectContent>
@@ -526,7 +516,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
 
               <FieldRow label="所属专题" required>
                 <Select value={form.topicId} onValueChange={(v) => setF("topicId", v)}>
-                  <SelectTrigger className={cn(!form.topicId && "border-destructive/40")}>
+                  <SelectTrigger className="border-0 border-b border-border/60 rounded-none px-0 h-9 focus:ring-0 shadow-none bg-transparent">
                     <SelectValue placeholder="选择专题" />
                   </SelectTrigger>
                   <SelectContent>
@@ -539,7 +529,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
 
               <FieldRow label="司法辖区" required>
                 <Select value={form.jurisdictionId} onValueChange={(v) => setF("jurisdictionId", v)}>
-                  <SelectTrigger className={cn(!form.jurisdictionId && "border-destructive/40")}>
+                  <SelectTrigger className="border-0 border-b border-border/60 rounded-none px-0 h-9 focus:ring-0 shadow-none bg-transparent">
                     <SelectValue placeholder="选择辖区" />
                   </SelectTrigger>
                   <SelectContent>
@@ -566,15 +556,16 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
                   </Badge>
                 ))}
               </div>
-              <div className="flex gap-2">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
-                  placeholder="输入标签后按 Enter"
-                  className="text-sm"
-                />
-                <Button variant="outline" size="icon" onClick={addTag} className="shrink-0">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <UInput
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                    placeholder="输入标签后按 Enter"
+                  />
+                </div>
+                <Button variant="ghost" size="icon" onClick={addTag} className="shrink-0 h-8 w-8">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -582,7 +573,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
 
             {/* Publish status */}
             <SectionCard icon={<Eye className="w-4 h-4" />} title="发布状态">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between py-1">
                 <div>
                   <p className="text-sm font-medium">{form.status === "published" ? "已发布" : "草稿"}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -596,7 +587,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
               </div>
             </SectionCard>
 
-            {/* Save buttons (bottom) */}
+            {/* Save buttons */}
             <div className="space-y-2 pt-2">
               <Button
                 className="w-full gap-2"
@@ -615,11 +606,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
                 <Save className="w-4 h-4" />
                 仅保存草稿
               </Button>
-              <Button
-                variant="ghost"
-                className="w-full"
-                asChild
-              >
+              <Button variant="ghost" className="w-full" asChild>
                 <Link href="/admin">取消，返回后台</Link>
               </Button>
             </div>

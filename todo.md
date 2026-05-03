@@ -65,3 +65,10 @@
 - [x] CaseEditor.tsx 集成 AI 总结辅助（基于摘要生成内容解读）
 - [x] CaseEditor.tsx 集成 AI 写作辅助（基于内容解读生成法律分析）
 - [x] Firecrawl URL 自动填充：已配置时可用，未配置时显示「待配置」提示
+
+## CaseEditor 字段调整（当前迭代）
+- [x] CaseEditor.tsx：删除顶部栏「草稿」状态徽章 + 「保存草稿」 + 「保存并发布」按鈕区域
+- [x] CaseEditor.tsx：删除「法律分析」字段及相关 AI 辅助按鈕
+- [x] CaseEditor.tsx：新增「原文全文」字段（大文本输入）
+- [x] CaseEditor.tsx：所有输入框改为上下横线风格（去除方框）
+- [x] Admin.tsx CaseForm：删除「深度分析」字段，新增「原文全文」字段

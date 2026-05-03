@@ -64,6 +64,7 @@ export const cases = mysqlTable("cases", {
   abstract: text("abstract"),
   aiSummary: text("aiSummary"),
   aiAnalysis: text("aiAnalysis"),
+  fullText: text("fullText"),
   tags: json("tags").$type<string[]>().default([]),
   language: varchar("language", { length: 8 }).default("zh"),
   status: mysqlEnum("status", ["published", "draft"]).default("draft").notNull(),

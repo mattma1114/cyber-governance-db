@@ -52,7 +52,7 @@ function CaseForm({
     sourceUrl: initial?.sourceUrl ?? "",
     abstract: initial?.abstract ?? "",
     aiSummary: initial?.aiSummary ?? "",
-    aiAnalysis: initial?.aiAnalysis ?? "",
+    fullText: (initial as any)?.fullText ?? "",
     tags: Array.isArray(initial?.tags)
       ? initial.tags.join(", ")
       : (initial?.tags ? JSON.parse(initial.tags).join(", ") : ""),
@@ -134,8 +134,8 @@ function CaseForm({
           <Textarea value={form.aiSummary} onChange={(e) => set("aiSummary", e.target.value)} rows={3} placeholder="AI 摘要解读" />
         </div>
         <div className="col-span-2 space-y-1.5">
-          <Label>深度分析</Label>
-          <Textarea value={form.aiAnalysis} onChange={(e) => set("aiAnalysis", e.target.value)} rows={3} placeholder="法律深度分析" />
+          <Label>原文全文</Label>
+          <Textarea value={form.fullText} onChange={(e) => set("fullText", e.target.value)} rows={4} placeholder="粘贴案例原始文件全文（可选）" />
         </div>
         <div className="col-span-2 space-y-1.5">
           <Label>标签（逗号分隔）</Label>
