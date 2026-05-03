@@ -401,7 +401,7 @@ export default function Platforms() {
                     .filter(Boolean);
                   return (
                     <Link key={p.id} href={`/platforms/${p.id}`}>
-                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/30 last:border-0">
+                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/15 last:border-0">
                         {/* Color dot + avatar */}
                         <div
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"

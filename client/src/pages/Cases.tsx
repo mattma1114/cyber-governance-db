@@ -586,7 +586,7 @@ export default function Cases() {
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
                   return (
                     <Link key={c.id} href={`/cases/${c.id}`}>
-                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/30 last:border-0">
+                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/15 last:border-0">
                         <div className="flex items-start gap-3">
                           <div className="flex flex-col gap-1 flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
