@@ -765,13 +765,46 @@ export default function PlatformEditor() {
                                       </div>
                                     </div>
                                     <div>
-                                      <Label className="text-xs text-muted-foreground mb-1 block">规则全文</Label>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <Label className="text-xs text-muted-foreground">规则全文</Label>
+                                        {ver.url && (
+                                          <button
+                                            type="button"
+                                            disabled={extractFromUrlMutation.isPending}
+                                            onClick={async () => {
+                                              if (!ver.url) return;
+                                              try {
+                                                const res = await extractFromUrlMutation.mutateAsync({ url: ver.url });
+                                                const extracted = res?.rawContent || "";
+                                                if (extracted) {
+                                                  setRules((p) => p.map((r, j) => j !== i ? r : {
+                                                    ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, content: extracted } : v),
+                                                  }));
+                                                  toast.success('规则全文已自动填充');
+                                                } else {
+                                                  toast.error('抓取结果为空，请手动粘贴规则内容');
+                                                }
+                                              } catch {
+                                                toast.error('抓取失败，请先在 API 配置中设置 Firecrawl Key');
+                                              }
+                                            }}
+                                            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                                          >
+                                            {extractFromUrlMutation.isPending ? (
+                                              <Loader2 className="w-3 h-3 animate-spin" />
+                                            ) : (
+                                              <Sparkles className="w-3 h-3" />
+                                            )}
+                                            Firecrawl 抓取全文
+                                          </button>
+                                        )}
+                                      </div>
                                       <UTextarea
                                         value={ver.content}
                                         onChange={(e) => setRules((p) => p.map((r, j) => j !== i ? r : {
                                           ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, content: e.target.value } : v),
                                         }))}
-                                        placeholder="粘贴规则原文内容（可选）"
+                                        placeholder="粘贴规则原文内容，或输入原文链接后点击「Firecrawl 抓取全文」自动获取"
                                         rows={4}
                                       />
                                     </div>
