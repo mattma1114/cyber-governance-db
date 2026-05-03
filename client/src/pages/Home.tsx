@@ -25,7 +25,7 @@ function CaseCard({ c, topics, jurisdictions }: { c: any; topics: any[]; jurisdi
   const juris = jurisdictions.find((j) => j.id === c.jurisdictionId);
   return (
     <Link href={`/cases/${c.id}`}>
-      <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
+      <Card className="h-full shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
         <CardContent className="p-5 flex flex-col gap-3 h-full">
           <div className="flex items-start justify-between gap-2">
             <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>

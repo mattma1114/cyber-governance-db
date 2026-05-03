@@ -329,7 +329,7 @@ export default function Platforms() {
                     .filter(Boolean);
                   return (
                     <Link key={p.id} href={`/platforms/${p.id}`}>
-                      <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group overflow-hidden">
+                      <Card className="h-full shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group overflow-hidden">
                         <div
                           className="h-1.5 w-full"
                           style={{ background: p.color ?? "var(--primary)" }}
@@ -394,14 +394,14 @@ export default function Platforms() {
               </div>
             ) : (
               /* List View */
-              <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
+              <div className="flex flex-col rounded-lg overflow-hidden">
                 {filtered.map((p) => {
                   const jurisLabels = p.jurisArr
                     .map((id) => jurisdictions?.find((j) => j.id === id))
                     .filter(Boolean);
                   return (
                     <Link key={p.id} href={`/platforms/${p.id}`}>
-                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group">
+                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/30 last:border-0">
                         {/* Color dot + avatar */}
                         <div
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
