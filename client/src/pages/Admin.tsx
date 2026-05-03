@@ -935,7 +935,7 @@ export default function Admin() {
           <TabsContent value="platforms">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-muted-foreground">共 {platforms?.length ?? 0} 个平台</p>
-              <Button size="sm" className="gap-1.5" onClick={() => setPlatformDialog({ open: true })}>
+              <Button size="sm" className="gap-1.5" onClick={() => navigate("/admin/platforms/new")}>
                 <Plus className="w-4 h-4" />
                 新增平台
               </Button>
@@ -992,7 +992,7 @@ export default function Admin() {
                               variant="ghost"
                               size="icon"
                               className="w-7 h-7"
-                              onClick={() => setPlatformDialog({ open: true, editing: p })}
+                              onClick={() => navigate(`/admin/platforms/${p.id}/edit`)}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>

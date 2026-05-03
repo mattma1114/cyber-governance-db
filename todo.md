@@ -72,3 +72,11 @@
 - [x] CaseEditor.tsx：新增「原文全文」字段（大文本输入）
 - [x] CaseEditor.tsx：所有输入框改为上下横线风格（去除方框）
 - [x] Admin.tsx CaseForm：删除「深度分析」字段，新增「原文全文」字段
+
+## 平台录入全屏页面（当前迭代）
+- [ ] 创建全屏平台录入/编辑页面 PlatformEditor.tsx（与 CaseEditor 相同设计风格）
+- [ ] PlatformEditor.tsx：AI URL 自动填充模式（Firecrawl + LLM 解析平台信息）
+- [ ] PlatformEditor.tsx：手工输入模式（所有字段横线风格，分区布局）
+- [ ] tRPC procedure: ai.extractPlatformFromUrl（adminProcedure）
+- [ ] Admin.tsx：新增/编辑平台按钮指向全屏页面 /admin/platforms/new 和 /admin/platforms/:id/edit
+- [ ] App.tsx：注册 PlatformEditor 路由

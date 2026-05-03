@@ -15,6 +15,7 @@ import PlatformDetail from "./pages/PlatformDetail";
 import About from "./pages/About";
 import Admin from "./pages/Admin";
 import CaseEditor from "./pages/CaseEditor";
+import PlatformEditor from "./pages/PlatformEditor";
 import Legal from "./pages/Legal";
 
 function Router() {
@@ -38,6 +39,16 @@ function Router() {
             <CaseEditor editId={parseInt(params.id)} />
           </ProtectedRoute>
         )}
+      </Route>
+      <Route path="/admin/platforms/new">
+        <ProtectedRoute requireAdmin>
+          <PlatformEditor />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/platforms/:id/edit">
+        <ProtectedRoute requireAdmin>
+          <PlatformEditor />
+        </ProtectedRoute>
       </Route>
       <Route path="/admin">
         <ProtectedRoute requireAdmin>

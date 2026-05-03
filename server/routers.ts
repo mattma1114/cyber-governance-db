@@ -560,6 +560,68 @@ ${pageContent.slice(0, 8000)}
               .join("");
         return { content };
       }),
+
+    extractPlatformFromUrl: adminProcedure
+      .input(z.object({ url: z.string().url() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        const [firecrawlRow] = await db!.select().from(apiSettings).where(eq(apiSettings.key, "firecrawl_api_key"));
+        const firecrawlKey = firecrawlRow?.value || process.env.FIRECRAWL_API_KEY;
+        if (!firecrawlKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "未配置 Firecrawl API Key" });
+
+        let pageContent = "";
+        try {
+          const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${firecrawlKey}` },
+            body: JSON.stringify({ url: input.url, formats: ["markdown"], onlyMainContent: true }),
+          });
+          const fcData = await fcRes.json() as any;
+          pageContent = fcData?.data?.markdown ?? fcData?.markdown ?? "";
+        } catch {
+          pageContent = "";
+        }
+
+        const systemPrompt = `你是互联网平台研究专家，请从给定的网页内容中提取平台结构化信息，以 JSON 格式返回。`;
+        const userPrompt = `网页内容如下：
+${pageContent.slice(0, 6000)}
+
+请提取以下字段并以 JSON 返回（字段不确定时留空字符串）：
+{
+  "id": "平台英文标识符（小写字母+连字符，如 meta、tik-tok）",
+  "name": "平台中文名（含旗下产品，如 Meta（Facebook / Instagram / WhatsApp））",
+  "company": "运营公司全称",
+  "hq": "总部所在地（中文）",
+  "founded": 创立年份（数字）,
+  "abbr": "缩写（1-4字符）",
+  "description": "平台简介（200字以内，中文）",
+  "jurisdiction": ["发源国家辖区ID，如 us、eu、cn"],
+  "portrait": {
+    "types": ["平台类型标签，如 社交、内容、即时通讯"],
+    "structure": "平台结构描述",
+    "contentSource": "内容来源描述",
+    "networkEffect": "网络效应描述",
+    "businessModel": ["商业模式标签"],
+    "openness": "开放程度描述",
+    "crossBorder": "跨境特征描述"
+  },
+  "timeline": [{"date": "年份", "event": "事件描述"}]
+}`;
+
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" } as any,
+        });
+        const raw = typeof result.choices[0].message.content === "string"
+          ? result.choices[0].message.content
+          : (result.choices[0].message.content as any[]).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+        let platform: any = {};
+        try { platform = JSON.parse(raw); } catch { platform = {}; }
+        return { platform, rawContent: pageContent.slice(0, 2000) };
+      }),
   }),
 
   // API Settings (admin only)
