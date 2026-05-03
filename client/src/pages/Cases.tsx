@@ -629,26 +629,48 @@ export default function Cases() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
+              <div className="flex items-center justify-center gap-1.5 mt-8 flex-wrap">
                 <Button
                   variant="outline"
                   size="icon"
+                  className="w-8 h-8"
                   disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </Button>
-                <span className="text-sm text-muted-foreground px-2">
-                  第 {page} / {totalPages} 页
-                </span>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === 'ellipsis' ? (
+                      <span key={`e${idx}`} className="w-8 h-8 flex items-center justify-center text-muted-foreground text-sm">…</span>
+                    ) : (
+                      <Button
+                        key={item}
+                        variant={item === page ? 'default' : 'outline'}
+                        size="icon"
+                        className="w-8 h-8 text-xs"
+                        onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        {item}
+                      </Button>
+                    )
+                  )}
                 <Button
                   variant="outline"
                   size="icon"
+                  className="w-8 h-8"
                   disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </Button>
+                <span className="text-xs text-muted-foreground ml-1">共 {totalPages} 页</span>
               </div>
             )}
           </div>

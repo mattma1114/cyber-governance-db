@@ -453,7 +453,8 @@ export default function Admin() {
     keyword: keyword || undefined,
   });
 
-  const { data: platforms, isLoading: platformsLoading } = trpc.platforms.list.useQuery({});
+  const { data: platformsData, isLoading: platformsLoading } = trpc.platforms.list.useQuery({ pageSize: 999 });
+  const platforms = platformsData?.items;
 
   const createTopic = trpc.topics.create.useMutation({
     onSuccess: () => { toast.success("专题已创建"); utils.topics.list.invalidate(); setTopicDialog({ open: false }); },
@@ -738,7 +739,7 @@ export default function Admin() {
           {/* Platforms Tab */}
           <TabsContent value="platforms">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">共 {platforms?.length ?? 0} 个平台</p>
+              <p className="text-sm text-muted-foreground">共 {platformsData?.total ?? 0} 个平台</p>
               <Button size="sm" className="gap-1.5" onClick={() => setPlatformDialog({ open: true })}>
                 <Plus className="w-4 h-4" />
                 新增平台

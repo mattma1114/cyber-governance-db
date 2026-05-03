@@ -322,10 +322,15 @@ export const appRouter = router({
         keyword: z.string().optional(),
         jurisdictionId: z.string().optional(),
         type: z.string().optional(),
+        page: z.number().default(1),
+        pageSize: z.number().default(12),
       }).optional())
       .query(async ({ input }) => {
         const db = await getDb();
-        if (!db) return [];
+        if (!db) return { items: [], total: 0, page: 1, pageSize: 12 };
+        const page = input?.page ?? 1;
+        const pageSize = input?.pageSize ?? 12;
+        const offset = (page - 1) * pageSize;
         const conditions = [eq(platforms.isActive, true)];
         if (input?.keyword) {
           conditions.push(or(
@@ -333,7 +338,12 @@ export const appRouter = router({
             like(platforms.company, `%${input.keyword}%`),
           )!);
         }
-        return db.select().from(platforms).where(and(...conditions)).orderBy(asc(platforms.sortOrder));
+        const where = and(...conditions);
+        const [items, countResult] = await Promise.all([
+          db.select().from(platforms).where(where).orderBy(asc(platforms.sortOrder)).limit(pageSize).offset(offset),
+          db.select({ count: sql<number>`count(*)` }).from(platforms).where(where),
+        ]);
+        return { items, total: Number(countResult[0]?.count ?? 0), page, pageSize };
       }),
 
     listAdmin: adminProcedure.query(async () => {

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+const PAGE_SIZE = 12;
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { truncate, cn } from "@/lib/utils";
 
 export default function Platforms() {
@@ -17,24 +18,31 @@ export default function Platforms() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [page, setPage] = useState(1);
 
-  const { data: platforms, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined });
+  const { data: platformData, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined, page, pageSize: PAGE_SIZE });
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
 
-  const handleSearch = () => {
-    setKeyword(inputVal);
-  };
+
 
   const clearFilters = () => {
     setKeyword("");
     setInputVal("");
     setSelectedJurisdictions([]);
     setSelectedTypes([]);
+    setPage(1);
   };
+
+  const handleSearch = () => {
+    setKeyword(inputVal);
+    setPage(1);
+  };
+
+  const totalPages = platformData ? Math.ceil(platformData.total / PAGE_SIZE) : 1;
 
   // Parse jurisdiction and portrait for each platform
   const parsedPlatforms = useMemo(() => {
-    return (platforms ?? []).map((p) => {
+    return (platformData?.items ?? []).map((p) => {
       const jurisArr: string[] = Array.isArray(p.jurisdiction)
         ? p.jurisdiction
         : (p.jurisdiction ? JSON.parse(p.jurisdiction as string) : []);
@@ -44,7 +52,7 @@ export default function Platforms() {
       const types: string[] = portrait?.types ?? [];
       return { ...p, jurisArr, types };
     });
-  }, [platforms]);
+  }, [platformData]);
 
   // Collect all unique platform types from data
   const allTypes = useMemo(() =>
@@ -249,7 +257,7 @@ export default function Platforms() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm text-muted-foreground">
-                  {isLoading ? "加载中…" : `共 ${filtered.length} 个平台`}
+                  {isLoading ? "加载中…" : `共 ${platformData?.total ?? 0} 个平台`}
                 </span>
                 {/* Active filter badges */}
                 {selectedTypes.map((t) => (
@@ -442,6 +450,52 @@ export default function Platforms() {
                     </Link>
                   );
                 })}
+              </div>
+            )}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-8 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="w-8 h-8"
+                  disabled={page <= 1}
+                  onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === 'ellipsis' ? (
+                      <span key={`e${idx}`} className="w-8 h-8 flex items-center justify-center text-muted-foreground text-sm">…</span>
+                    ) : (
+                      <Button
+                        key={item}
+                        variant={item === page ? 'default' : 'outline'}
+                        size="icon"
+                        className="w-8 h-8 text-xs"
+                        onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      >
+                        {item}
+                      </Button>
+                    )
+                  )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="w-8 h-8"
+                  disabled={page >= totalPages}
+                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Button>
+                <span className="text-xs text-muted-foreground ml-1">共 {totalPages} 页</span>
               </div>
             )}
           </div>
