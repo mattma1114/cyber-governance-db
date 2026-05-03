@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, BookOpen,
-  Sparkles, FileText, Quote, Copy, Check, ChevronDown, ChevronUp, Building2, Link2, Languages
+  Sparkles, FileText, Quote, Copy, Check, ChevronDown, ChevronUp, Building2, Link2, Languages, AlignLeft
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -131,6 +131,30 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
             点击文本框可全选，或使用右上角按钮一键复制
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Full Text Section (collapsible for long content) ────────────────────────────
+function FullTextSection({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const THRESHOLD = 1500;
+  const isLong = text.length > THRESHOLD;
+  const displayed = isLong && !expanded ? text.slice(0, THRESHOLD) + "..." : text;
+
+  return (
+    <div>
+      <div className="text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap font-mono bg-muted/30 rounded-lg p-4">
+        {displayed}
+      </div>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
+        >
+          {expanded ? <><ChevronUp className="w-3.5 h-3.5" />收起</> : <><ChevronDown className="w-3.5 h-3.5" />展开全文 ({text.length}字)</>}
+        </button>
       )}
     </div>
   );
@@ -389,6 +413,29 @@ export default function CaseDetail() {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 原文全文 */}
+            {(c as any).fullText && (
+              <div className="mt-8 pt-8 border-t border-border/20">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <AlignLeft className="w-4 h-4 text-primary" />
+                    原文全文
+                  </h2>
+                  {c.sourceUrl && (
+                    <button
+                      onClick={handleGoogleTranslate}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-3 py-1.5 transition-colors hover:border-primary/40"
+                      title="使用 Google 翻译查看原文"
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                      Google 翻译
+                    </button>
+                  )}
+                </div>
+                <FullTextSection text={(c as any).fullText} />
               </div>
             )}
 

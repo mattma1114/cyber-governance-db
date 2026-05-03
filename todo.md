@@ -89,3 +89,7 @@
 - [x] routers.ts：新增 ai.extractPlatformByKeyword procedure（LLM 搜索+提取，不依赖 Firecrawl）
 - [x] PlatformEditor.tsx：AI 面板改为关键词输入模式，规则文件保持独立 Firecrawl URL 抓取
 - [x] 关键词模式无需 Firecrawl 配置即可使用
+
+## 案例详情页增强（当前迭代）
+- [x] CaseDetail.tsx：右栏新增「原文全文」展示区块（fullText 字段），支持超长文本折叠展开
+- [x] 原文全文区块：右上角有 Google 翻译按钮，超过 1500 字时显示折叠/展开控件
