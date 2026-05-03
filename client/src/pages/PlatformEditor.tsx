@@ -93,7 +93,7 @@ export default function PlatformEditor() {
 
   // ── AI mode state ──
   const [aiMode, setAiMode] = useState(!isEdit);
-  const [aiUrl, setAiUrl] = useState("");
+  const [aiKeyword, setAiKeyword] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
   const [aiExtractError, setAiExtractError] = useState<string | null>(null);
@@ -138,7 +138,8 @@ export default function PlatformEditor() {
   // ── Mutations ──
   const createMutation = trpc.platforms.create.useMutation();
   const updateMutation = trpc.platforms.update.useMutation();
-  const extractMutation = trpc.ai.extractPlatformFromUrl.useMutation();
+  const extractMutation = trpc.ai.extractPlatformByKeyword.useMutation();
+  const extractFromUrlMutation = trpc.ai.extractPlatformFromUrl.useMutation();
   const utils = trpc.useUtils();
 
   // ── Check Firecrawl config ──
@@ -193,16 +194,12 @@ export default function PlatformEditor() {
 
   // ── AI Extract ──
   const handleAiExtract = async () => {
-    if (!aiUrl.trim()) { toast.error("请输入平台官网或维基百科 URL"); return; }
-    if (!firecrawlConfigured) {
-      toast.error("Firecrawl 未配置，请前往管理后台 → API 配置 Tab 录入 Key");
-      return;
-    }
+    if (!aiKeyword.trim()) { toast.error("请输入平台名称关键词，如 Meta 或 TikTok"); return; }
     setAiLoading(true);
     setAiExtractError(null);
     setAiExtractPartial(false);
     try {
-      const result = await extractMutation.mutateAsync({ url: aiUrl.trim() });
+      const result = await extractMutation.mutateAsync({ keyword: aiKeyword.trim() });
       if (result.platform) {
         const p = result.platform as any;
         let filledCount = 0;
@@ -416,30 +413,25 @@ export default function PlatformEditor() {
               <div>
                 <h2 className="text-sm font-semibold mb-0.5">AI 自动填充</h2>
                 <p className="text-xs text-muted-foreground">
-                  输入平台官网、维基百科或 Crunchbase 链接，AI 将自动提取平台基本信息、画像特征和发展历程。
+                  输入平台名称关键词，AI 将自动检索平台官网、维基百科、Crunchbase 等来源，自动填充平台基本信息、画像特征和发展历程（规则文件除外）。
                 </p>
               </div>
             </div>
-            {firecrawlConfigured === false && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600">
-                Firecrawl API Key 未配置。请前往管理后台 → API 配置 Tab 录入 Key 后方可使用此功能。
-              </div>
-            )}
             <div className="flex gap-2">
               <div className="flex-1 relative">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  value={aiUrl}
-                  onChange={(e) => setAiUrl(e.target.value)}
+                  value={aiKeyword}
+                  onChange={(e) => setAiKeyword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAiExtract()}
-                  placeholder="https://about.meta.com 或 https://en.wikipedia.org/wiki/Meta_Platforms"
+                  placeholder="输入平台名称关键词，如 Meta、TikTok、微信、Spotify..."
                   className="pl-9 text-sm"
                   disabled={aiLoading}
                 />
               </div>
               <Button
                 onClick={handleAiExtract}
-                disabled={aiLoading || !aiUrl.trim() || firecrawlConfigured === false}
+                disabled={aiLoading || !aiKeyword.trim()}
                 className="gap-1.5 shrink-0"
               >
                 {aiLoading ? (

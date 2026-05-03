@@ -622,6 +622,47 @@ ${pageContent.slice(0, 6000)}
         try { platform = JSON.parse(raw); } catch { platform = {}; }
         return { platform, rawContent: pageContent.slice(0, 2000) };
       }),
+
+    extractPlatformByKeyword: adminProcedure
+      .input(z.object({ keyword: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        const systemPrompt = `你是互联网平台研究专家。用户会给你一个平台名称关键词，你需要基于你的知识提取该平台的完整结构化信息，以 JSON 格式返回。请尽可能详细、准确地填写所有字段。`;
+        const userPrompt = `请研究互联网平台"${input.keyword}"，提取以下结构化信息并以 JSON 格式返回（字段不确定时留空字符串或空数组）：
+{
+  "id": "平台英文标识符（小写字母+连字符，如 meta、tik-tok）",
+  "name": "平台中文名（含旗下主要产品，如 Meta（Facebook / Instagram / WhatsApp））",
+  "company": "运营公司全称（英文）",
+  "hq": "总部所在地（中文，如 美国加利福尼亚州门洛帕克）",
+  "founded": 创立年份数字,
+  "abbr": "缩写（1-4个大写字母）",
+  "description": "平台简介（150-200字，中文，介绍平台定位、主要产品、用户规模）",
+  "jurisdiction": ["发源国家辖区ID，从以下选择：us、eu、cn、uk、sea、jp、kr"],
+  "portrait": {
+    "types": ["平台类型标签，从以下选择：社交、内容、即时通讯、电商、搜索、AIGC、视频、音乐、游戏、职场、新闻"],
+    "structure": "平台结构描述（50字以内）",
+    "contentSource": "内容来源描述（50字以内）",
+    "networkEffect": "网络效应描述（50字以内）",
+    "businessModel": ["商业模式标签，如 广告、订阅、电商佣金"],
+    "openness": "开放程度描述（50字以内）",
+    "crossBorder": "跨境特征描述（50字以内）"
+  },
+  "timeline": [{"date": "年份如2004", "event": "重要事件描述50字以内"}]
+}
+timeline 请列出该平台最重要的 5-10 个发展里程碑，按时间顺序排列。`;
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" } as any,
+        });
+        const raw = typeof result.choices[0].message.content === "string"
+          ? result.choices[0].message.content
+          : (result.choices[0].message.content as any[]).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+        let platform: any = {};
+        try { platform = JSON.parse(raw); } catch { platform = {}; }
+        return { platform };
+      }),
   }),
 
   // API Settings (admin only)

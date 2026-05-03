@@ -84,3 +84,8 @@
 ## 预览功能（当前迭代）
 - [x] PlatformEditor.tsx：底部添加「预览」按鈕，先保存草稿再在新标签页打开前台平台详情页
 - [x] CaseEditor.tsx：底部添加「预览」按鈕，先保存草稿再在新标签页打开前台案例详情页
+
+## 平台 AI 关键词自动填充（当前迭代）
+- [ ] routers.ts：新增 ai.extractPlatformByKeyword procedure（LLM 搜索+提取，不依赖 Firecrawl）
+- [ ] PlatformEditor.tsx：AI 面板改为关键词输入模式，规则文件保持独立 Firecrawl URL 抓取
+- [ ] 关键词模式无需 Firecrawl 配置即可使用
