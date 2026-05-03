@@ -159,7 +159,6 @@ export default function Cases() {
                 司法案例、监管执法与立法政策
               </p>
             </div>
-            <Separator />
             {/* Search */}
             <div>
               <div className="relative">
@@ -222,13 +221,9 @@ export default function Cases() {
                 )}
               </div>
             )}
-
-            <Separator />
-
             {/* Case Type */}
             <div>
-              <div className="flex items-center gap-1.5 mb-3">
-                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+              <div className="flex items-center gap-1.5 mb-3">               <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">案例类型</span>
               </div>
               <div className="flex flex-col gap-1">
@@ -257,10 +252,7 @@ export default function Cases() {
                   );
                 })}
               </div>
-            </div>
-
-            <Separator />
-
+             </div>
             {/* Topics */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
@@ -294,9 +286,6 @@ export default function Cases() {
                 })}
               </div>
             </div>
-
-            <Separator />
-
             {/* Jurisdictions */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
@@ -378,7 +367,6 @@ export default function Cases() {
                           onChange={(e) => setInputVal(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") { handleSearch(); setDrawerOpen(false); } }} />
                       </div>
-                      <Separator />
                       {/* Case Type */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">案例类型</p>
@@ -396,10 +384,9 @@ export default function Cases() {
                             );
                           })}
                         </div>
-                      </div>
-                      <Separator />
-                      {/* Topics */}
-                      <div>
+            </div>
+            {/* Topics */}
+            <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">研究专题</p>
                         <div className="flex flex-wrap gap-2">
                           {topics?.map((t) => {
@@ -415,10 +402,9 @@ export default function Cases() {
                             );
                           })}
                         </div>
-                      </div>
-                      <Separator />
-                      {/* Jurisdictions */}
-                      <div>
+            </div>
+            {/* Jurisdictions */}
+            <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">司法辖区</p>
                         <div className="flex flex-wrap gap-2">
                           {jurisdictions?.map((j) => {
@@ -571,7 +557,7 @@ export default function Cases() {
                 })}
               </div>
             ) : (
-              <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
+              <div className="flex flex-col rounded-lg overflow-hidden">
                 {/* Sort header */}
                 <div className="px-4 py-2 bg-muted/30 flex items-center gap-2 text-xs text-muted-foreground select-none">
                   <span className="flex-1">标题 / 摘要</span>
@@ -599,7 +585,7 @@ export default function Cases() {
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
                   return (
                     <Link key={c.id} href={`/cases/${c.id}`}>
-                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group">
+                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/30 last:border-0">
                         <div className="flex items-start gap-3">
                           <div className="flex flex-col gap-1 flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">

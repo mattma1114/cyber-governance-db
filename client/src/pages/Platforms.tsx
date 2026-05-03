@@ -102,7 +102,7 @@ export default function Platforms() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-border bg-white">
+      <div className="bg-white">
         <div className="container py-8">
           <h1 className="text-2xl font-bold mb-1">平台画像库</h1>
           <p className="text-muted-foreground text-sm">
@@ -158,7 +158,7 @@ export default function Platforms() {
               </Button>
             )}
 
-            <Separator />
+
 
             {/* Platform Type */}
             <div>
@@ -202,7 +202,7 @@ export default function Platforms() {
               </div>
             </div>
 
-            <Separator />
+
 
             {/* Jurisdictions */}
             <div>

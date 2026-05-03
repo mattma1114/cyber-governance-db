@@ -412,7 +412,7 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
         </TabsContent>
       </Tabs>
 
-      <div className="pt-3 border-t border-border mt-3">
+<div className="pt-3 mt-3">
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>取消</Button>
           <Button onClick={() => onSave(buildPayload())} disabled={saving || !basic.id || !basic.name}>
@@ -572,7 +572,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-border bg-white">
+      <div className="bg-white">
         <div className="container py-6">
           <div className="flex items-center justify-between">
             <div>

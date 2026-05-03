@@ -14,7 +14,7 @@ import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
 function PortraitItem({ label, value }: { label: string; value: string | string[] }) {
   return (
-    <div className="flex flex-col gap-1 py-3 border-b border-border last:border-0">
+<div className="flex flex-col gap-1 py-3">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {Array.isArray(value) ? (
         <div className="flex flex-wrap gap-1.5">
@@ -99,7 +99,7 @@ export default function PlatformDetail() {
   return (
     <div className="min-h-screen">
       {/* Breadcrumb */}
-      <div className="border-b border-border bg-white">
+      <div className="bg-white">
         <div className="container py-3">
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/platforms">
@@ -165,7 +165,7 @@ export default function PlatformDetail() {
           </p>
         )}
 
-        <Separator className="mb-8" />
+
 
         {/* Tabs */}
         <Tabs defaultValue="portrait">
@@ -298,7 +298,7 @@ export default function PlatformDetail() {
         </Tabs>
 
         {/* Bottom nav */}
-        <div className="mt-12 pt-6 border-t border-border">
+<div className="mt-12 pt-6">
           <Button variant="outline" asChild>
             <Link href="/platforms">
               <ArrowLeft className="w-4 h-4 mr-2" />

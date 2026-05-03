@@ -90,7 +90,7 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
   ];
 
   return (
-    <Card className="border-border">
+<Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -229,7 +229,7 @@ export default function CaseDetail() {
   return (
     <div className="min-h-screen">
       {/* Breadcrumb */}
-      <div className="border-b border-border bg-white">
+      <div className="bg-white">
         <div className="container py-3">
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/cases">
@@ -295,7 +295,7 @@ export default function CaseDetail() {
           </div>
         </div>
 
-        <Separator className="mb-8" />
+
 
         <div className="space-y-6">
           {/* Abstract */}
@@ -374,7 +374,7 @@ export default function CaseDetail() {
         <RelatedCases caseId={c.id} topicId={c.topicId ?? ""} jurisdictionId={c.jurisdictionId ?? ""} />
 
         {/* Bottom nav */}
-        <div className="mt-12 pt-6 border-t border-border flex items-center justify-between">
+<div className="mt-12 pt-6 flex items-center justify-between">
           <Button variant="outline" asChild>
             <Link href="/cases">
               <ArrowLeft className="w-4 h-4 mr-2" />
