@@ -254,40 +254,43 @@ export default function Platforms() {
           </div>
           {/* ── Right: Results ── */}
           <div className="flex-1 min-w-0">
-            {/* Result header */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-muted-foreground">
-                  {isLoading ? "加载中…" : `共 ${platformData?.total ?? 0} 个平台`}
-                </span>
-                {/* Active filter badges */}
-                {selectedTypes.map((t) => (
-                  <Badge
-                    key={t}
-                    variant="secondary"
-                    className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
-                    onClick={() => toggleType(t)}
-                  >
-                    {t}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedJurisdictions.map((jId) => {
-                  const j = jurisdictions?.find((x) => x.id === jId);
-                  return j ? (
+             {/* Sticky toolbar: active filter tags + result count + view toggle */}
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
+              {/* Active filter badges */}
+              {(selectedTypes.length > 0 || selectedJurisdictions.length > 0) && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedTypes.map((t) => (
                     <Badge
-                      key={jId}
+                      key={t}
                       variant="secondary"
                       className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
-                      onClick={() => toggleJurisdiction(jId)}
+                      onClick={() => toggleType(t)}
                     >
-                      {j.flag} {j.label}
+                      {t}
                       <X className="w-2.5 h-2.5" />
                     </Badge>
-                  ) : null;
-                })}
-              </div>
-
+                  ))}
+                  {selectedJurisdictions.map((jId) => {
+                    const j = jurisdictions?.find((x) => x.id === jId);
+                    return j ? (
+                      <Badge
+                        key={jId}
+                        variant="secondary"
+                        className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
+                        onClick={() => toggleJurisdiction(jId)}
+                      >
+                        {j.flag} {j.label}
+                        <X className="w-2.5 h-2.5" />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              {/* Result count + view toggle */}
+              <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {isLoading ? "加载中…" : `共 ${platformData?.total ?? 0} 个平台`}
+              </span>
               {/* View toggle */}
               <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
                 <button
@@ -311,8 +314,8 @@ export default function Platforms() {
                   <List className="w-3.5 h-3.5" />
                 </button>
               </div>
+              </div>
             </div>
-
             {isLoading ? (
               <div className={viewMode === "grid" ? "grid sm:grid-cols-2 lg:grid-cols-3 gap-4" : "flex flex-col gap-2"}>
                 {Array.from({ length: 6 }).map((_, i) => (
