@@ -96,6 +96,8 @@ export default function PlatformEditor() {
   const [aiUrl, setAiUrl] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
+  const [aiExtractError, setAiExtractError] = useState<string | null>(null);
+  const [aiExtractPartial, setAiExtractPartial] = useState(false);
 
   // ── Form state ──
   const [basic, setBasic] = useState({
@@ -195,24 +197,33 @@ export default function PlatformEditor() {
       return;
     }
     setAiLoading(true);
+    setAiExtractError(null);
+    setAiExtractPartial(false);
     try {
       const result = await extractMutation.mutateAsync({ url: aiUrl.trim() });
       if (result.platform) {
         const p = result.platform as any;
-        setBasic((prev) => ({
-          ...prev,
-          id: p.id ?? prev.id,
-          name: p.name ?? prev.name,
-          company: p.company ?? prev.company,
-          hq: p.hq ?? prev.hq,
-          founded: p.founded ? String(p.founded) : prev.founded,
-          abbr: p.abbr ?? prev.abbr,
-          color: p.color ?? prev.color,
-          description: p.description ?? prev.description,
-        }));
-        if (p.jurisdiction?.length) setJurisSel(p.jurisdiction);
+        let filledCount = 0;
+        setBasic((prev) => {
+          const next = {
+            ...prev,
+            id: p.id ?? prev.id,
+            name: p.name ?? prev.name,
+            company: p.company ?? prev.company,
+            hq: p.hq ?? prev.hq,
+            founded: p.founded ? String(p.founded) : prev.founded,
+            abbr: p.abbr ?? prev.abbr,
+            color: p.color ?? prev.color,
+            description: p.description ?? prev.description,
+          };
+          filledCount += [p.name, p.company, p.hq, p.founded, p.description].filter(Boolean).length;
+          return next;
+        });
+        if (p.jurisdiction?.length) { setJurisSel(p.jurisdiction); filledCount++; }
         if (p.portrait) {
           const port = p.portrait;
+          const hasPortrait = Object.values(port).some(Boolean);
+          if (hasPortrait) filledCount++;
           setPortrait({
             types: Array.isArray(port.types) ? port.types.join(", ") : (port.types ?? ""),
             structure: port.structure ?? "",
@@ -223,12 +234,20 @@ export default function PlatformEditor() {
             crossBorder: port.crossBorder ?? "",
           });
         }
-        if (p.timeline?.length) setTimeline(p.timeline);
-        toast.success("AI 已自动填充平台信息，请核对后保存");
-        setAiMode(false);
+        if (p.timeline?.length) { setTimeline(p.timeline); filledCount++; }
+        if (filledCount === 0) {
+          setAiExtractError("未能从该页面提取到结构化平台信息，请尝试其他 URL（如维基百科页面）或手动填写。");
+        } else {
+          const isPartial = !p.portrait || !p.timeline?.length;
+          if (isPartial) setAiExtractPartial(true);
+          toast.success(`AI 已自动填充 ${filledCount} 个字段，请核对后保存`);
+          setAiMode(false);
+        }
+      } else {
+        setAiExtractError("提取结果为空，可能是页面访问受限。请尝试其他 URL 或手动填写。");
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "AI 提取失败，请手动填写");
+      setAiExtractError(e?.message ?? "AI 提取失败，请手动填写各字段。");
     } finally {
       setAiLoading(false);
     }
@@ -380,6 +399,12 @@ export default function PlatformEditor() {
                 )}
               </Button>
             </div>
+            {aiExtractError && (
+              <div className="mt-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
+                <span className="shrink-0 mt-0.5">⚠️</span>
+                <span>{aiExtractError}</span>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               也可以
               <button
@@ -390,6 +415,17 @@ export default function PlatformEditor() {
               </button>
               所有字段
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Partial Fill Notice ── */}
+      {aiExtractPartial && !aiMode && (
+        <div className="max-w-6xl mx-auto px-6 pt-4">
+          <div className="px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 flex items-center gap-2">
+            <span>ℹ️</span>
+            <span>AI 已填充基本信息，但平台画像和大事件部分可能需要手动补充。</span>
+            <button className="ml-auto underline underline-offset-2 shrink-0" onClick={() => setAiExtractPartial(false)}>已知晓</button>
           </div>
         </div>
       )}
