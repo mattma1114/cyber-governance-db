@@ -191,39 +191,10 @@ export default function Cases() {
               </Button>
             )}
 
-            {/* Active filter tags - shown below clear button */}
-            {hasFilters && (
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {selectedTypes.map((v) => (
-                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
-                    {CASE_TYPES.find((t) => t.value === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedTopics.map((v) => (
-                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
-                    {topics?.find((t) => t.id === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedJurisdictions.map((v) => (
-                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
-                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
-                    {jurisdictions?.find((j) => j.id === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {keyword && (
-                  <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
-                    "{keyword}"
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                )}
-              </div>
-            )}
+
             {/* Case Type */}
             <div>
-              <div className="flex items-center gap-1.5 mb-3">               <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+              <div className="flex items-center gap-1.5 mb-3"><Filter className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">案例类型</span>
               </div>
               <div className="flex flex-col gap-1">
@@ -427,6 +398,36 @@ export default function Cases() {
                 </Drawer.Portal>
               </Drawer.Root>
             </div>
+            {/* Active filter tags */}
+            {hasFilters && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {selectedTypes.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
+                    {CASE_TYPES.find((t) => t.value === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedTopics.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
+                    {topics?.find((t) => t.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedJurisdictions.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
+                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
+                    {jurisdictions?.find((j) => j.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {keyword && (
+                  <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
+                    "{keyword}"
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                )}
+              </div>
+            )}
             {/* Result count + view toggle */}
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
