@@ -122,20 +122,11 @@ export default function Platforms() {
       <div className="container py-6">
         <div className="flex gap-6 items-start">
           {/* ── Left: Sidebar Filters ── */}
+          <div className="shrink-0 flex items-start gap-2 sticky top-4 self-start">
           <aside className={cn(
-            "shrink-0 flex flex-col gap-4 transition-all duration-200 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto",
-            sidebarOpen ? "w-56" : "w-8"
+            "flex flex-col gap-4 transition-all duration-200 max-h-[calc(100vh-2rem)] overflow-y-auto",
+            sidebarOpen ? "w-56" : "w-0 overflow-hidden"
           )}>
-            {/* Collapse toggle */}
-            <button
-              onClick={() => setSidebarOpen((v) => !v)}
-              className="flex items-center justify-center w-7 h-7 rounded-md border border-border hover:bg-muted transition-colors self-end shrink-0 mt-0.5"
-              title={sidebarOpen ? "折叠筛选栏" : "展开筛选栏"}
-            >
-              {sidebarOpen
-                ? <PanelLeftClose className="w-3.5 h-3.5 text-muted-foreground" />
-                : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
-            </button>
             {sidebarOpen && (<>
             {/* Search */}
             <div className="flex gap-2">
@@ -250,7 +241,17 @@ export default function Platforms() {
             </div>
             </>)}
           </aside>
-
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="flex items-center justify-center w-7 h-7 rounded-md border border-border hover:bg-muted transition-colors shrink-0 mt-0.5"
+            title={sidebarOpen ? "折叠筛选栏" : "展开筛选栏"}
+          >
+            {sidebarOpen
+              ? <PanelLeftClose className="w-3.5 h-3.5 text-muted-foreground" />
+              : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
+          </button>
+          </div>
           {/* ── Right: Results ── */}
           <div className="flex-1 min-w-0">
             {/* Result header */}

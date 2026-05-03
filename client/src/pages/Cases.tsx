@@ -429,7 +429,7 @@ export default function Cases() {
               </div>
             )}
             {/* Result count + view toggle */}
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-center justify-between mb-4 flex-wrap gap-2 py-2 -mx-1 px-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm text-muted-foreground">
                   {isLoading ? "加载中…" : `共 ${data?.total ?? 0} 条结果`}
