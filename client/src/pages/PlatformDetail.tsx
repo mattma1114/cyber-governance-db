@@ -172,169 +172,135 @@ function RulesSection({ rules: rawRules }: { rules: any[] }) {
 
   return (
     <div>
-      <h2 className="text-base font-semibold mb-6 flex items-center gap-2">
+      <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
         <FileText className="w-4 h-4 text-primary" />
         规则文件
       </h2>
 
-      {/* Three-column grid */}
-      <div className="grid grid-cols-[200px_180px_1fr] gap-0 border border-border/25 rounded-xl overflow-hidden min-h-[480px]">
+      {/* Row 1: Rule name tabs */}
+      <div className="mb-0 border border-border/25 rounded-t-xl overflow-hidden">
+        <div className="px-4 py-2 border-b border-border/20 bg-muted/20">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">规则名称</span>
+        </div>
+        <div className="flex flex-wrap gap-0 overflow-x-auto">
+          {rules.map((rule, idx) => {
+            const isActive = rule.id === selectedRuleId;
+            return (
+              <button
+                key={rule.id}
+                onClick={() => handleSelectRule(rule)}
+                className={cn(
+                  "flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors border-b-2 whitespace-nowrap",
+                  isActive
+                    ? "border-primary text-primary font-medium bg-primary/5"
+                    : "border-transparent text-foreground/70 hover:text-foreground hover:bg-muted/40"
+                )}
+              >
+                {rule.title || `规则 ${idx + 1}`}
+                {rule.type && (
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-full",
+                    isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  )}>
+                    {rule.type}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        {/* ── Column 1: Rule Names ── */}
-        <div className="border-r border-border/25 bg-muted/20 overflow-y-auto">
-          <div className="px-3 py-2.5 border-b border-border/20">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">规则名称</span>
-          </div>
-          <div className="py-1">
-            {rules.map((rule) => {
-              const isActive = rule.id === selectedRuleId;
+      {/* Row 2: Version tabs */}
+      <div className="border-x border-border/25 border-b border-border/20">
+        <div className="px-4 py-2 border-b border-border/20 bg-muted/10 flex items-center justify-between">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">版本历史</span>
+          {selectedVersion?.url && (
+            <div className="flex items-center gap-2">
+              <a
+                href={selectedVersion.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-2.5 py-1 transition-colors hover:border-primary/40"
+              >
+                <ExternalLink className="w-3 h-3" />
+                原文
+              </a>
+              <button
+                onClick={handleGoogleTranslate}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-2.5 py-1 transition-colors hover:border-primary/40"
+              >
+                <Languages className="w-3 h-3" />
+                翻译
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-0 overflow-x-auto">
+          {selectedRule?.versions?.length > 0 ? (
+            selectedRule.versions.map((ver) => {
+              const isActive = ver.versionId === selectedVersionId;
               return (
                 <button
-                  key={rule.id}
-                  onClick={() => handleSelectRule(rule)}
+                  key={ver.versionId}
+                  onClick={() => setSelectedVersionId(ver.versionId)}
                   className={cn(
-                    "w-full text-left px-3 py-3 transition-colors flex items-start gap-2 group",
+                    "flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors border-b-2 whitespace-nowrap",
                     isActive
-                      ? "bg-primary/8 text-primary"
-                      : "hover:bg-muted/60 text-foreground/80"
+                      ? "border-primary text-primary font-medium bg-primary/5"
+                      : "border-transparent text-foreground/70 hover:text-foreground hover:bg-muted/40"
                   )}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-xs font-medium leading-snug line-clamp-3",
-                      isActive ? "text-primary" : "text-foreground/85 group-hover:text-foreground"
-                    )}>
-                      {rule.title}
-                    </p>
-                    {rule.type && (
-                      <span className={cn(
-                        "text-[10px] mt-1 block",
-                        isActive ? "text-primary/60" : "text-muted-foreground"
-                      )}>
-                        {rule.type}
-                      </span>
-                    )}
-                  </div>
-                  {isActive && <ChevronRight className="w-3 h-3 text-primary shrink-0 mt-0.5" />}
+                  <span>{ver.versionLabel || "版本"}</span>
+                  {ver.date && (
+                    <span className="text-[10px] font-mono text-muted-foreground">{ver.date}</span>
+                  )}
                 </button>
               );
-            })}
-          </div>
+            })
+          ) : (
+            <p className="text-xs text-muted-foreground px-4 py-3">暂无版本记录</p>
+          )}
         </div>
+      </div>
 
-        {/* ── Column 2: Version / Date Selection ── */}
-        <div className="border-r border-border/25 bg-muted/10 overflow-y-auto">
-          <div className="px-3 py-2.5 border-b border-border/20">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">版本历史</span>
+      {/* Row 3: Full text content */}
+      <div className="border border-t-0 border-border/25 rounded-b-xl min-h-[320px]">
+        {selectedVersion?.content ? (
+          <div className="px-5 py-5 text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap">
+            {selectedVersion.content}
           </div>
-          <div className="py-1">
-            {selectedRule?.versions?.length > 0 ? (
-              selectedRule.versions.map((ver) => {
-                const isActive = ver.versionId === selectedVersionId;
-                return (
-                  <button
-                    key={ver.versionId}
-                    onClick={() => setSelectedVersionId(ver.versionId)}
-                    className={cn(
-                      "w-full text-left px-3 py-3 transition-colors",
-                      isActive
-                        ? "bg-primary/8 border-l-2 border-primary"
-                        : "hover:bg-muted/60 border-l-2 border-transparent"
-                    )}
-                  >
-                    <p className={cn(
-                      "text-xs font-medium leading-snug",
-                      isActive ? "text-primary" : "text-foreground/85"
-                    )}>
-                      {ver.versionLabel}
-                    </p>
-                    {ver.date && (
-                      <span className="text-[10px] text-muted-foreground mt-0.5 block font-mono">
-                        {ver.date}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            ) : (
-              <p className="text-xs text-muted-foreground px-3 py-4">暂无版本记录</p>
-            )}
-          </div>
-        </div>
-
-        {/* ── Column 3: Full Text / Content ── */}
-        <div className="overflow-y-auto flex flex-col">
-          {/* Content header */}
-          <div className="px-5 py-3 border-b border-border/20 flex items-center justify-between gap-3 shrink-0">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-foreground/80 truncate">{selectedRule?.title}</p>
-              {selectedVersion?.date && (
-                <span className="text-[10px] text-muted-foreground font-mono">{selectedVersion.date}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {selectedVersion?.url && (
-                <>
-                  <a
-                    href={selectedVersion.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-2.5 py-1 transition-colors hover:border-primary/40"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    原文
-                  </a>
-                  <button
-                    onClick={handleGoogleTranslate}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-2.5 py-1 transition-colors hover:border-primary/40"
-                  >
-                    <Languages className="w-3 h-3" />
-                    翻译
-                  </button>
-                </>
-              )}
+        ) : selectedVersion?.url ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
+            <FileText className="w-10 h-10 text-muted-foreground/20" />
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">暂未录入规则全文</p>
+              <div className="flex items-center justify-center gap-3">
+                <a
+                  href={selectedVersion.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  前往原始来源查阅
+                </a>
+                <button
+                  onClick={handleGoogleTranslate}
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Languages className="w-3.5 h-3.5" />
+                  Google 翻译
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Content body */}
-          <div className="flex-1 px-5 py-5 overflow-y-auto">
-            {selectedVersion?.content ? (
-              <div className="text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap">
-                {selectedVersion.content}
-              </div>
-            ) : selectedVersion?.url ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
-                <FileText className="w-10 h-10 text-muted-foreground/20" />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-3">暂未录入规则全文</p>
-                  <div className="flex items-center justify-center gap-3">
-                    <a
-                      href={selectedVersion.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      前往原始来源查阅
-                    </a>
-                    <button
-                      onClick={handleGoogleTranslate}
-                      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      <Languages className="w-3.5 h-3.5" />
-                      Google 翻译
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <FileText className="w-10 h-10 text-muted-foreground/20 mb-3" />
-                <p className="text-sm text-muted-foreground">暂无内容</p>
-              </div>
-            )}
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <FileText className="w-10 h-10 text-muted-foreground/20 mb-3" />
+            <p className="text-sm text-muted-foreground">暂无内容</p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
