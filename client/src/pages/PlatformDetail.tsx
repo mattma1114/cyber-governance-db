@@ -396,6 +396,30 @@ function RelatedCasesSection({
   );
 }
 
+// ── Collapsible Description ──────────────────────────────────────────────────
+const DESCRIPTION_THRESHOLD = 100; // chars before showing expand button
+
+function CollapsibleDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > DESCRIPTION_THRESHOLD;
+
+  return (
+    <div className="text-sm leading-relaxed text-foreground/80">
+      <span className={cn(!expanded && isLong && "line-clamp-3")}>
+        {text}
+      </span>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="ml-1.5 text-xs text-primary hover:underline whitespace-nowrap"
+        >
+          {expanded ? "收起" : "展开全文"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PlatformDetail() {
   const { id } = useParams<{ id: string }>();
@@ -544,9 +568,7 @@ export default function PlatformDetail() {
             </div>
             {/* Description inline under the name block */}
             {p.description && (
-              <p className="text-sm leading-relaxed text-foreground/80">
-                {p.description}
-              </p>
+              <CollapsibleDescription text={p.description} />
             )}
           </div>
         </div>
