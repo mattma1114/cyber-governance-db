@@ -499,21 +499,24 @@ export default function PlatformDetail() {
       <div className="container max-w-6xl py-8">
         {/* Platform header */}
         <div className="flex items-start gap-5 mb-8 pb-8 border-b border-border/20">
+          {/* Logo */}
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-md shrink-0"
             style={{ background: p.color ?? "var(--primary)" }}
           >
             {p.abbr ?? p.name[0]}
           </div>
+
+          {/* Name + meta + description */}
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold leading-tight mb-1">{p.name}</h1>
             {p.company && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-3">
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-2">
                 <Building2 className="w-3.5 h-3.5 shrink-0" />
                 {p.company}
               </p>
             )}
-            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-2">
               {p.hq && (
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5" />
@@ -527,26 +530,26 @@ export default function PlatformDetail() {
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {jurisLabels.map((j) => j && (
-                <Badge key={j.id} variant="outline" className="gap-1 text-xs">
-                  <span>{j.flag}</span>
-                  {j.label}
+            {/* Only show the first jurisdiction (origin country) + platform types */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {jurisLabels[0] && (
+                <Badge variant="outline" className="gap-1 text-xs">
+                  <span>{jurisLabels[0].flag}</span>
+                  {jurisLabels[0].label}
                 </Badge>
-              ))}
+              )}
               {portrait?.types?.map((t: string) => (
                 <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
               ))}
             </div>
+            {/* Description inline under the name block */}
+            {p.description && (
+              <p className="text-sm leading-relaxed text-foreground/80">
+                {p.description}
+              </p>
+            )}
           </div>
         </div>
-
-        {/* Description */}
-        {p.description && (
-          <p className="text-sm leading-relaxed text-foreground/85 mb-8 pb-8 border-b border-border/20">
-            {p.description}
-          </p>
-        )}
 
         {/* Two-column layout: left nav + right content */}
         <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8 items-start">
