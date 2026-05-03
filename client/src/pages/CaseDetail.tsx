@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, BookOpen,
-  Sparkles, Scale, Quote, Copy, Check, ChevronDown, ChevronUp, Building2, Link2
+  Sparkles, FileText, Quote, Copy, Check, ChevronDown, ChevronUp, Building2, Link2, Languages
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -120,7 +120,7 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
             <button
               onClick={handleCopy}
               className="absolute top-2.5 right-2.5 p-1.5 rounded-md hover:bg-background border border-border transition-colors"
-              title="复制引用"
+              title="一键复制引用"
             >
               {copied
                 ? <Check className="w-3.5 h-3.5 text-green-500" />
@@ -136,81 +136,45 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
   );
 }
 
-// ── Related Content (right column bottom) ────────────────────────────────────
+// ── Related Content (right column bottom) — only same-topic cases ─────────────
 function RelatedContent({ caseId, topicId }: { caseId: number; topicId: string }) {
   const { data: sameTopicData } = trpc.cases.list.useQuery(
     { page: 1, pageSize: 5, topicId: topicId || undefined },
     { enabled: !!topicId }
   );
-  const { data: platformsData } = trpc.platforms.list.useQuery({ page: 1, pageSize: 20 });
 
-  const relatedCases = sameTopicData?.items.filter((c) => c.id !== caseId).slice(0, 3) ?? [];
-  const relatedPlatforms = (platformsData?.items ?? []).slice(0, 3);
+  const relatedCases = sameTopicData?.items.filter((c) => c.id !== caseId).slice(0, 4) ?? [];
 
-  if (relatedCases.length === 0 && relatedPlatforms.length === 0) return null;
+  if (relatedCases.length === 0) return null;
 
   return (
     <div className="mt-10 pt-8 border-t border-border/20">
-      <h2 className="text-base font-semibold mb-6 flex items-center gap-2">
+      <h2 className="text-base font-semibold mb-5 flex items-center gap-2">
         <Link2 className="w-4 h-4 text-primary" />
         关联内容
       </h2>
 
-      {relatedCases.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">同专题案例</h3>
-          <div>
-            {relatedCases.map((rc, i) => (
-              <div key={rc.id}>
-                <Link href={`/cases/${rc.id}`}>
-                  <div className="py-3 hover:bg-muted/40 -mx-2 px-2 rounded-md transition-colors cursor-pointer group">
-                    <div className="flex items-start gap-2">
-                      <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[rc.type])}>
-                        {TYPE_LABELS[rc.type]?.label}
-                      </Badge>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium line-clamp-2 leading-snug group-hover:text-primary transition-colors">{rc.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{rc.date}</p>
-                      </div>
-                    </div>
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">同专题案例</h3>
+      <div>
+        {relatedCases.map((rc, i) => (
+          <div key={rc.id}>
+            <Link href={`/cases/${rc.id}`}>
+              <div className="py-3 hover:bg-muted/40 -mx-2 px-2 rounded-md transition-colors cursor-pointer group">
+                <div className="flex items-start gap-2">
+                  <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[rc.type])}>
+                    {TYPE_LABELS[rc.type]?.label}
+                  </Badge>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium line-clamp-2 leading-snug group-hover:text-primary transition-colors">{rc.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{rc.date}</p>
                   </div>
-                </Link>
-                {i < relatedCases.length - 1 && <div className="border-t border-border/15" />}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {relatedPlatforms.length > 0 && (
-        <div>
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">平台画像库</h3>
-          <div>
-            {relatedPlatforms.map((p: any, i: number) => (
-              <div key={p.id}>
-                <Link href={`/platforms/${p.id}`}>
-                  <div className="py-3 hover:bg-muted/40 -mx-2 px-2 rounded-md transition-colors cursor-pointer group flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
-                      style={{ backgroundColor: p.color ?? "#6b7280" }}
-                    >
-                      {p.abbr ?? p.name?.slice(0, 2)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium group-hover:text-primary transition-colors">{p.name}</p>
-                      {p.company && <p className="text-xs text-muted-foreground truncate">{p.company}</p>}
-                    </div>
-                  </div>
-                </Link>
-                {i < relatedPlatforms.length - 1 && <div className="border-t border-border/15" />}
-              </div>
-            ))}
-            <Link href="/platforms">
-              <p className="text-xs text-primary hover:underline mt-2 cursor-pointer">查看全部平台 →</p>
             </Link>
+            {i < relatedCases.length - 1 && <div className="border-t border-border/15" />}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
@@ -228,6 +192,13 @@ export default function CaseDetail() {
   useEffect(() => {
     if (caseId) incrementView.mutate({ id: caseId });
   }, [caseId]);
+
+  // Google Translate handler
+  const handleGoogleTranslate = () => {
+    if (!c?.sourceUrl) return;
+    const translateUrl = `https://translate.google.com/translate?sl=auto&tl=zh-CN&u=${encodeURIComponent(c.sourceUrl)}`;
+    window.open(translateUrl, "_blank", "noopener,noreferrer");
+  };
 
   if (isLoading) {
     return (
@@ -345,17 +316,6 @@ export default function CaseDetail() {
               </div>
             )}
 
-            {/* AI Summary */}
-            {c.aiSummary && (
-              <div className="border-t border-border/20 pt-5 mb-5">
-                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground/80">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  AI 摘要解读
-                </h2>
-                <p className="text-sm leading-relaxed text-foreground/80">{c.aiSummary}</p>
-              </div>
-            )}
-
             {/* Citation */}
             <div className="border-t border-border/20 pt-5">
               <CitationBox
@@ -369,31 +329,65 @@ export default function CaseDetail() {
           {/* ── RIGHT COLUMN ── */}
           <div>
 
-            {/* Full text */}
+            {/* 内容解读 (formerly AI Summary / aiSummary field) — top of right column */}
+            {c.aiSummary && (
+              <div className="mb-8 pb-8 border-b border-border/20">
+                <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  内容解读
+                </h2>
+                <div className="text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap">
+                  {c.aiSummary}
+                </div>
+              </div>
+            )}
+
+            {/* 原文内容 (formerly 全文内容 / aiAnalysis field) */}
             {c.aiAnalysis ? (
               <div>
-                <h2 className="text-base font-semibold mb-5 flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-primary" />
-                  全文内容
-                </h2>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
+                    原文内容
+                  </h2>
+                  {c.sourceUrl && (
+                    <button
+                      onClick={handleGoogleTranslate}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-3 py-1.5 transition-colors hover:border-primary/40"
+                      title="使用 Google 翻译查看原文"
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                      Google 翻译
+                    </button>
+                  )}
+                </div>
                 <div className="text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap">
                   {c.aiAnalysis}
                 </div>
               </div>
             ) : (
               <div className="text-sm text-muted-foreground py-16 text-center">
-                <Scale className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                <p>暂无全文内容</p>
+                <FileText className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                <p>暂无原文内容</p>
                 {c.sourceUrl && (
-                  <a
-                    href={c.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline mt-2 inline-flex items-center gap-1"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    前往原始来源查阅
-                  </a>
+                  <div className="flex items-center justify-center gap-3 mt-3">
+                    <a
+                      href={c.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      前往原始来源查阅
+                    </a>
+                    <button
+                      onClick={handleGoogleTranslate}
+                      className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 transition-colors"
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                      Google 翻译
+                    </button>
+                  </div>
                 )}
               </div>
             )}
