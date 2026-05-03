@@ -15,6 +15,13 @@
       "when": 1777654434669,
       "tag": "0001_sour_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1777829352079,
+      "tag": "0002_first_zzzax",
+      "breakpoints": true
     }
   ]
 }

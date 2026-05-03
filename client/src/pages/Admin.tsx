@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
-  Tag, Globe, X
+  Tag, Globe, X, Settings, Key, CheckCircle2, AlertCircle, Save
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
@@ -193,9 +193,10 @@ const PORTRAIT_DIMS = [
   { key: "governance", label: "治理机制" },
 ];
 
-function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
+function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCases }: {
   initial?: any; onSave: (d: any) => void; onCancel: () => void; saving: boolean;
   jurisdictions?: Array<{ id: string; label: string; flag?: string | null }>;
+  allCases?: Array<{ id: number; title: string; type?: string | null; date?: string | null }>;
 }) {
   const isEdit = !!initial;
   const initPortrait = initial?.portrait
@@ -247,6 +248,11 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
   }>>(initRules);
   const [expandedRuleIdx, setExpandedRuleIdx] = useState<number | null>(null);
   const [formTab, setFormTab] = useState("basic");
+  const initRelatedCaseIds: number[] = initial?.relatedCaseIds
+    ? (typeof initial.relatedCaseIds === "string" ? JSON.parse(initial.relatedCaseIds) : initial.relatedCaseIds)
+    : [];
+  const [relatedCaseIds, setRelatedCaseIds] = useState<number[]>(initRelatedCaseIds);
+  const [caseSearch, setCaseSearch] = useState("");
 
   const setB = (k: string, v: any) => setBasic((p) => ({ ...p, [k]: v }));
   const toggleJuris = (id: string) => setJurisSel((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
@@ -265,6 +271,7 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
     portrait: { ...portrait, types: types.split(",").map((t) => t.trim()).filter(Boolean) },
     timeline,
     rules,
+    relatedCaseIds,
   });
 
   return (
@@ -275,6 +282,7 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
           <TabsTrigger value="portrait" className="flex-1">结构画像</TabsTrigger>
           <TabsTrigger value="timeline" className="flex-1">时间线</TabsTrigger>
           <TabsTrigger value="rules" className="flex-1">规则文件</TabsTrigger>
+          <TabsTrigger value="related" className="flex-1">关联案例</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basic" className="space-y-3">
@@ -509,6 +517,40 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
             </div>
           ))}
         </TabsContent>
+
+        <TabsContent value="related" className="space-y-3">
+          <p className="text-xs text-muted-foreground">选择与该平台直接相关的案例，将在平台详情页「关联案例」标签下展示。</p>
+          <Input
+            placeholder="搜索案例名称…"
+            value={caseSearch}
+            onChange={(e) => setCaseSearch(e.target.value)}
+            className="h-8 text-sm"
+          />
+          <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+            {(allCases ?? []).filter((c) =>
+              !caseSearch || c.title.toLowerCase().includes(caseSearch.toLowerCase())
+            ).map((c) => (
+              <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={relatedCaseIds.includes(c.id)}
+                  onChange={(e) => setRelatedCaseIds((p) =>
+                    e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id)
+                  )}
+                  className="rounded"
+                />
+                <span className="text-sm flex-1 truncate">{c.title}</span>
+                {c.date && <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>}
+              </label>
+            ))}
+            {(allCases ?? []).length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-4">暂无案例数据</p>
+            )}
+          </div>
+          {relatedCaseIds.length > 0 && (
+            <p className="text-xs text-primary">已选择 {relatedCaseIds.length} 个关联案例</p>
+          )}
+        </TabsContent>
       </Tabs>
 
 <div className="pt-3 mt-3">
@@ -534,10 +576,14 @@ export default function Admin() {
   const [inputVal, setInputVal] = useState("");
 
   // Case dialog
+  const [, navigate] = useLocation();
   const [caseDialog, setCaseDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id?: number; title?: string }>({ open: false });
   // Platform dialog
   const [platformDialog, setPlatformDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
+  const [platformDeleteDialog, setPlatformDeleteDialog] = useState<{ open: boolean; id?: string; name?: string }>({ open: false });
+  // API Settings
+  const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
   // Topic/Jurisdiction dialog
   const [topicDialog, setTopicDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [jurisDialog, setJurisDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
@@ -546,14 +592,17 @@ export default function Admin() {
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: stats } = trpc.cases.stats.useQuery();
 
+  // Fetch all cases (unpaginated) for platform related-cases selector
+  const { data: allCasesForPlatform } = trpc.cases.listAdmin.useQuery({ page: 1, pageSize: 500, keyword: "" });
+
   const { data: casesData, isLoading: casesLoading } = trpc.cases.listAdmin.useQuery({
     page,
     pageSize: PAGE_SIZE,
     keyword: keyword || undefined,
   });
 
-  const { data: platformsData, isLoading: platformsLoading } = trpc.platforms.list.useQuery({ pageSize: 999 });
-  const platforms = platformsData?.items;
+  const { data: platformsData, isLoading: platformsLoading } = trpc.platforms.listAdmin.useQuery();
+  const platforms = platformsData;
 
   const createTopic = trpc.topics.create.useMutation({
     onSuccess: () => { toast.success("专题已创建"); utils.topics.list.invalidate(); setTopicDialog({ open: false }); },
@@ -584,9 +633,51 @@ export default function Admin() {
     onError: (e: any) => toast.error(e.message),
   });
   const updatePlatform = trpc.platforms.update.useMutation({
-    onSuccess: () => { toast.success("平台已更新"); utils.platforms.list.invalidate(); setPlatformDialog({ open: false }); },
+    onSuccess: () => { toast.success("平台已更新"); utils.platforms.list.invalidate(); utils.platforms.listAdmin.invalidate(); setPlatformDialog({ open: false }); },
     onError: (e: any) => toast.error(e.message),
   });
+  const deletePlatform = trpc.platforms.delete.useMutation({
+    onSuccess: () => { toast.success("平台已删除"); utils.platforms.list.invalidate(); utils.platforms.listAdmin.invalidate(); setPlatformDeleteDialog({ open: false }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const togglePlatformActive = trpc.platforms.update.useMutation({
+    onSuccess: () => { utils.platforms.list.invalidate(); utils.platforms.listAdmin.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const { data: apiSettingsList, refetch: refetchSettings } = trpc.settings.list.useQuery();
+  const setApiSetting = trpc.settings.set.useMutation({
+    onSuccess: () => { toast.success("配置已保存"); refetchSettings(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteApiSetting = trpc.settings.delete.useMutation({
+    onSuccess: () => { toast.success("配置已清除"); refetchSettings(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const API_CONFIG_ITEMS = [
+    {
+      key: "firecrawl_api_key",
+      label: "Firecrawl API Key",
+      description: "用于 AI 自动从 URL 抓取案例内容。在 firecrawl.dev 获取（免费套餐 500 次/月）。",
+      placeholder: "fc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      docsUrl: "https://firecrawl.dev",
+    },
+    {
+      key: "openai_api_key",
+      label: "AI 写作 API Key (OpenAI 兼容)",
+      description: "用于案例内容的 AI 总结、AI 写作辅助功能。支持 OpenAI、DeepSeek、其他兼容接口。",
+      placeholder: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      docsUrl: "https://platform.openai.com/api-keys",
+    },
+    {
+      key: "openai_base_url",
+      label: "AI API Base URL（可选）",
+      description: "自定义 AI API 地址，用于接入 DeepSeek、山岳等国产模型。留空则使用内置模型。",
+      placeholder: "https://api.deepseek.com/v1",
+      docsUrl: "",
+    },
+  ];
 
   const createCase = trpc.cases.create.useMutation({
     onSuccess: () => {
@@ -690,8 +781,9 @@ export default function Admin() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-5">
             {[
+              { label: "平台总数", value: platforms?.length ?? 0 },
               { label: "案例总数", value: stats?.total ?? 0 },
               { label: "司法案例", value: stats?.judicial ?? 0 },
               { label: "监管执法", value: stats?.regulatory ?? 0 },
@@ -721,6 +813,10 @@ export default function Admin() {
               <Tag className="w-3.5 h-3.5" />
               专题/辖区
             </TabsTrigger>
+            <TabsTrigger value="api" className="gap-1.5">
+              <Settings className="w-3.5 h-3.5" />
+              API 配置
+            </TabsTrigger>
           </TabsList>
 
           {/* Cases Tab */}
@@ -741,7 +837,7 @@ export default function Admin() {
               <Button
                 size="sm"
                 className="gap-1.5"
-                onClick={() => setCaseDialog({ open: true })}
+                onClick={() => navigate("/admin/cases/new")}
               >
                 <Plus className="w-4 h-4" />
                 新增案例
@@ -797,7 +893,7 @@ export default function Admin() {
                               variant="ghost"
                               size="icon"
                               className="w-7 h-7"
-                              onClick={() => setCaseDialog({ open: true, editing: c })}
+                              onClick={() => navigate(`/admin/cases/${c.id}/edit`)}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
@@ -838,7 +934,7 @@ export default function Admin() {
           {/* Platforms Tab */}
           <TabsContent value="platforms">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">共 {platformsData?.total ?? 0} 个平台</p>
+              <p className="text-sm text-muted-foreground">共 {platforms?.length ?? 0} 个平台</p>
               <Button size="sm" className="gap-1.5" onClick={() => setPlatformDialog({ open: true })}>
                 <Plus className="w-4 h-4" />
                 新增平台
@@ -856,6 +952,7 @@ export default function Admin() {
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">平台</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">母公司</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">总部</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">状态</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground w-28">操作</th>
                     </tr>
                   </thead>
@@ -876,6 +973,20 @@ export default function Admin() {
                         <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{p.company}</td>
                         <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{p.hq}</td>
                         <td className="px-4 py-3">
+                          <button
+                            onClick={() => togglePlatformActive.mutate({ id: p.id, isActive: !p.isActive })}
+                            className={cn(
+                              "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
+                              p.isActive
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                : "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {p.isActive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                            {p.isActive ? "已激活" : "未激活"}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
@@ -894,6 +1005,14 @@ export default function Admin() {
                               <Link href={`/platforms/${p.id}`}>
                                 <Eye className="w-3.5 h-3.5" />
                               </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-7 h-7 text-destructive hover:text-destructive"
+                              onClick={() => setPlatformDeleteDialog({ open: true, id: p.id, name: p.name })}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         </td>
@@ -994,6 +1113,78 @@ export default function Admin() {
               </div>
             </div>
           </TabsContent>
+
+          {/* API Config Tab */}
+          <TabsContent value="api">
+            <div className="max-w-2xl space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-1">第三方 API 配置</h3>
+                <p className="text-xs text-muted-foreground mb-4">配置后可在案例录入页面中使用 AI 自动填充、AI 总结和 AI 写作功能。API Key 加密存储，仅显示是否已配置。</p>
+                <div className="space-y-4">
+                  {API_CONFIG_ITEMS.map((item) => {
+                    const existing = apiSettingsList?.find((s: any) => s.key === item.key);
+                    const inputVal = apiKeyInputs[item.key] ?? "";
+                    return (
+                      <div key={item.key} className="border border-border rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Key className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="font-medium text-sm">{item.label}</span>
+                              {existing?.hasValue ? (
+                                <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                  <CheckCircle2 className="w-3 h-3" /> 已配置
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                                  <AlertCircle className="w-3 h-3" /> 未配置
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+                            {item.docsUrl && (
+                              <a href={item.docsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-0.5 inline-block">
+                                获取 API Key ↗
+                              </a>
+                            )}
+                          </div>
+                          {existing?.hasValue && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive shrink-0 h-7 text-xs"
+                              onClick={() => deleteApiSetting.mutate({ key: item.key })}
+                            >
+                              <X className="w-3 h-3 mr-1" />清除
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            placeholder={existing?.hasValue ? "已配置（输入新内容可更新）" : item.placeholder}
+                            value={inputVal}
+                            onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [item.key]: e.target.value }))}
+                            className="flex-1 font-mono text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            disabled={!inputVal.trim() || setApiSetting.isPending}
+                            onClick={() => {
+                              setApiSetting.mutate({ key: item.key, value: inputVal.trim(), label: item.label });
+                              setApiKeyInputs((prev) => ({ ...prev, [item.key]: "" }));
+                            }}
+                          >
+                            <Save className="w-3.5 h-3.5 mr-1" />保存
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -1032,6 +1223,7 @@ export default function Admin() {
           <PlatformForm
             initial={platformDialog.editing}
             jurisdictions={jurisdictions ?? []}
+            allCases={(allCasesForPlatform?.items ?? []).map((c: any) => ({ id: c.id, title: c.title, type: c.type, date: c.date }))}
             onSave={(d) => platformDialog.editing ? updatePlatform.mutate(d) : createPlatform.mutate(d)}
             onCancel={() => setPlatformDialog({ open: false })}
             saving={createPlatform.isPending || updatePlatform.isPending}
@@ -1056,7 +1248,7 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm Dialog */}
+      {/* Delete Case Confirm Dialog */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(o) => setDeleteDialog({ open: o })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1070,6 +1262,27 @@ export default function Admin() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteDialog.id && deleteCase.mutate({ id: deleteDialog.id })}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Platform Confirm Dialog */}
+      <AlertDialog open={platformDeleteDialog.open} onOpenChange={(o) => setPlatformDeleteDialog({ open: o })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除平台</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除平台「{platformDeleteDialog.name}」吗？删除后该平台的所有数据将不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => platformDeleteDialog.id && deletePlatform.mutate({ id: platformDeleteDialog.id })}
             >
               删除
             </AlertDialogAction>

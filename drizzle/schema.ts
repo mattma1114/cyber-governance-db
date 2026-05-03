@@ -120,3 +120,12 @@ export const platforms = mysqlTable("platforms", {
 
 export type Platform = typeof platforms.$inferSelect;
 export type InsertPlatform = typeof platforms.$inferInsert;
+
+// API 配置（管理员存储第三方 API Key）
+export const apiSettings = mysqlTable("api_settings", {
+  key: varchar("key", { length: 128 }).primaryKey(),
+  value: text("value").notNull(),
+  label: varchar("label", { length: 256 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ApiSetting = typeof apiSettings.$inferSelect;

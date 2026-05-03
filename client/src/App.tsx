@@ -14,6 +14,7 @@ import Platforms from "./pages/Platforms";
 import PlatformDetail from "./pages/PlatformDetail";
 import About from "./pages/About";
 import Admin from "./pages/Admin";
+import CaseEditor from "./pages/CaseEditor";
 import Legal from "./pages/Legal";
 
 function Router() {
@@ -26,6 +27,18 @@ function Router() {
       <Route path="/platforms/:id" component={PlatformDetail} />
       <Route path="/about" component={About} />
       <Route path="/legal" component={Legal} />
+      <Route path="/admin/cases/new">
+        <ProtectedRoute requireAdmin>
+          <CaseEditor />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/cases/:id/edit">
+        {(params) => (
+          <ProtectedRoute requireAdmin>
+            <CaseEditor editId={parseInt(params.id)} />
+          </ProtectedRoute>
+        )}
+      </Route>
       <Route path="/admin">
         <ProtectedRoute requireAdmin>
           <Admin />
