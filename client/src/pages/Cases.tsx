@@ -137,7 +137,7 @@ export default function Cases() {
         <div className="flex gap-6 items-start">
           {/* ── Left sidebar filters ── */}
           <aside className={cn(
-            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto",
+            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-16 self-start max-h-[calc(100vh-5rem)] overflow-y-auto z-20",
             sidebarOpen ? "w-52" : "w-8"
           )}>            {/* Collapse toggle button */}
             <button
