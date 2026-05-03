@@ -5,13 +5,31 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Building2, MapPin, Calendar, ExternalLink,
-  LayoutGrid, Clock, FileText, Scale, Network
+  LayoutGrid, Clock, FileText, Scale, Network, Languages, ChevronRight
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 import { useState } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type NavSection = "portrait" | "timeline" | "rules" | "cases";
+
+interface RuleVersion {
+  versionId: string;
+  versionLabel: string;
+  date: string;
+  url?: string;
+  content?: string;
+}
+
+interface Rule {
+  id: string;
+  title: string;
+  type: string;
+  versions: RuleVersion[];
+  // legacy support: flat fields
+  date?: string;
+  url?: string;
+}
 
 const NAV_ITEMS: { key: NavSection; label: string; icon: React.ReactNode }[] = [
   { key: "portrait", label: "平台画像", icon: <LayoutGrid className="w-4 h-4" /> },
@@ -29,6 +47,31 @@ const PORTRAIT_LABELS: Record<string, string> = {
   openness: "开放程度",
   crossBorder: "跨境运营",
 };
+
+// ── Normalize rules: support both legacy flat format and new versioned format ──
+function normalizeRules(raw: any[]): Rule[] {
+  return raw.map((r, idx) => {
+    if (r.versions && Array.isArray(r.versions)) {
+      // Already new format
+      return r as Rule;
+    }
+    // Legacy flat format: { date, title, type, url }
+    return {
+      id: r.id ?? `rule-${idx}`,
+      title: r.title ?? "未命名规则",
+      type: r.type ?? "",
+      versions: [
+        {
+          versionId: `v-${idx}-0`,
+          versionLabel: "初始版本",
+          date: r.date ?? "",
+          url: r.url,
+          content: r.content,
+        },
+      ],
+    } as Rule;
+  });
+}
 
 // ── Portrait Section ──────────────────────────────────────────────────────────
 function PortraitSection({ portrait }: { portrait: any }) {
@@ -100,45 +143,198 @@ function TimelineSection({ timeline }: { timeline: any[] }) {
   );
 }
 
-// ── Rules Section ─────────────────────────────────────────────────────────────
-function RulesSection({ rules }: { rules: any[] }) {
+// ── Rules Section — three-column layout ──────────────────────────────────────
+function RulesSection({ rules: rawRules }: { rules: any[] }) {
+  const rules = normalizeRules(rawRules);
+  const [selectedRuleId, setSelectedRuleId] = useState<string>(rules[0]?.id ?? "");
+  const [selectedVersionId, setSelectedVersionId] = useState<string>(
+    rules[0]?.versions?.[0]?.versionId ?? ""
+  );
+
   if (rules.length === 0) {
     return <p className="text-sm text-muted-foreground py-8 text-center">暂无规则文件</p>;
   }
+
+  const selectedRule = rules.find((r) => r.id === selectedRuleId) ?? rules[0];
+  const selectedVersion = selectedRule?.versions?.find((v) => v.versionId === selectedVersionId)
+    ?? selectedRule?.versions?.[0];
+
+  const handleSelectRule = (rule: Rule) => {
+    setSelectedRuleId(rule.id);
+    setSelectedVersionId(rule.versions?.[0]?.versionId ?? "");
+  };
+
+  const handleGoogleTranslate = () => {
+    if (!selectedVersion?.url) return;
+    const url = `https://translate.google.com/translate?sl=auto&tl=zh-CN&u=${encodeURIComponent(selectedVersion.url)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div>
       <h2 className="text-base font-semibold mb-6 flex items-center gap-2">
         <FileText className="w-4 h-4 text-primary" />
         规则文件
       </h2>
-      <div>
-        {rules.map((rule: any, i: number) => (
-          <div key={i}>
-            <div className="py-4 flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Badge variant="outline" className="text-xs">{rule.type}</Badge>
-                  {rule.date && (
-                    <span className="text-xs text-muted-foreground">{rule.date}</span>
+
+      {/* Three-column grid */}
+      <div className="grid grid-cols-[200px_180px_1fr] gap-0 border border-border/25 rounded-xl overflow-hidden min-h-[480px]">
+
+        {/* ── Column 1: Rule Names ── */}
+        <div className="border-r border-border/25 bg-muted/20 overflow-y-auto">
+          <div className="px-3 py-2.5 border-b border-border/20">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">规则名称</span>
+          </div>
+          <div className="py-1">
+            {rules.map((rule) => {
+              const isActive = rule.id === selectedRuleId;
+              return (
+                <button
+                  key={rule.id}
+                  onClick={() => handleSelectRule(rule)}
+                  className={cn(
+                    "w-full text-left px-3 py-3 transition-colors flex items-start gap-2 group",
+                    isActive
+                      ? "bg-primary/8 text-primary"
+                      : "hover:bg-muted/60 text-foreground/80"
                   )}
-                </div>
-                <p className="text-sm font-medium leading-snug">{rule.title}</p>
-              </div>
-              {rule.url && (
-                <a
-                  href={rule.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-                  title="查看原文"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      "text-xs font-medium leading-snug line-clamp-3",
+                      isActive ? "text-primary" : "text-foreground/85 group-hover:text-foreground"
+                    )}>
+                      {rule.title}
+                    </p>
+                    {rule.type && (
+                      <span className={cn(
+                        "text-[10px] mt-1 block",
+                        isActive ? "text-primary/60" : "text-muted-foreground"
+                      )}>
+                        {rule.type}
+                      </span>
+                    )}
+                  </div>
+                  {isActive && <ChevronRight className="w-3 h-3 text-primary shrink-0 mt-0.5" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Column 2: Version / Date Selection ── */}
+        <div className="border-r border-border/25 bg-muted/10 overflow-y-auto">
+          <div className="px-3 py-2.5 border-b border-border/20">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">版本历史</span>
+          </div>
+          <div className="py-1">
+            {selectedRule?.versions?.length > 0 ? (
+              selectedRule.versions.map((ver) => {
+                const isActive = ver.versionId === selectedVersionId;
+                return (
+                  <button
+                    key={ver.versionId}
+                    onClick={() => setSelectedVersionId(ver.versionId)}
+                    className={cn(
+                      "w-full text-left px-3 py-3 transition-colors",
+                      isActive
+                        ? "bg-primary/8 border-l-2 border-primary"
+                        : "hover:bg-muted/60 border-l-2 border-transparent"
+                    )}
+                  >
+                    <p className={cn(
+                      "text-xs font-medium leading-snug",
+                      isActive ? "text-primary" : "text-foreground/85"
+                    )}>
+                      {ver.versionLabel}
+                    </p>
+                    {ver.date && (
+                      <span className="text-[10px] text-muted-foreground mt-0.5 block font-mono">
+                        {ver.date}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <p className="text-xs text-muted-foreground px-3 py-4">暂无版本记录</p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Column 3: Full Text / Content ── */}
+        <div className="overflow-y-auto flex flex-col">
+          {/* Content header */}
+          <div className="px-5 py-3 border-b border-border/20 flex items-center justify-between gap-3 shrink-0">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground/80 truncate">{selectedRule?.title}</p>
+              {selectedVersion?.date && (
+                <span className="text-[10px] text-muted-foreground font-mono">{selectedVersion.date}</span>
               )}
             </div>
-            {i < rules.length - 1 && <div className="border-t border-border/20" />}
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedVersion?.url && (
+                <>
+                  <a
+                    href={selectedVersion.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-2.5 py-1 transition-colors hover:border-primary/40"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    原文
+                  </a>
+                  <button
+                    onClick={handleGoogleTranslate}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border/50 rounded-full px-2.5 py-1 transition-colors hover:border-primary/40"
+                  >
+                    <Languages className="w-3 h-3" />
+                    翻译
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        ))}
+
+          {/* Content body */}
+          <div className="flex-1 px-5 py-5 overflow-y-auto">
+            {selectedVersion?.content ? (
+              <div className="text-sm leading-relaxed text-foreground/85 whitespace-pre-wrap">
+                {selectedVersion.content}
+              </div>
+            ) : selectedVersion?.url ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
+                <FileText className="w-10 h-10 text-muted-foreground/20" />
+                <div>
+                  <p className="text-sm text-muted-foreground mb-3">暂未录入规则全文</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <a
+                      href={selectedVersion.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      前往原始来源查阅
+                    </a>
+                    <button
+                      onClick={handleGoogleTranslate}
+                      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                      Google 翻译
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <FileText className="w-10 h-10 text-muted-foreground/20 mb-3" />
+                <p className="text-sm text-muted-foreground">暂无内容</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -262,7 +458,7 @@ export default function PlatformDetail() {
     ? (typeof p.portrait === "string" ? JSON.parse(p.portrait) : p.portrait)
     : null;
 
-  const rules: any[] = p.rules
+  const rawRules: any[] = p.rules
     ? (typeof p.rules === "string" ? JSON.parse(p.rules) : p.rules)
     : [];
 
@@ -274,7 +470,8 @@ export default function PlatformDetail() {
     relatedCaseIds.includes(String(c.id))
   ) ?? [];
 
-  // Badge counts for nav items
+  const rules = normalizeRules(rawRules);
+
   const sectionCounts: Record<NavSection, number> = {
     portrait: portrait ? Object.keys(PORTRAIT_LABELS).filter((k) => portrait[k]).length : 0,
     timeline: timeline.length,
@@ -351,7 +548,7 @@ export default function PlatformDetail() {
           </p>
         )}
 
-        {/* Two-column layout */}
+        {/* Two-column layout: left nav + right content */}
         <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8 items-start">
 
           {/* ── LEFT: Navigation ── */}
@@ -398,7 +595,7 @@ export default function PlatformDetail() {
               <TimelineSection timeline={timeline} />
             )}
             {activeSection === "rules" && (
-              <RulesSection rules={rules} />
+              <RulesSection rules={rawRules} />
             )}
             {activeSection === "cases" && (
               <RelatedCasesSection

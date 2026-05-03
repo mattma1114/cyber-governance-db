@@ -43,6 +43,11 @@
 - [x] 受保护路由验证（ProtectedRoute 组件）
 - [x] TypeScript 编译（仅剩框架层 storageProxy.ts 1个错误，非业务代码）
 
+## 已完成（本次迭代）
+- [x] 规则文件模块改为三栏布局（左：规则名称，中：版本历史，右：规则全文/原文链接）
+- [x] Admin.tsx 平台表单规则 Tab 支持多版本管理（版本号/日期/链接/全文）
+- [x] 兼容旧版 flat 格式规则数据（自动 normalize）
+
 ## AI 辅助录入
 - [ ] 后端添加 cases.extractFromText tRPC 接口（调用 LLM 提取结构化字段）
 - [ ] 前端 Admin.tsx 案例表单添加"AI 辅助填充"面板（粘贴原文 → 解析 → 自动填充）

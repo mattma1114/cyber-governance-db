@@ -96,10 +96,16 @@ export const platforms = mysqlTable("platforms", {
     crossBorder: string;
   }>(),
   rules: json("rules").$type<Array<{
-    date: string;
+    id: string;
     title: string;
     type: string;
-    url: string;
+    versions: Array<{
+      versionId: string;
+      versionLabel: string;
+      date: string;
+      url?: string;
+      content?: string;
+    }>;
   }>>().default([]),
   timeline: json("timeline").$type<Array<{
     date: string;

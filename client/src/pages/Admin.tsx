@@ -207,9 +207,22 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
   const initTimeline: Array<{ date: string; event: string }> = initial?.timeline
     ? (typeof initial.timeline === "string" ? JSON.parse(initial.timeline) : initial.timeline)
     : [];
-  const initRules: Array<{ date: string; title: string; type: string; url: string }> = initial?.rules
-    ? (typeof initial.rules === "string" ? JSON.parse(initial.rules) : initial.rules)
-    : [];
+  // Normalize rules to new versioned format
+  const normalizeAdminRules = (raw: any[]): Array<{
+    id: string; title: string; type: string;
+    versions: Array<{ versionId: string; versionLabel: string; date: string; url: string; content: string }>;
+  }> => raw.map((r, idx) => {
+    if (r.versions && Array.isArray(r.versions)) return r;
+    return {
+      id: r.id ?? `rule-${idx}`,
+      title: r.title ?? "",
+      type: r.type ?? "",
+      versions: [{ versionId: `v-${idx}-0`, versionLabel: "初始版本", date: r.date ?? "", url: r.url ?? "", content: r.content ?? "" }],
+    };
+  });
+  const initRules = normalizeAdminRules(
+    initial?.rules ? (typeof initial.rules === "string" ? JSON.parse(initial.rules) : initial.rules) : []
+  );
 
   const [basic, setBasic] = useState({
     id: initial?.id ?? "",
@@ -228,7 +241,11 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
     Object.fromEntries(PORTRAIT_DIMS.map((d) => [d.key, initPortrait[d.key] ?? ""]))
   );
   const [timeline, setTimeline] = useState<Array<{ date: string; event: string }>>(initTimeline);
-  const [rules, setRules] = useState<Array<{ date: string; title: string; type: string; url: string }>>(initRules);
+  const [rules, setRules] = useState<Array<{
+    id: string; title: string; type: string;
+    versions: Array<{ versionId: string; versionLabel: string; date: string; url: string; content: string }>;
+  }>>(initRules);
+  const [expandedRuleIdx, setExpandedRuleIdx] = useState<number | null>(null);
   const [formTab, setFormTab] = useState("basic");
 
   const setB = (k: string, v: any) => setBasic((p) => ({ ...p, [k]: v }));
@@ -374,39 +391,121 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
 
         <TabsContent value="rules" className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">平台规则文件列表</p>
-            <Button size="sm" variant="outline" className="gap-1" onClick={() => setRules((p) => [...p, { date: "", title: "", type: "", url: "" }])}>
-              <Plus className="w-3.5 h-3.5" />新增
+            <p className="text-xs text-muted-foreground">平台规则文件列表（每条规则可添加多个版本）</p>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => {
+              const newIdx = rules.length;
+              setRules((p) => [...p, { id: `rule-${Date.now()}`, title: "", type: "", versions: [{ versionId: `v-${Date.now()}-0`, versionLabel: "初始版本", date: "", url: "", content: "" }] }]);
+              setExpandedRuleIdx(newIdx);
+            }}>
+              <Plus className="w-3.5 h-3.5" />新增规则
             </Button>
           </div>
-          {rules.map((item, i) => (
-            <div key={i} className="border border-border rounded-lg p-3 space-y-2">
-              <div className="flex gap-2">
-                <Input
-                  className="w-28 shrink-0"
-                  value={item.date}
-                  onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}
-                  placeholder="2023-01"
-                />
-                <Input
-                  value={item.type}
-                  onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
-                  placeholder="类型（如隐私政策）"
-                />
-                <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-destructive" onClick={() => setRules((p) => p.filter((_, j) => j !== i))}>
-                  <X className="w-3.5 h-3.5" />
+          {rules.map((rule, i) => (
+            <div key={rule.id ?? i} className="border border-border/50 rounded-lg overflow-hidden">
+              {/* Rule header */}
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/30">
+                <button
+                  type="button"
+                  className="flex-1 flex items-center gap-2 text-left"
+                  onClick={() => setExpandedRuleIdx(expandedRuleIdx === i ? null : i)}
+                >
+                  <ChevronRight className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", expandedRuleIdx === i && "rotate-90")} />
+                  <span className="text-sm font-medium truncate">{rule.title || "（未命名规则）"}</span>
+                  {rule.type && <Badge variant="outline" className="text-[10px] shrink-0">{rule.type}</Badge>}
+                  <span className="text-xs text-muted-foreground shrink-0">{rule.versions?.length ?? 0} 个版本</span>
+                </button>
+                <Button variant="ghost" size="icon" className="w-7 h-7 shrink-0 text-destructive" onClick={() => setRules((p) => p.filter((_, j) => j !== i))}>
+                  <X className="w-3 h-3" />
                 </Button>
               </div>
-              <Input
-                value={item.title}
-                onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
-                placeholder="文件标题"
-              />
-              <Input
-                value={item.url}
-                onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, url: e.target.value } : x))}
-                placeholder="https://..."
-              />
+              {/* Rule body (expanded) */}
+              {expandedRuleIdx === i && (
+                <div className="p-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">规则名称</Label>
+                      <Input
+                        value={rule.title}
+                        onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
+                        placeholder="如：用户服务协议"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">规则类型</Label>
+                      <Input
+                        value={rule.type}
+                        onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
+                        placeholder="如：隐私政策"
+                      />
+                    </div>
+                  </div>
+                  {/* Versions */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">版本历史</Label>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() =>
+                        setRules((p) => p.map((x, j) => j === i ? {
+                          ...x,
+                          versions: [...(x.versions ?? []), { versionId: `v-${Date.now()}`, versionLabel: "", date: "", url: "", content: "" }]
+                        } : x))
+                      }>
+                        <Plus className="w-3 h-3" />添加版本
+                      </Button>
+                    </div>
+                    {rule.versions?.map((ver, vi) => (
+                      <div key={ver.versionId ?? vi} className="border border-border/30 rounded-md p-2.5 space-y-2">
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            className="w-28 shrink-0 h-7 text-xs"
+                            value={ver.versionLabel}
+                            onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
+                              ...x,
+                              versions: x.versions.map((v, k) => k === vi ? { ...v, versionLabel: e.target.value } : v)
+                            } : x))}
+                            placeholder="版本号（如 v2.0）"
+                          />
+                          <Input
+                            className="w-28 shrink-0 h-7 text-xs"
+                            value={ver.date}
+                            onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
+                              ...x,
+                              versions: x.versions.map((v, k) => k === vi ? { ...v, date: e.target.value } : v)
+                            } : x))}
+                            placeholder="2024-01-01"
+                          />
+                          <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-destructive ml-auto" onClick={() =>
+                            setRules((p) => p.map((x, j) => j === i ? {
+                              ...x,
+                              versions: x.versions.filter((_, k) => k !== vi)
+                            } : x))
+                          }>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <Input
+                          className="h-7 text-xs"
+                          value={ver.url}
+                          onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
+                            ...x,
+                            versions: x.versions.map((v, k) => k === vi ? { ...v, url: e.target.value } : v)
+                          } : x))}
+                          placeholder="原文链接 https://..."
+                        />
+                        <Textarea
+                          className="text-xs min-h-[60px]"
+                          value={ver.content}
+                          onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
+                            ...x,
+                            versions: x.versions.map((v, k) => k === vi ? { ...v, content: e.target.value } : v)
+                          } : x))}
+                          placeholder="规则全文（可选，留空则前端显示跳转原文链接）"
+                          rows={3}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </TabsContent>
