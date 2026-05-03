@@ -39,7 +39,7 @@
 - [x] About 联系方式提供真实邮箱链接 cyberdb@zjicm.edu.cn
 
 ## 测试
-- [x] 后端 tRPC 路由单元测试（auth/cases/topics/platforms）- 7 tests passed
+- [x] 后端 tRPC 路由单元测试（auth/cases/topics/platforms）- 15 tests passed
 - [x] 受保护路由验证（ProtectedRoute 组件）
 - [x] TypeScript 编译（仅剩框架层 storageProxy.ts 1个错误，非业务代码）
 

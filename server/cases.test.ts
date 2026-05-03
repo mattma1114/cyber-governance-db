@@ -92,10 +92,12 @@ describe("topics router", () => {
 });
 
 describe("platforms router", () => {
-  it("list returns array without DB", async () => {
+  it("list returns paginated object without DB", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const result = await caller.platforms.list({});
-    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveProperty("items");
+    expect(result).toHaveProperty("total");
+    expect(Array.isArray(result.items)).toBe(true);
   });
 
   it("listAdmin rejects non-admin users", async () => {

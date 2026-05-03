@@ -4,17 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowLeft, Building2, MapPin, Calendar, Globe, ExternalLink,
+  ArrowLeft, Building2, MapPin, Calendar, ExternalLink,
   LayoutGrid, Clock, FileText, Scale, Network
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
 function PortraitItem({ label, value }: { label: string; value: string | string[] }) {
   return (
-<div className="flex flex-col gap-1 py-3">
+    <div className="flex flex-col gap-1 py-3">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {Array.isArray(value) ? (
         <div className="flex flex-wrap gap-1.5">
@@ -31,10 +30,31 @@ function PortraitItem({ label, value }: { label: string; value: string | string[
 
 export default function PlatformDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: p, isLoading } = trpc.platforms.getById.useQuery({ id: id ?? "" }, { enabled: !!id });
+
+  // ── ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP ──────────────────
+  const { data: p, isLoading } = trpc.platforms.getById.useQuery(
+    { id: id ?? "" },
+    { enabled: !!id }
+  );
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: topics } = trpc.topics.list.useQuery();
 
+  // Parse relatedCaseIds from the platform data (safe even when p is undefined)
+  const relatedCaseIds: string[] = (() => {
+    if (!p?.relatedCaseIds) return [];
+    return typeof p.relatedCaseIds === "string"
+      ? JSON.parse(p.relatedCaseIds)
+      : (p.relatedCaseIds as string[]);
+  })();
+
+  // This hook MUST be called unconditionally — no early returns before this line
+  const { data: relatedCasesData } = trpc.cases.list.useQuery(
+    { page: 1, pageSize: 20 },
+    { enabled: relatedCaseIds.length > 0 }
+  );
+  // ── END HOOKS ─────────────────────────────────────────────────────────────
+
+  // Now it is safe to do conditional returns
   if (isLoading) {
     return (
       <div className="container py-8 max-w-4xl">
@@ -56,10 +76,13 @@ export default function PlatformDetail() {
     );
   }
 
+  // Derived data (safe to compute after early returns)
   const jurisArr: string[] = Array.isArray(p.jurisdiction)
     ? p.jurisdiction
     : (p.jurisdiction ? JSON.parse(p.jurisdiction as string) : []);
-  const jurisLabels = jurisArr.map((id) => jurisdictions?.find((j) => j.id === id)).filter(Boolean);
+  const jurisLabels = jurisArr
+    .map((jId) => jurisdictions?.find((j) => j.id === jId))
+    .filter(Boolean);
 
   const portrait: any = p.portrait
     ? (typeof p.portrait === "string" ? JSON.parse(p.portrait) : p.portrait)
@@ -73,15 +96,6 @@ export default function PlatformDetail() {
     ? (typeof p.timeline === "string" ? JSON.parse(p.timeline) : p.timeline)
     : [];
 
-  const relatedCaseIds: string[] = p.relatedCaseIds
-    ? (typeof p.relatedCaseIds === "string" ? JSON.parse(p.relatedCaseIds) : p.relatedCaseIds)
-    : [];
-
-  // Fetch related cases
-  const { data: relatedCasesData } = trpc.cases.list.useQuery(
-    { page: 1, pageSize: 20 },
-    { enabled: relatedCaseIds.length > 0 }
-  );
   const relatedCases = relatedCasesData?.items.filter((c) =>
     relatedCaseIds.includes(String(c.id))
   ) ?? [];
@@ -165,8 +179,6 @@ export default function PlatformDetail() {
           </p>
         )}
 
-
-
         {/* Tabs */}
         <Tabs defaultValue="portrait">
           <TabsList className="mb-6">
@@ -221,9 +233,7 @@ export default function PlatformDetail() {
                 <div className="space-y-4 pl-10">
                   {timeline.map((item: any, i: number) => (
                     <div key={i} className="relative">
-                      <div
-                        className="absolute -left-6 top-1.5 w-3 h-3 rounded-full border-2 border-primary bg-background"
-                      />
+                      <div className="absolute -left-6 top-1.5 w-3 h-3 rounded-full border-2 border-primary bg-background" />
                       <div className="p-4 rounded-xl border border-border bg-card hover:shadow-sm transition-shadow">
                         <span className="text-xs font-mono text-muted-foreground">{item.date}</span>
                         <p className="text-sm mt-1">{item.event}</p>
@@ -277,7 +287,10 @@ export default function PlatformDetail() {
                   <Link key={c.id} href={`/cases/${c.id}`}>
                     <Card className="hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer">
                       <CardContent className="p-4 flex items-start gap-3">
-                        <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[c.type])}>
+                        <Badge
+                          variant="secondary"
+                          className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[c.type])}
+                        >
                           {TYPE_LABELS[c.type]?.label}
                         </Badge>
                         <div className="flex-1 min-w-0">
@@ -298,7 +311,7 @@ export default function PlatformDetail() {
         </Tabs>
 
         {/* Bottom nav */}
-<div className="mt-12 pt-6">
+        <div className="mt-12 pt-6">
           <Button variant="outline" asChild>
             <Link href="/platforms">
               <ArrowLeft className="w-4 h-4 mr-2" />
