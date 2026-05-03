@@ -80,3 +80,7 @@
 - [x] tRPC procedure: ai.extractPlatformFromUrl（adminProcedure）
 - [x] Admin.tsx：新增/编辑平台按鈕指向全屏页面 /admin/platforms/new 和 /admin/platforms/:id/edit
 - [x] App.tsx：注册 PlatformEditor 路由
+
+## 预览功能（当前迭代）
+- [x] PlatformEditor.tsx：底部添加「预览」按鈕，先保存草稿再在新标签页打开前台平台详情页
+- [x] CaseEditor.tsx：底部添加「预览」按鈕，先保存草稿再在新标签页打开前台案例详情页

@@ -98,6 +98,7 @@ export default function PlatformEditor() {
   const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
   const [aiExtractError, setAiExtractError] = useState<string | null>(null);
   const [aiExtractPartial, setAiExtractPartial] = useState(false);
+  const [savedPlatformId, setSavedPlatformId] = useState<string | null>(id ?? null);
 
   // ── Form state ──
   const [basic, setBasic] = useState({
@@ -121,6 +122,7 @@ export default function PlatformEditor() {
   const [expandedRuleIdx, setExpandedRuleIdx] = useState<number | null>(null);
   const [expandedVersionIdx, setExpandedVersionIdx] = useState<Record<number, number | null>>({});
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   // ── Queries ──
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -253,6 +255,51 @@ export default function PlatformEditor() {
     }
   };
 
+  // ── Preview ──
+  const handlePreview = async () => {
+    if (!basic.name.trim()) { toast.error("请先填写平台名称"); return; }
+    if (!basic.id.trim()) { toast.error("请先填写平台 ID"); return; }
+    setPreviewing(true);
+    try {
+      const platformId = isEdit ? id! : basic.id.trim().toLowerCase();
+      const payload = {
+        name: basic.name.trim(),
+        company: basic.company || undefined,
+        hq: basic.hq || undefined,
+        founded: basic.founded ? parseInt(basic.founded) : undefined,
+        abbr: basic.abbr || undefined,
+        color: basic.color || undefined,
+        description: basic.description || undefined,
+        jurisdiction: jurisSel,
+        portrait: {
+          types: portrait.types.split(",").map((s) => s.trim()).filter(Boolean),
+          structure: portrait.structure,
+          contentSource: portrait.contentSource,
+          networkEffect: portrait.networkEffect,
+          businessModel: portrait.businessModel.split(",").map((s) => s.trim()).filter(Boolean),
+          openness: portrait.openness,
+          crossBorder: portrait.crossBorder,
+        },
+        timeline,
+        rules,
+        isActive: basic.isActive,
+      };
+      if (isEdit) {
+        await updateMutation.mutateAsync({ id: id!, ...payload });
+      } else {
+        await createMutation.mutateAsync({ id: platformId, ...payload });
+      }
+      setSavedPlatformId(platformId);
+      await utils.platforms.list.invalidate();
+      toast.success("已保存，正在打开预览...");
+      window.open(`/platforms/${platformId}`, "_blank");
+    } catch (e: any) {
+      toast.error(e?.message ?? "保存失败，无法预览");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   // ── Save ──
   const handleSave = async (publish: boolean) => {
     if (!basic.name.trim()) { toast.error("平台名称不能为空"); return; }
@@ -281,14 +328,17 @@ export default function PlatformEditor() {
         rules,
         isActive: publish ? true : basic.isActive,
       };
+      const platformId = isEdit ? id! : basic.id.trim().toLowerCase();
       if (isEdit) {
         await updateMutation.mutateAsync({ id: id!, ...payload });
         toast.success("平台已更新");
       } else {
-        await createMutation.mutateAsync({ id: basic.id.trim().toLowerCase(), ...payload });
+        await createMutation.mutateAsync({ id: platformId, ...payload });
         toast.success("平台已创建");
       }
+      setSavedPlatformId(platformId);
       await utils.platforms.list.invalidate();
+      if (!publish) return; // 不跳转，保留在页面以支持预览
       navigate("/admin");
     } catch (e: any) {
       toast.error(e?.message ?? "保存失败");
@@ -819,12 +869,26 @@ export default function PlatformEditor() {
                   >
                     仅保存
                   </Button>
+                  {basic.id.trim() && basic.name.trim() && (
+                    <Button
+                      variant="ghost"
+                      className="w-full gap-1.5 text-primary hover:text-primary"
+                      onClick={handlePreview}
+                      disabled={previewing || saving}
+                    >
+                      {previewing ? (
+                        <><Loader2 className="w-3.5 h-3.5 animate-spin" />保存并预览...</>
+                      ) : (
+                        <><svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>保存并预览</>
+                      )}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="w-full text-muted-foreground"
                     onClick={() => navigate("/admin")}
                   >
-                    取消
+                    返回后台
                   </Button>
                 </div>
               </div>

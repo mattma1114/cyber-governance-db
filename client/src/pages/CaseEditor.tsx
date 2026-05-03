@@ -117,6 +117,7 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
   const [urlInput, setUrlInput] = useState("");
   const [aiMode, setAiMode] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [aiError, setAiError] = useState("");
+  const [savedCaseId, setSavedCaseId] = useState<number | null>(editId ?? null);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [form, setForm] = useState({
@@ -242,6 +243,43 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
     const t = tagInput.trim();
     if (t && !form.tags.includes(t)) setF("tags", [...form.tags, t]);
     setTagInput("");
+  };
+
+  const [previewing, setPreviewing] = useState(false);
+
+  const handlePreview = async () => {
+    if (!form.title) { toast.error("请填写案例标题"); return; }
+    if (!form.type) { toast.error("请选择案例类型"); return; }
+    if (!form.topicId) { toast.error("请选择所属专题"); return; }
+    if (!form.jurisdictionId) { toast.error("请选择司法辖区"); return; }
+    if (!form.date) { toast.error("请填写日期"); return; }
+    setPreviewing(true);
+    const payload = {
+      ...form,
+      type: form.type as "judicial" | "regulatory" | "legislation",
+      status: form.status,
+    };
+    try {
+      if (editId) {
+        await updateCase.mutateAsync({ id: editId, ...payload });
+        toast.success("已保存，正在打开预览...");
+        window.open(`/cases/${editId}`, "_blank");
+      } else {
+        const res = await createCase.mutateAsync(payload) as any;
+        const newId = res?.id;
+        if (newId) {
+          setSavedCaseId(newId);
+          toast.success("已保存，正在打开预览...");
+          window.open(`/cases/${newId}`, "_blank");
+        } else {
+          toast.error("保存成功但无法获取案例 ID，请手动预览");
+        }
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "保存失败，无法预览");
+    } finally {
+      setPreviewing(false);
+    }
   };
 
   const handleSave = (publish?: boolean) => {
@@ -606,6 +644,20 @@ export default function CaseEditor({ editId }: CaseEditorProps) {
                 <Save className="w-4 h-4" />
                 仅保存草稿
               </Button>
+              {form.title && form.type && form.topicId && form.jurisdictionId && form.date && (
+                <Button
+                  variant="ghost"
+                  className="w-full gap-2 text-primary hover:text-primary"
+                  onClick={handlePreview}
+                  disabled={previewing || isSaving}
+                >
+                  {previewing ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />保存并预览...</>
+                  ) : (
+                    <><Eye className="w-4 h-4" />保存并预览</>
+                  )}
+                </Button>
+              )}
               <Button variant="ghost" className="w-full" asChild>
                 <Link href="/admin">取消，返回后台</Link>
               </Button>
