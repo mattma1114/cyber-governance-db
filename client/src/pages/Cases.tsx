@@ -137,7 +137,7 @@ export default function Cases() {
         <div className="flex gap-6 items-start">
           {/* ── Left sidebar filters ── */}
           <aside className={cn(
-            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-16 self-start max-h-[calc(100vh-5rem)] overflow-y-auto z-20",
+            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-[57px] self-start max-h-[calc(100vh-5rem)] overflow-y-auto z-10",
             sidebarOpen ? "w-52" : "w-8"
           )}>            {/* Collapse toggle button */}
             <button
@@ -399,7 +399,7 @@ export default function Cases() {
               </Drawer.Root>
             </div>
             {/* Sticky toolbar: result count + view toggle + active filter tags */}
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
+            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
               {/* Active filter tags */}
               {hasFilters && (
                 <div className="flex flex-wrap gap-1.5">

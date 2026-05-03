@@ -122,7 +122,7 @@ export default function Platforms() {
       <div className="container py-6">
         <div className="flex gap-6 items-start">
           {/* ── Left: Sidebar Filters ── */}
-          <div className="shrink-0 flex items-start gap-2 sticky top-16 self-start z-20">
+          <div className="shrink-0 flex items-start gap-2 sticky top-[57px] self-start z-10">
           <aside className={cn(
             "flex flex-col gap-4 transition-all duration-200 max-h-[calc(100vh-5rem)] overflow-y-auto",
             sidebarOpen ? "w-56" : "w-0 overflow-hidden"
@@ -255,7 +255,7 @@ export default function Platforms() {
           {/* ── Right: Results ── */}
           <div className="flex-1 min-w-0">
              {/* Sticky toolbar: active filter tags + result count + view toggle */}
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
+            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
               {/* Active filter badges */}
               {(selectedTypes.length > 0 || selectedJurisdictions.length > 0) && (
                 <div className="flex flex-wrap gap-1.5">
