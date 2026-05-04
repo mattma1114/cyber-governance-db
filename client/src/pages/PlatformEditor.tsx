@@ -1,925 +1,804 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, Sparkles, Globe, Plus, X, ChevronRight,
-  Loader2, Building2, MapPin, Calendar, Tag, Layers,
-  FileText, Clock, Link as LinkIcon, Wand2
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Loader2,
+  Wand2,
+  Plus,
+  Trash2,
+  ExternalLink,
+  Globe,
+  BookOpen,
+  TrendingUp,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
-// ─── 七维画像维度 ───────────────────────────────────────────────
-const PORTRAIT_DIMS = [
-  { key: "types", label: "平台类型", placeholder: "如：社交媒体、短视频、即时通讯" },
-  { key: "structure", label: "平台结构", placeholder: "描述平台的组织架构和运营模式" },
-  { key: "contentSource", label: "内容来源", placeholder: "UGC / PGC / PUGC / 算法推荐等" },
-  { key: "networkEffect", label: "网络效应", placeholder: "单边/双边/多边网络效应分析" },
-  { key: "businessModel", label: "商业模式", placeholder: "如：广告、订阅、电商、数据变现" },
-  { key: "openness", label: "开放程度", placeholder: "API 开放程度、第三方生态、互操作性" },
-  { key: "crossBorder", label: "跨境特征", placeholder: "跨境数据流动、本地化策略、监管应对" },
-] as const;
+type PortraitData = {
+  types: string[];
+  structure: string;
+  contentSource: string;
+  networkEffect: string;
+  businessModel: string[];
+  openness: string;
+  crossBorder: string;
+};
 
-type PortraitKey = typeof PORTRAIT_DIMS[number]["key"];
-
-interface RuleVersion {
-  versionId: string;
-  versionLabel: string;
+type RuleItem = {
   date: string;
-  url?: string;
-  content?: string;
-}
-
-interface Rule {
-  id: string;
   title: string;
   type: string;
-  versions: RuleVersion[];
-}
+  url: string;
+};
 
-interface TimelineItem {
+type TimelineItem = {
   date: string;
   event: string;
-}
+};
 
-// ─── Underline Input ────────────────────────────────────────────
-function UInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={cn(
-        "w-full bg-transparent border-0 border-b border-border/50 focus:border-primary outline-none py-2 text-sm placeholder:text-muted-foreground/50 transition-colors",
-        className
-      )}
-    />
-  );
-}
+type PlatformForm = {
+  id: string;
+  name: string;
+  company: string;
+  jurisdiction: string[];
+  founded: string;
+  hq: string;
+  color: string;
+  abbr: string;
+  description: string;
+  portrait: PortraitData;
+  rules: RuleItem[];
+  timeline: TimelineItem[];
+  relatedCaseIds: string[];
+  sortOrder: string;
+  isActive: boolean;
+  // Extra fields from AI (stored in description as JSON or separate)
+  website: string;
+  wikipediaUrl: string;
+  crunchbaseUrl: string;
+  profileFeatures: string;
+  developmentHistory: string;
+};
 
-function UTextarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={cn(
-        "w-full bg-transparent border-0 border-b border-border/50 focus:border-primary outline-none py-2 text-sm placeholder:text-muted-foreground/50 transition-colors resize-none",
-        className
-      )}
-    />
-  );
-}
+const defaultPortrait: PortraitData = {
+  types: [],
+  structure: "",
+  contentSource: "",
+  networkEffect: "",
+  businessModel: [],
+  openness: "",
+  crossBorder: "",
+};
 
-// ─── Section Header ─────────────────────────────────────────────
-function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border/30">
-      <Icon className="w-4 h-4 text-primary" />
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-    </div>
-  );
-}
+const defaultForm: PlatformForm = {
+  id: "",
+  name: "",
+  company: "",
+  jurisdiction: [],
+  founded: "",
+  hq: "",
+  color: "#3B82F6",
+  abbr: "",
+  description: "",
+  portrait: defaultPortrait,
+  rules: [],
+  timeline: [],
+  relatedCaseIds: [],
+  sortOrder: "0",
+  isActive: true,
+  website: "",
+  wikipediaUrl: "",
+  crunchbaseUrl: "",
+  profileFeatures: "",
+  developmentHistory: "",
+};
 
-// ─── Main Component ─────────────────────────────────────────────
 export default function PlatformEditor() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id?: string }>();
   const [, navigate] = useLocation();
-  const { user } = useAuth();
-  const isEdit = Boolean(id);
+  const isEdit = !!params.id && params.id !== "new";
+  const platformId = isEdit ? params.id! : null;
 
-  // ── AI mode state ──
-  const [aiMode, setAiMode] = useState(!isEdit);
-  const [aiKeyword, setAiKeyword] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
-  const [aiExtractError, setAiExtractError] = useState<string | null>(null);
-  const [aiExtractPartial, setAiExtractPartial] = useState(false);
-  const [savedPlatformId, setSavedPlatformId] = useState<string | null>(id ?? null);
+  const [form, setForm] = useState<PlatformForm>(defaultForm);
+  const [keyword, setKeyword] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"basic" | "portrait" | "rules" | "timeline">("basic");
 
-  // ── Form state ──
-  const [basic, setBasic] = useState({
-    id: "",
-    name: "",
-    company: "",
-    hq: "",
-    founded: "",
-    abbr: "",
-    color: "#3B82F6",
-    description: "",
-    isActive: true,
-  });
-  const [jurisSel, setJurisSel] = useState<string[]>([]);
-  const [portrait, setPortrait] = useState<Record<PortraitKey, string>>({
-    types: "", structure: "", contentSource: "", networkEffect: "",
-    businessModel: "", openness: "", crossBorder: "",
-  });
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [expandedRuleIdx, setExpandedRuleIdx] = useState<number | null>(null);
-  const [expandedVersionIdx, setExpandedVersionIdx] = useState<Record<number, number | null>>({});
-  const [saving, setSaving] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
-
-  // ── Queries ──
-  const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
-  const { data: existingPlatform } = trpc.platforms.getById.useQuery(
-    { id: id! },
-    { enabled: isEdit && Boolean(id) }
-  );
-  const firecrawlStatus = trpc.settings.getValue.useQuery(
-    { key: "firecrawl_api_key" },
-    { enabled: user?.role === "admin" }
+  const { data: existingPlatform, isLoading: platformLoading } = trpc.platforms.getById.useQuery(
+    { id: platformId! },
+    { enabled: !!platformId }
   );
 
-  // ── Mutations ──
-  const createMutation = trpc.platforms.create.useMutation();
-  const updateMutation = trpc.platforms.update.useMutation();
-  const extractMutation = trpc.ai.extractPlatformByKeyword.useMutation();
-  const extractFromUrlMutation = trpc.ai.extractPlatformFromUrl.useMutation();
   const utils = trpc.useUtils();
 
-  // ── Check Firecrawl config ──
-  useEffect(() => {
-    if (firecrawlStatus.data !== undefined) {
-      setFirecrawlConfigured(Boolean(firecrawlStatus.data?.value));
-    }
-  }, [firecrawlStatus.data]);
+  const createMutation = trpc.platforms.create.useMutation({
+    onSuccess: () => {
+      toast.success("平台已创建");
+      utils.platforms.list.invalidate();
+      utils.platforms.listAdmin.invalidate();
+      navigate(`/platforms/${form.id}`);
+    },
+    onError: (e) => toast.error(`创建失败：${e.message}`),
+  });
 
-  // ── Load existing platform for edit ──
+  const updateMutation = trpc.platforms.update.useMutation({
+    onSuccess: () => {
+      toast.success("平台已更新");
+      utils.platforms.list.invalidate();
+      utils.platforms.listAdmin.invalidate();
+      utils.platforms.getById.invalidate({ id: platformId! });
+      navigate(`/platforms/${platformId}`);
+    },
+    onError: (e) => toast.error(`更新失败：${e.message}`),
+  });
+
+  const aiExtractMutation = trpc.ai.extractPlatformByKeyword.useMutation({
+    onSuccess: (data) => {
+      setForm((prev) => ({
+        ...prev,
+        name: data.name || prev.name,
+        company: data.name || prev.company,
+        hq: data.headquarters || prev.hq,
+        founded: data.founded || prev.founded,
+        description: data.description || prev.description,
+        website: data.website || prev.website,
+        wikipediaUrl: data.wikipediaUrl || prev.wikipediaUrl,
+        crunchbaseUrl: data.crunchbaseUrl || prev.crunchbaseUrl,
+        profileFeatures: data.profileFeatures || prev.profileFeatures,
+        developmentHistory: data.developmentHistory || prev.developmentHistory,
+        portrait: {
+          ...prev.portrait,
+          types: data.tags?.slice(0, 3) || prev.portrait.types,
+        },
+      }));
+      toast.success("AI 已自动填充平台信息（规则文件需单独抓取）");
+    },
+    onError: (e) => toast.error(`AI 提取失败：${e.message}`),
+  });
+
   useEffect(() => {
     if (existingPlatform) {
-      const p = existingPlatform;
-      setBasic({
-        id: p.id,
-        name: p.name,
-        company: p.company ?? "",
-        hq: p.hq ?? "",
+      const p = existingPlatform as any;
+      setForm({
+        id: p.id || "",
+        name: p.name || "",
+        company: p.company || "",
+        jurisdiction: p.jurisdiction || [],
         founded: p.founded ? String(p.founded) : "",
-        abbr: p.abbr ?? "",
-        color: p.color ?? "#3B82F6",
-        description: p.description ?? "",
+        hq: p.hq || "",
+        color: p.color || "#3B82F6",
+        abbr: p.abbr || "",
+        description: p.description || "",
+        portrait: p.portrait || defaultPortrait,
+        rules: p.rules || [],
+        timeline: p.timeline || [],
+        relatedCaseIds: p.relatedCaseIds || [],
+        sortOrder: String(p.sortOrder ?? 0),
         isActive: p.isActive ?? true,
+        website: p.website || "",
+        wikipediaUrl: p.wikipediaUrl || "",
+        crunchbaseUrl: p.crunchbaseUrl || "",
+        profileFeatures: p.profileFeatures || "",
+        developmentHistory: p.developmentHistory || "",
       });
-      setJurisSel(Array.isArray(p.jurisdiction) ? p.jurisdiction : []);
-      if (p.portrait) {
-        const port = p.portrait as any;
-        setPortrait({
-          types: Array.isArray(port.types) ? port.types.join(", ") : (port.types ?? ""),
-          structure: port.structure ?? "",
-          contentSource: port.contentSource ?? "",
-          networkEffect: port.networkEffect ?? "",
-          businessModel: Array.isArray(port.businessModel) ? port.businessModel.join(", ") : (port.businessModel ?? ""),
-          openness: port.openness ?? "",
-          crossBorder: port.crossBorder ?? "",
-        });
-      }
-      setTimeline(Array.isArray(p.timeline) ? p.timeline : []);
-      setRules(Array.isArray(p.rules) ? (p.rules as Rule[]) : []);
-      setAiMode(false);
     }
   }, [existingPlatform]);
 
-  // ── Auth guard ──
-  if (user && user.role !== "admin") {
+  const handleChange = (field: keyof PlatformForm, value: any) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePortraitChange = (field: keyof PortraitData, value: any) => {
+    setForm((prev) => ({ ...prev, portrait: { ...prev.portrait, [field]: value } }));
+  };
+
+  const handleAiExtract = async () => {
+    if (!keyword.trim()) {
+      toast.error("请输入平台关键词");
+      return;
+    }
+    setIsAiLoading(true);
+    try {
+      await aiExtractMutation.mutateAsync({ keyword: keyword.trim() });
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const addRule = () => {
+    setForm((prev) => ({
+      ...prev,
+      rules: [...prev.rules, { date: "", title: "", type: "policy", url: "" }],
+    }));
+  };
+
+  const updateRule = (idx: number, field: keyof RuleItem, value: string) => {
+    setForm((prev) => {
+      const rules = [...prev.rules];
+      rules[idx] = { ...rules[idx], [field]: value };
+      return { ...prev, rules };
+    });
+  };
+
+  const removeRule = (idx: number) => {
+    setForm((prev) => ({ ...prev, rules: prev.rules.filter((_, i) => i !== idx) }));
+  };
+
+  const addTimeline = () => {
+    setForm((prev) => ({
+      ...prev,
+      timeline: [...prev.timeline, { date: "", event: "" }],
+    }));
+  };
+
+  const updateTimeline = (idx: number, field: keyof TimelineItem, value: string) => {
+    setForm((prev) => {
+      const timeline = [...prev.timeline];
+      timeline[idx] = { ...timeline[idx], [field]: value };
+      return { ...prev, timeline };
+    });
+  };
+
+  const removeTimeline = (idx: number) => {
+    setForm((prev) => ({ ...prev, timeline: prev.timeline.filter((_, i) => i !== idx) }));
+  };
+
+  const handleSubmit = () => {
+    if (!form.name.trim()) {
+      toast.error("请填写平台名称");
+      return;
+    }
+    if (!isEdit && !form.id.trim()) {
+      toast.error("请填写平台 ID（英文小写，如 tiktok）");
+      return;
+    }
+
+    const payload = {
+      id: form.id,
+      name: form.name,
+      company: form.company || undefined,
+      jurisdiction: form.jurisdiction,
+      founded: form.founded ? Number(form.founded) : undefined,
+      hq: form.hq || undefined,
+      color: form.color || undefined,
+      abbr: form.abbr || undefined,
+      description: form.description || undefined,
+      portrait: form.portrait,
+      rules: form.rules,
+      timeline: form.timeline,
+      relatedCaseIds: form.relatedCaseIds,
+      sortOrder: Number(form.sortOrder) || 0,
+      isActive: form.isActive,
+    };
+
+    if (isEdit) {
+      updateMutation.mutate(payload);
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  if (isEdit && platformLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">无权限访问此页面</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  // ── AI Extract ──
-  const handleAiExtract = async () => {
-    if (!aiKeyword.trim()) { toast.error("请输入平台名称关键词，如 Meta 或 TikTok"); return; }
-    setAiLoading(true);
-    setAiExtractError(null);
-    setAiExtractPartial(false);
-    try {
-      const result = await extractMutation.mutateAsync({ keyword: aiKeyword.trim() });
-      if (result.platform) {
-        const p = result.platform as any;
-        let filledCount = 0;
-        setBasic((prev) => {
-          const next = {
-            ...prev,
-            id: p.id ?? prev.id,
-            name: p.name ?? prev.name,
-            company: p.company ?? prev.company,
-            hq: p.hq ?? prev.hq,
-            founded: p.founded ? String(p.founded) : prev.founded,
-            abbr: p.abbr ?? prev.abbr,
-            color: p.color ?? prev.color,
-            description: p.description ?? prev.description,
-          };
-          filledCount += [p.name, p.company, p.hq, p.founded, p.description].filter(Boolean).length;
-          return next;
-        });
-        if (p.jurisdiction?.length) { setJurisSel(p.jurisdiction); filledCount++; }
-        if (p.portrait) {
-          const port = p.portrait;
-          const hasPortrait = Object.values(port).some(Boolean);
-          if (hasPortrait) filledCount++;
-          setPortrait({
-            types: Array.isArray(port.types) ? port.types.join(", ") : (port.types ?? ""),
-            structure: port.structure ?? "",
-            contentSource: port.contentSource ?? "",
-            networkEffect: port.networkEffect ?? "",
-            businessModel: Array.isArray(port.businessModel) ? port.businessModel.join(", ") : (port.businessModel ?? ""),
-            openness: port.openness ?? "",
-            crossBorder: port.crossBorder ?? "",
-          });
-        }
-        if (p.timeline?.length) { setTimeline(p.timeline); filledCount++; }
-        if (filledCount === 0) {
-          setAiExtractError("未能从该页面提取到结构化平台信息，请尝试其他 URL（如维基百科页面）或手动填写。");
-        } else {
-          const isPartial = !p.portrait || !p.timeline?.length;
-          if (isPartial) setAiExtractPartial(true);
-          toast.success(`AI 已自动填充 ${filledCount} 个字段，请核对后保存`);
-          setAiMode(false);
-        }
-      } else {
-        setAiExtractError("提取结果为空，可能是页面访问受限。请尝试其他 URL 或手动填写。");
-      }
-    } catch (e: any) {
-      setAiExtractError(e?.message ?? "AI 提取失败，请手动填写各字段。");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  // ── Preview ──
-  const handlePreview = async () => {
-    if (!basic.name.trim()) { toast.error("请先填写平台名称"); return; }
-    if (!basic.id.trim()) { toast.error("请先填写平台 ID"); return; }
-    setPreviewing(true);
-    try {
-      const platformId = isEdit ? id! : basic.id.trim().toLowerCase();
-      const payload = {
-        name: basic.name.trim(),
-        company: basic.company || undefined,
-        hq: basic.hq || undefined,
-        founded: basic.founded ? parseInt(basic.founded) : undefined,
-        abbr: basic.abbr || undefined,
-        color: basic.color || undefined,
-        description: basic.description || undefined,
-        jurisdiction: jurisSel,
-        portrait: {
-          types: portrait.types.split(",").map((s) => s.trim()).filter(Boolean),
-          structure: portrait.structure,
-          contentSource: portrait.contentSource,
-          networkEffect: portrait.networkEffect,
-          businessModel: portrait.businessModel.split(",").map((s) => s.trim()).filter(Boolean),
-          openness: portrait.openness,
-          crossBorder: portrait.crossBorder,
-        },
-        timeline,
-        rules,
-        isActive: basic.isActive,
-      };
-      if (isEdit) {
-        await updateMutation.mutateAsync({ id: id!, ...payload });
-      } else {
-        await createMutation.mutateAsync({ id: platformId, ...payload });
-      }
-      setSavedPlatformId(platformId);
-      await utils.platforms.list.invalidate();
-      toast.success("已保存，正在打开预览...");
-      window.open(`/platforms/${platformId}`, "_blank");
-    } catch (e: any) {
-      toast.error(e?.message ?? "保存失败，无法预览");
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
-  // ── Save ──
-  const handleSave = async (publish: boolean) => {
-    if (!basic.name.trim()) { toast.error("平台名称不能为空"); return; }
-    if (!basic.id.trim()) { toast.error("平台 ID 不能为空（如 meta、tiktok）"); return; }
-    setSaving(true);
-    try {
-        const payload = {
-        name: basic.name.trim(),
-        company: basic.company || undefined,
-        hq: basic.hq || undefined,
-        founded: basic.founded ? parseInt(basic.founded) : undefined,
-        abbr: basic.abbr || undefined,
-        color: basic.color || undefined,
-        description: basic.description || undefined,
-        jurisdiction: jurisSel,
-        portrait: {
-          types: portrait.types.split(",").map((s) => s.trim()).filter(Boolean),
-          structure: portrait.structure,
-          contentSource: portrait.contentSource,
-          networkEffect: portrait.networkEffect,
-          businessModel: portrait.businessModel.split(",").map((s) => s.trim()).filter(Boolean),
-          openness: portrait.openness,
-          crossBorder: portrait.crossBorder,
-        },
-        timeline,
-        rules,
-        isActive: publish ? true : basic.isActive,
-      };
-      const platformId = isEdit ? id! : basic.id.trim().toLowerCase();
-      if (isEdit) {
-        await updateMutation.mutateAsync({ id: id!, ...payload });
-        toast.success("平台已更新");
-      } else {
-        await createMutation.mutateAsync({ id: platformId, ...payload });
-        toast.success("平台已创建");
-      }
-      setSavedPlatformId(platformId);
-      await utils.platforms.list.invalidate();
-      if (!publish) return; // 不跳转，保留在页面以支持预览
-      navigate("/admin");
-    } catch (e: any) {
-      toast.error(e?.message ?? "保存失败");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const setB = (k: string, v: any) => setBasic((prev) => ({ ...prev, [k]: v }));
-  const toggleJuris = (id: string) =>
-    setJurisSel((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const tabs = [
+    { key: "basic", label: "基本信息" },
+    { key: "portrait", label: "画像特征" },
+    { key: "rules", label: "规则文件" },
+    { key: "timeline", label: "发展历程" },
+  ] as const;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ── Top Bar ── */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/30">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border">
+        <div className="container py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/admin")}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate("/admin")}>
               <ArrowLeft className="w-4 h-4" />
-              返回管理后台
+            </Button>
+            <div>
+              <h1 className="text-base font-semibold">
+                {isEdit ? `编辑平台：${form.name}` : "新增平台"}
+              </h1>
+              {isEdit && (
+                <p className="text-xs text-muted-foreground">ID: {platformId}</p>
+              )}
+            </div>
+          </div>
+          <Button onClick={handleSubmit} disabled={isSaving} size="sm">
+            {isSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+            {isEdit ? "保存更改" : "创建平台"}
+          </Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="container border-t border-border flex gap-0">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
             </button>
-            <span className="text-border/50">|</span>
-            <h1 className="text-sm font-semibold">
-              {isEdit ? `编辑平台：${basic.name || id}` : "新增平台"}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isEdit && (
-              <button
-                onClick={() => setAiMode(!aiMode)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-                  aiMode
-                    ? "bg-primary/10 text-primary border border-primary/20"
-                    : "text-muted-foreground hover:text-foreground border border-border/50 hover:border-border"
-                )}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                AI 自动填充
-              </button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSave(false)}
-              disabled={saving}
-              className="text-xs h-8"
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "保存"}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="text-xs h-8"
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "保存并激活"}
-            </Button>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* ── AI Mode Banner ── */}
-      {aiMode && !isEdit && (
-        <div className="max-w-6xl mx-auto px-6 pt-8 pb-4">
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Sparkles className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold mb-0.5">AI 自动填充</h2>
-                <p className="text-xs text-muted-foreground">
-                  输入平台名称关键词，AI 将自动检索平台官网、维基百科、Crunchbase 等来源，自动填充平台基本信息、画像特征和发展历程（规则文件除外）。
+      <div className="container py-6">
+        {/* ── Basic Info Tab ── */}
+        {activeTab === "basic" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-5">
+              {/* AI keyword auto-fill */}
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wand2 className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">AI 自动填充（通过平台关键词）</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  输入平台名称关键词，AI 将自动检索并提取官网、Wikipedia、Crunchbase 链接，以及画像特征和发展历程等信息。<strong>规则文件需在「规则文件」Tab 中单独抓取。</strong>
                 </p>
+                <div className="flex gap-2">
+                  <Input
+                    className="h-9 text-sm flex-1"
+                    placeholder="输入平台名称，如：TikTok、Meta、微信"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAiExtract()}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleAiExtract}
+                    disabled={isAiLoading || aiExtractMutation.isPending}
+                  >
+                    {(isAiLoading || aiExtractMutation.isPending) ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      "AI 填充"
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  value={aiKeyword}
-                  onChange={(e) => setAiKeyword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAiExtract()}
-                  placeholder="输入平台名称关键词，如 Meta、TikTok、微信、Spotify..."
-                  className="pl-9 text-sm"
-                  disabled={aiLoading}
+
+              {/* Platform ID (only for new) */}
+              {!isEdit && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">平台 ID *（英文小写，创建后不可修改）</Label>
+                  <Input
+                    className="h-9 font-mono"
+                    placeholder="如：tiktok、meta、wechat"
+                    value={form.id}
+                    onChange={(e) => handleChange("id", e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">平台名称 *</Label>
+                  <Input
+                    className="h-9"
+                    placeholder="如：TikTok"
+                    value={form.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">缩写</Label>
+                  <Input
+                    className="h-9"
+                    placeholder="如：TT"
+                    value={form.abbr}
+                    onChange={(e) => handleChange("abbr", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">所属公司</Label>
+                  <Input
+                    className="h-9"
+                    placeholder="如：ByteDance"
+                    value={form.company}
+                    onChange={(e) => handleChange("company", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">成立年份</Label>
+                  <Input
+                    className="h-9"
+                    type="number"
+                    placeholder="如：2016"
+                    value={form.founded}
+                    onChange={(e) => handleChange("founded", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">总部所在地</Label>
+                  <Input
+                    className="h-9"
+                    placeholder="如：北京 / 新加坡"
+                    value={form.hq}
+                    onChange={(e) => handleChange("hq", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">主题色</Label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={form.color}
+                      onChange={(e) => handleChange("color", e.target.value)}
+                      className="w-9 h-9 rounded border border-border cursor-pointer"
+                    />
+                    <Input
+                      className="h-9 font-mono flex-1"
+                      value={form.color}
+                      onChange={(e) => handleChange("color", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">平台简介</Label>
+                <Textarea
+                  className="min-h-[100px] text-sm"
+                  placeholder="简要描述平台的定位和功能"
+                  value={form.description}
+                  onChange={(e) => handleChange("description", e.target.value)}
                 />
               </div>
-              <Button
-                onClick={handleAiExtract}
-                disabled={aiLoading || !aiKeyword.trim()}
-                className="gap-1.5 shrink-0"
-              >
-                {aiLoading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />分析中…</>
-                ) : (
-                  <><Wand2 className="w-4 h-4" />自动填充</>
-                )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">画像特征（AI 填充）</Label>
+                <Textarea
+                  className="min-h-[100px] text-sm"
+                  placeholder="平台的核心特征描述"
+                  value={form.profileFeatures}
+                  onChange={(e) => handleChange("profileFeatures", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Right sidebar */}
+            <div className="space-y-5">
+              {/* Links */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <h3 className="text-sm font-medium flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  外部链接
+                </h3>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">官方网站</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      placeholder="https://..."
+                      value={form.website}
+                      onChange={(e) => handleChange("website", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Wikipedia</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      placeholder="https://en.wikipedia.org/..."
+                      value={form.wikipediaUrl}
+                      onChange={(e) => handleChange("wikipediaUrl", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Crunchbase</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      placeholder="https://www.crunchbase.com/..."
+                      value={form.crunchbaseUrl}
+                      onChange={(e) => handleChange("crunchbaseUrl", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sort order */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <h3 className="text-sm font-medium">排序权重</h3>
+                <Input
+                  className="h-9"
+                  type="number"
+                  value={form.sortOrder}
+                  onChange={(e) => handleChange("sortOrder", e.target.value)}
+                />
+              </div>
+
+              {/* Active */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <h3 className="text-sm font-medium">可见性</h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={form.isActive}
+                    onChange={(e) => handleChange("isActive", e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="isActive" className="text-sm">
+                    在前台展示
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Portrait Tab ── */}
+        {activeTab === "portrait" && (
+          <div className="max-w-2xl space-y-5">
+            <div className="space-y-1.5">
+              <Label className="text-xs">平台类型（多选，逗号分隔）</Label>
+              <Input
+                className="h-9"
+                placeholder="如：社交媒体, 短视频, UGC"
+                value={form.portrait.types.join(", ")}
+                onChange={(e) =>
+                  handlePortraitChange(
+                    "types",
+                    e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">平台架构</Label>
+              <Input
+                className="h-9"
+                placeholder="如：双边市场、多边平台"
+                value={form.portrait.structure}
+                onChange={(e) => handlePortraitChange("structure", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">内容来源</Label>
+              <Input
+                className="h-9"
+                placeholder="如：UGC、PGC、算法推荐"
+                value={form.portrait.contentSource}
+                onChange={(e) => handlePortraitChange("contentSource", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">网络效应</Label>
+              <Input
+                className="h-9"
+                placeholder="如：强双边网络效应"
+                value={form.portrait.networkEffect}
+                onChange={(e) => handlePortraitChange("networkEffect", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">商业模式（多选，逗号分隔）</Label>
+              <Input
+                className="h-9"
+                placeholder="如：广告、订阅、电商"
+                value={form.portrait.businessModel.join(", ")}
+                onChange={(e) =>
+                  handlePortraitChange(
+                    "businessModel",
+                    e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">开放程度</Label>
+              <Input
+                className="h-9"
+                placeholder="如：半开放、封闭生态"
+                value={form.portrait.openness}
+                onChange={(e) => handlePortraitChange("openness", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">跨境运营</Label>
+              <Input
+                className="h-9"
+                placeholder="如：全球化运营、本地化合规"
+                value={form.portrait.crossBorder}
+                onChange={(e) => handlePortraitChange("crossBorder", e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Rules Tab ── */}
+        {activeTab === "rules" && (
+          <div className="max-w-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">规则文件</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  手动添加平台规则文件，或使用 Firecrawl 抓取（需配置 API Key）
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={addRule}>
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
+                添加规则
               </Button>
             </div>
-            {aiExtractError && (
-              <div className="mt-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
-                <span className="shrink-0 mt-0.5">⚠️</span>
-                <span>{aiExtractError}</span>
+
+            {form.rules.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-lg">
+                暂无规则文件，点击「添加规则」手动录入
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-2">
-              也可以
-              <button
-                className="text-primary underline underline-offset-2 mx-1"
-                onClick={() => setAiMode(false)}
-              >
-                跳过，手动填写
-              </button>
-              所有字段
-            </p>
-          </div>
-        </div>
-      )}
 
-      {/* ── Partial Fill Notice ── */}
-      {aiExtractPartial && !aiMode && (
-        <div className="max-w-6xl mx-auto px-6 pt-4">
-          <div className="px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 flex items-center gap-2">
-            <span>ℹ️</span>
-            <span>AI 已填充基本信息，但平台画像和大事件部分可能需要手动补充。</span>
-            <button className="ml-auto underline underline-offset-2 shrink-0" onClick={() => setAiExtractPartial(false)}>已知晓</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Main Content ── */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* ── Left: Main Form ── */}
-          <div className="lg:col-span-2 space-y-10">
-
-            {/* 基本信息 */}
-            <section>
-              <SectionHeader icon={Building2} title="基本信息" />
-              <div className="space-y-5">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">平台名称 *</Label>
-                  <UInput
-                    value={basic.name}
-                    onChange={(e) => setB("name", e.target.value)}
-                    placeholder="如：Meta（Facebook / Instagram / WhatsApp）"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">平台 ID *</Label>
-                    <UInput
-                      value={basic.id}
-                      onChange={(e) => setB("id", e.target.value.toLowerCase().replace(/\s+/g, "-"))}
-                      placeholder="meta（小写字母+连字符）"
-                      disabled={isEdit}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">缩写</Label>
-                    <UInput
-                      value={basic.abbr}
-                      onChange={(e) => setB("abbr", e.target.value)}
-                      placeholder="M（最多 4 字符）"
-                      maxLength={4}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">运营公司</Label>
-                  <UInput
-                    value={basic.company}
-                    onChange={(e) => setB("company", e.target.value)}
-                    placeholder="Meta Platforms, Inc."
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">总部所在地</Label>
-                    <UInput
-                      value={basic.hq}
-                      onChange={(e) => setB("hq", e.target.value)}
-                      placeholder="美国加利福尼亚州门洛帕克"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">创立年份</Label>
-                    <UInput
-                      value={basic.founded}
-                      onChange={(e) => setB("founded", e.target.value)}
-                      placeholder="2004"
-                      type="number"
-                      min={1990}
-                      max={2099}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">平台简介</Label>
-                  <UTextarea
-                    value={basic.description}
-                    onChange={(e) => setB("description", e.target.value)}
-                    placeholder="简要描述平台的定位、规模和核心业务（200 字以内）"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* 七维画像 */}
-            <section>
-              <SectionHeader icon={Layers} title="平台结构七维画像" />
-              <div className="space-y-5">
-                {PORTRAIT_DIMS.map((dim) => (
-                  <div key={dim.key}>
-                    <Label className="text-xs text-muted-foreground mb-1 block">{dim.label}</Label>
-                    <UTextarea
-                      value={portrait[dim.key]}
-                      onChange={(e) => setPortrait((p) => ({ ...p, [dim.key]: e.target.value }))}
-                      placeholder={dim.placeholder}
-                      rows={2}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* 平台大事件 */}
-            <section>
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/30">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-semibold">平台大事件</h3>
-                </div>
-                <button
-                  onClick={() => setTimeline((p) => [...p, { date: "", event: "" }])}
-                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />新增
-                </button>
-              </div>
-              <div className="space-y-3">
-                {timeline.length === 0 && (
-                  <p className="text-xs text-muted-foreground py-2">暂无事件，点击「新增」添加</p>
-                )}
-                {timeline.map((item, i) => (
-                  <div key={i} className="flex gap-3 items-center pb-3 border-b border-border/20 last:border-0">
-                    <UInput
-                      value={item.date}
-                      onChange={(e) => setTimeline((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}
-                      placeholder="2012"
-                      className="w-24 shrink-0"
-                    />
-                    <UInput
-                      value={item.event}
-                      onChange={(e) => setTimeline((p) => p.map((x, j) => j === i ? { ...x, event: e.target.value } : x))}
-                      placeholder="事件描述"
-                    />
-                    <button
-                      onClick={() => setTimeline((p) => p.filter((_, j) => j !== i))}
-                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* 规则文件 */}
-            <section>
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/30">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-semibold">规则文件</h3>
-                </div>
-                <button
-                  onClick={() => {
-                    const newIdx = rules.length;
-                    setRules((p) => [
-                      ...p,
-                      {
-                        id: `rule-${Date.now()}`,
-                        title: "",
-                        type: "",
-                        versions: [{ versionId: `v-${Date.now()}-0`, versionLabel: "初始版本", date: "", url: "", content: "" }],
-                      },
-                    ]);
-                    setExpandedRuleIdx(newIdx);
-                  }}
-                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />新增规则
-                </button>
-              </div>
-              <div className="space-y-2">
-                {rules.length === 0 && (
-                  <p className="text-xs text-muted-foreground py-2">暂无规则文件，点击「新增规则」添加</p>
-                )}
-                {rules.map((rule, i) => (
-                  <div key={rule.id ?? i} className="border border-border/30 rounded-lg overflow-hidden">
-                    {/* Rule header */}
-                    <div className="flex items-center gap-2 px-4 py-3 bg-muted/20">
-                      <button
-                        type="button"
-                        className="flex-1 flex items-center gap-2 text-left"
-                        onClick={() => setExpandedRuleIdx(expandedRuleIdx === i ? null : i)}
-                      >
-                        <ChevronRight className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", expandedRuleIdx === i && "rotate-90")} />
-                        <span className="text-sm font-medium truncate">{rule.title || "（未命名规则）"}</span>
-                        {rule.type && <Badge variant="outline" className="text-[10px] shrink-0">{rule.type}</Badge>}
-                        <span className="text-xs text-muted-foreground shrink-0">{rule.versions?.length ?? 0} 个版本</span>
-                      </button>
-                      <button
-                        onClick={() => setRules((p) => p.filter((_, j) => j !== i))}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {/* Rule body */}
-                    {expandedRuleIdx === i && (
-                      <div className="px-4 py-4 space-y-4 border-t border-border/20">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-xs text-muted-foreground mb-1 block">规则名称</Label>
-                            <UInput
-                              value={rule.title}
-                              onChange={(e) => setRules((p) => p.map((r, j) => j === i ? { ...r, title: e.target.value } : r))}
-                              placeholder="服务条款"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground mb-1 block">规则类型</Label>
-                            <UInput
-                              value={rule.type}
-                              onChange={(e) => setRules((p) => p.map((r, j) => j === i ? { ...r, type: e.target.value } : r))}
-                              placeholder="ToS / Privacy / Community Standards"
-                            />
-                          </div>
-                        </div>
-                        {/* Versions */}
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <Label className="text-xs text-muted-foreground">版本历史</Label>
-                            <button
-                              onClick={() => {
-                                setRules((p) => p.map((r, j) => j !== i ? r : {
-                                  ...r,
-                                  versions: [...r.versions, {
-                                    versionId: `v-${Date.now()}-${r.versions.length}`,
-                                    versionLabel: "",
-                                    date: "",
-                                    url: "",
-                                    content: "",
-                                  }],
-                                }));
-                                setExpandedVersionIdx((prev) => ({ ...prev, [i]: (rules[i]?.versions?.length ?? 0) }));
-                              }}
-                              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                            >
-                              <Plus className="w-3 h-3" />新增版本
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            {rule.versions.map((ver, vi) => (
-                              <div key={ver.versionId ?? vi} className="border border-border/20 rounded-md overflow-hidden">
-                                <div className="flex items-center gap-2 px-3 py-2 bg-muted/10">
-                                  <button
-                                    type="button"
-                                    className="flex-1 flex items-center gap-2 text-left"
-                                    onClick={() => setExpandedVersionIdx((prev) => ({ ...prev, [i]: prev[i] === vi ? null : vi }))}
-                                  >
-                                    <ChevronRight className={cn("w-3 h-3 text-muted-foreground transition-transform", expandedVersionIdx[i] === vi && "rotate-90")} />
-                                    <span className="text-xs font-medium">{ver.versionLabel || "（未命名版本）"}</span>
-                                    {ver.date && <span className="text-xs text-muted-foreground">{ver.date}</span>}
-                                  </button>
-                                  <button
-                                    onClick={() => setRules((p) => p.map((r, j) => j !== i ? r : { ...r, versions: r.versions.filter((_, k) => k !== vi) }))}
-                                    className="text-muted-foreground hover:text-destructive transition-colors"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                                {expandedVersionIdx[i] === vi && (
-                                  <div className="px-3 py-3 space-y-3 border-t border-border/20">
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div>
-                                        <Label className="text-xs text-muted-foreground mb-1 block">版本号</Label>
-                                        <UInput
-                                          value={ver.versionLabel}
-                                          onChange={(e) => setRules((p) => p.map((r, j) => j !== i ? r : {
-                                            ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, versionLabel: e.target.value } : v),
-                                          }))}
-                                          placeholder="v2.0 / 2024版"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs text-muted-foreground mb-1 block">生效日期</Label>
-                                        <UInput
-                                          value={ver.date}
-                                          onChange={(e) => setRules((p) => p.map((r, j) => j !== i ? r : {
-                                            ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, date: e.target.value } : v),
-                                          }))}
-                                          placeholder="2024-01-01"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs text-muted-foreground mb-1 block">原文链接</Label>
-                                      <div className="relative">
-                                        <LinkIcon className="absolute left-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                                        <UInput
-                                          value={ver.url}
-                                          onChange={(e) => setRules((p) => p.map((r, j) => j !== i ? r : {
-                                            ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, url: e.target.value } : v),
-                                          }))}
-                                          placeholder="https://..."
-                                          className="pl-5"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center justify-between mb-1">
-                                        <Label className="text-xs text-muted-foreground">规则全文</Label>
-                                        {ver.url && (
-                                          <button
-                                            type="button"
-                                            disabled={extractFromUrlMutation.isPending}
-                                            onClick={async () => {
-                                              if (!ver.url) return;
-                                              try {
-                                                const res = await extractFromUrlMutation.mutateAsync({ url: ver.url });
-                                                const extracted = res?.rawContent || "";
-                                                if (extracted) {
-                                                  setRules((p) => p.map((r, j) => j !== i ? r : {
-                                                    ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, content: extracted } : v),
-                                                  }));
-                                                  toast.success('规则全文已自动填充');
-                                                } else {
-                                                  toast.error('抓取结果为空，请手动粘贴规则内容');
-                                                }
-                                              } catch {
-                                                toast.error('抓取失败，请先在 API 配置中设置 Firecrawl Key');
-                                              }
-                                            }}
-                                            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-                                          >
-                                            {extractFromUrlMutation.isPending ? (
-                                              <Loader2 className="w-3 h-3 animate-spin" />
-                                            ) : (
-                                              <Sparkles className="w-3 h-3" />
-                                            )}
-                                            Firecrawl 抓取全文
-                                          </button>
-                                        )}
-                                      </div>
-                                      <UTextarea
-                                        value={ver.content}
-                                        onChange={(e) => setRules((p) => p.map((r, j) => j !== i ? r : {
-                                          ...r, versions: r.versions.map((v, k) => k === vi ? { ...v, content: e.target.value } : v),
-                                        }))}
-                                        placeholder="粘贴规则原文内容，或输入原文链接后点击「Firecrawl 抓取全文」自动获取"
-                                        rows={4}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-
-          {/* ── Right: Meta Panel ── */}
-          <div className="space-y-6">
-            {/* 辖区 */}
-            <div className="sticky top-20">
-              <div className="border border-border/30 rounded-xl p-5 space-y-5">
-                <div>
-                  <SectionHeader icon={MapPin} title="发源辖区" />
-                  <div className="flex flex-wrap gap-2">
-                    {jurisdictions?.map((j) => (
-                      <button
-                        key={j.id}
-                        type="button"
-                        onClick={() => toggleJuris(j.id)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-full text-xs border transition-colors",
-                          jurisSel.includes(j.id)
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "border-border hover:bg-muted"
-                        )}
-                      >
-                        {j.flag} {j.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-border/20 pt-4">
-                  <SectionHeader icon={Tag} title="显示设置" />
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">品牌主色</Label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={basic.color}
-                          onChange={(e) => setB("color", e.target.value)}
-                          className="w-8 h-8 rounded cursor-pointer border border-border/50"
-                        />
-                        <UInput
-                          value={basic.color}
-                          onChange={(e) => setB("color", e.target.value)}
-                          placeholder="#3B82F6"
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">公开展示</Label>
-                      <Switch
-                        checked={basic.isActive}
-                        onCheckedChange={(v) => setB("isActive", v)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-border/20 pt-4 space-y-2">
+            {form.rules.map((rule, idx) => (
+              <div key={idx} className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">规则 #{idx + 1}</span>
                   <Button
-                    className="w-full"
-                    onClick={() => handleSave(true)}
-                    disabled={saving}
-                  >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "保存并激活"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleSave(false)}
-                    disabled={saving}
-                  >
-                    仅保存
-                  </Button>
-                  {basic.id.trim() && basic.name.trim() && (
-                    <Button
-                      variant="ghost"
-                      className="w-full gap-1.5 text-primary hover:text-primary"
-                      onClick={handlePreview}
-                      disabled={previewing || saving}
-                    >
-                      {previewing ? (
-                        <><Loader2 className="w-3.5 h-3.5 animate-spin" />保存并预览...</>
-                      ) : (
-                        <><svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>保存并预览</>
-                      )}
-                    </Button>
-                  )}
-                  <Button
+                    size="icon"
                     variant="ghost"
-                    className="w-full text-muted-foreground"
-                    onClick={() => navigate("/admin")}
+                    className="w-7 h-7 text-destructive hover:text-destructive"
+                    onClick={() => removeRule(idx)}
                   >
-                    返回后台
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">标题</Label>
+                    <Input
+                      className="h-8 text-sm"
+                      value={rule.title}
+                      onChange={(e) => updateRule(idx, "title", e.target.value)}
+                      placeholder="规则文件标题"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">类型</Label>
+                    <Select
+                      value={rule.type || "policy"}
+                      onValueChange={(v) => updateRule(idx, "type", v)}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="policy">平台政策</SelectItem>
+                        <SelectItem value="terms">服务条款</SelectItem>
+                        <SelectItem value="privacy">隐私政策</SelectItem>
+                        <SelectItem value="community">社区准则</SelectItem>
+                        <SelectItem value="transparency">透明度报告</SelectItem>
+                        <SelectItem value="other">其他</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">日期</Label>
+                    <Input
+                      className="h-8 text-sm"
+                      type="date"
+                      value={rule.date}
+                      onChange={(e) => updateRule(idx, "date", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">URL</Label>
+                    <Input
+                      className="h-8 text-sm"
+                      placeholder="https://..."
+                      value={rule.url}
+                      onChange={(e) => updateRule(idx, "url", e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        </div>
+        )}
+
+        {/* ── Timeline Tab ── */}
+        {activeTab === "timeline" && (
+          <div className="max-w-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">发展历程</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  记录平台的关键发展节点
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={addTimeline}>
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
+                添加节点
+              </Button>
+            </div>
+
+            {/* AI development history */}
+            {form.developmentHistory && (
+              <div className="rounded-lg border border-border p-4 bg-muted/20">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">AI 提取的发展历程</span>
+                </div>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{form.developmentHistory}</p>
+              </div>
+            )}
+
+            {form.timeline.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-lg">
+                暂无发展历程，点击「添加节点」录入
+              </div>
+            )}
+
+            {form.timeline.map((item, idx) => (
+              <div key={idx} className="flex gap-3 items-start">
+                <div className="flex flex-col items-center">
+                  <div className="w-2 h-2 rounded-full bg-primary mt-3" />
+                  {idx < form.timeline.length - 1 && (
+                    <div className="w-px flex-1 bg-border mt-1" />
+                  )}
+                </div>
+                <div className="flex-1 rounded-lg border border-border p-3 space-y-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="h-7 text-xs w-32"
+                      placeholder="日期"
+                      value={item.date}
+                      onChange={(e) => updateTimeline(idx, "date", e.target.value)}
+                    />
+                    <Input
+                      className="h-7 text-xs flex-1"
+                      placeholder="事件描述"
+                      value={item.event}
+                      onChange={(e) => updateTimeline(idx, "event", e.target.value)}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-destructive hover:text-destructive shrink-0"
+                      onClick={() => removeTimeline(idx)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

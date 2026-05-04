@@ -97,16 +97,10 @@ export const platforms = mysqlTable("platforms", {
     crossBorder: string;
   }>(),
   rules: json("rules").$type<Array<{
-    id: string;
+    date: string;
     title: string;
     type: string;
-    versions: Array<{
-      versionId: string;
-      versionLabel: string;
-      date: string;
-      url?: string;
-      content?: string;
-    }>;
+    url: string;
   }>>().default([]),
   timeline: json("timeline").$type<Array<{
     date: string;
@@ -121,12 +115,13 @@ export const platforms = mysqlTable("platforms", {
 
 export type Platform = typeof platforms.$inferSelect;
 export type InsertPlatform = typeof platforms.$inferInsert;
-
-// API 配置（管理员存储第三方 API Key）
+// API 设置表
 export const apiSettings = mysqlTable("api_settings", {
-  key: varchar("key", { length: 128 }).primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 128 }).notNull().unique(),
   value: text("value").notNull(),
   label: varchar("label", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type ApiSetting = typeof apiSettings.$inferSelect;

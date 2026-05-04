@@ -137,7 +137,7 @@ export default function Cases() {
         <div className="flex gap-6 items-start">
           {/* ── Left sidebar filters ── */}
           <aside className={cn(
-            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-[57px] self-start max-h-[calc(100vh-5rem)] overflow-y-auto z-10",
+            "hidden md:flex flex-col gap-5 shrink-0 transition-all duration-200 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto",
             sidebarOpen ? "w-52" : "w-8"
           )}>            {/* Collapse toggle button */}
             <button
@@ -159,6 +159,7 @@ export default function Cases() {
                 司法案例、监管执法与立法政策
               </p>
             </div>
+            <Separator />
             {/* Search */}
             <div>
               <div className="relative">
@@ -191,10 +192,43 @@ export default function Cases() {
               </Button>
             )}
 
+            {/* Active filter tags - shown below clear button */}
+            {hasFilters && (
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {selectedTypes.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
+                    {CASE_TYPES.find((t) => t.value === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedTopics.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
+                    {topics?.find((t) => t.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedJurisdictions.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
+                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
+                    {jurisdictions?.find((j) => j.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {keyword && (
+                  <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
+                    "{keyword}"
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            <Separator />
 
             {/* Case Type */}
             <div>
-              <div className="flex items-center gap-1.5 mb-3"><Filter className="w-3.5 h-3.5 text-muted-foreground" />
+              <div className="flex items-center gap-1.5 mb-3">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">案例类型</span>
               </div>
               <div className="flex flex-col gap-1">
@@ -223,7 +257,10 @@ export default function Cases() {
                   );
                 })}
               </div>
-             </div>
+            </div>
+
+            <Separator />
+
             {/* Topics */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
@@ -257,6 +294,9 @@ export default function Cases() {
                 })}
               </div>
             </div>
+
+            <Separator />
+
             {/* Jurisdictions */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
@@ -338,6 +378,7 @@ export default function Cases() {
                           onChange={(e) => setInputVal(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") { handleSearch(); setDrawerOpen(false); } }} />
                       </div>
+                      <Separator />
                       {/* Case Type */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">案例类型</p>
@@ -355,9 +396,10 @@ export default function Cases() {
                             );
                           })}
                         </div>
-            </div>
-            {/* Topics */}
-            <div>
+                      </div>
+                      <Separator />
+                      {/* Topics */}
+                      <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">研究专题</p>
                         <div className="flex flex-wrap gap-2">
                           {topics?.map((t) => {
@@ -373,9 +415,10 @@ export default function Cases() {
                             );
                           })}
                         </div>
-            </div>
-            {/* Jurisdictions */}
-            <div>
+                      </div>
+                      <Separator />
+                      {/* Jurisdictions */}
+                      <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">司法辖区</p>
                         <div className="flex flex-wrap gap-2">
                           {jurisdictions?.map((j) => {
@@ -398,40 +441,8 @@ export default function Cases() {
                 </Drawer.Portal>
               </Drawer.Root>
             </div>
-            {/* Sticky toolbar: result count + view toggle + active filter tags */}
-            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
-              {/* Active filter tags */}
-              {hasFilters && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedTypes.map((v) => (
-                    <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
-                      {CASE_TYPES.find((t) => t.value === v)?.label}
-                      <X className="w-2.5 h-2.5" />
-                    </Badge>
-                  ))}
-                  {selectedTopics.map((v) => (
-                    <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
-                      {topics?.find((t) => t.id === v)?.label}
-                      <X className="w-2.5 h-2.5" />
-                    </Badge>
-                  ))}
-                  {selectedJurisdictions.map((v) => (
-                    <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
-                      {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
-                      {jurisdictions?.find((j) => j.id === v)?.label}
-                      <X className="w-2.5 h-2.5" />
-                    </Badge>
-                  ))}
-                  {keyword && (
-                    <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
-                      "{keyword}"
-                      <X className="w-2.5 h-2.5" />
-                    </Badge>
-                  )}
-                </div>
-              )}
-              {/* Result count + view toggle */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
+            {/* Result count + view toggle */}
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm text-muted-foreground">
                   {isLoading ? "加载中…" : `共 ${data?.total ?? 0} 条结果`}
@@ -482,6 +493,7 @@ export default function Cases() {
               </div>
               </div>
             </div>
+
             {/* Mobile search bar */}
             <div className="flex gap-2 mb-4 md:hidden">
               <div className="relative flex-1">
@@ -517,7 +529,7 @@ export default function Cases() {
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
                   return (
                     <Link key={c.id} href={`/cases/${c.id}`}>
-                      <Card className="h-full shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
+                      <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
                         <CardContent className="p-4 flex flex-col gap-2 h-full">
                           <div className="flex items-start justify-between gap-2">
                             <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
@@ -560,7 +572,7 @@ export default function Cases() {
                 })}
               </div>
             ) : (
-              <div className="flex flex-col rounded-lg overflow-hidden">
+              <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
                 {/* Sort header */}
                 <div className="px-4 py-2 bg-muted/30 flex items-center gap-2 text-xs text-muted-foreground select-none">
                   <span className="flex-1">标题 / 摘要</span>
@@ -588,7 +600,7 @@ export default function Cases() {
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
                   return (
                     <Link key={c.id} href={`/cases/${c.id}`}>
-                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/15 last:border-0">
+                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group">
                         <div className="flex items-start gap-3">
                           <div className="flex flex-col gap-1 flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -631,54 +643,31 @@ export default function Cases() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-1.5 mt-8 flex-wrap">
+              <div className="flex items-center justify-center gap-2 mt-6">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="w-8 h-8"
                   disabled={page <= 1}
-                  onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => setPage((p) => p - 1)}
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((item, idx) =>
-                    item === 'ellipsis' ? (
-                      <span key={`e${idx}`} className="w-8 h-8 flex items-center justify-center text-muted-foreground text-sm">…</span>
-                    ) : (
-                      <Button
-                        key={item}
-                        variant={item === page ? 'default' : 'outline'}
-                        size="icon"
-                        className="w-8 h-8 text-xs"
-                        onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                      >
-                        {item}
-                      </Button>
-                    )
-                  )}
+                <span className="text-sm text-muted-foreground px-2">
+                  第 {page} / {totalPages} 页
+                </span>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="w-8 h-8"
                   disabled={page >= totalPages}
-                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => setPage((p) => p + 1)}
                 >
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
-                <span className="text-xs text-muted-foreground ml-1">共 {totalPages} 页</span>
               </div>
             )}
           </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }

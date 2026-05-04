@@ -39,57 +39,23 @@
 - [x] About 联系方式提供真实邮箱链接 cyberdb@zjicm.edu.cn
 
 ## 测试
-- [x] 后端 tRPC 路由单元测试（auth/cases/topics/platforms）- 15 tests passed
+- [x] 后端 tRPC 路由单元测试（auth/cases/topics/platforms）- 7 tests passed
 - [x] 受保护路由验证（ProtectedRoute 组件）
 - [x] TypeScript 编译（仅剩框架层 storageProxy.ts 1个错误，非业务代码）
 
-## 已完成（本次迭代）
-- [x] 规则文件模块改为三栏布局（左：规则名称，中：版本历史，右：规则全文/原文链接）
-- [x] Admin.tsx 平台表单规则 Tab 支持多版本管理（版本号/日期/链接/全文）
-- [x] 兼容旧版 flat 格式规则数据（自动 normalize）
+## AI 辅助录入
+- [ ] 后端添加 cases.extractFromText tRPC 接口（调用 LLM 提取结构化字段）
+- [ ] 前端 Admin.tsx 案例表单添加"AI 辅助填充"面板（粘贴原文 → 解析 → 自动填充）
+- [ ] 添加对应 vitest 测试
 
-## AI 辅助录入（当前迭代）
-- [x] 案例录入改为全屏独立页面 /admin/cases/new 和 /admin/cases/:id/edit
-- [x] 全屏案例录入页：AI URL 自动填充模式（Firecrawl 抓取 + LLM 解析）
-- [x] 全屏案例录入页：手工输入模式（兆底方案）
-- [x] tRPC procedure: ai.extractFromUrl + ai.generateContent（adminProcedure）
-- [x] Admin.tsx 平台管理：补全删除按鈕和删除确认弹窗
-- [x] Admin.tsx 平台管理：补全激活/停用快捷切换
-- [x] Admin.tsx 平台表单：新增「关联案例」 Tab
-- [x] Admin.tsx 统计卡片：新增平台总数
-
-## API 配置与 AI 辅助写作（当前迭代）
-- [x] 数据库新增 api_settings 表（key/value 存储，仅管理员可读写）
-- [x] tRPC 路由：settings.list / settings.set / settings.delete / settings.getValue（adminProcedure）
-- [x] Admin.tsx 新增「API 配置」Tab（Firecrawl Key + AI 写作 API Key 配置界面）
-- [x] CaseEditor.tsx 集成 AI 总结辅助（基于摘要生成内容解读）
-- [x] CaseEditor.tsx 集成 AI 写作辅助（基于内容解读生成法律分析）
-- [x] Firecrawl URL 自动填充：已配置时可用，未配置时显示「待配置」提示
-
-## CaseEditor 字段调整（当前迭代）
-- [x] CaseEditor.tsx：删除顶部栏「草稿」状态徽章 + 「保存草稿」 + 「保存并发布」按鈕区域
-- [x] CaseEditor.tsx：删除「法律分析」字段及相关 AI 辅助按鈕
-- [x] CaseEditor.tsx：新增「原文全文」字段（大文本输入）
-- [x] CaseEditor.tsx：所有输入框改为上下横线风格（去除方框）
-- [x] Admin.tsx CaseForm：删除「深度分析」字段，新增「原文全文」字段
-
-## 平台录入全屏页面（当前迭代）
-- [x] 创建全屏平台录入/编辑页面 PlatformEditor.tsx（与 CaseEditor 相同设计风格）
-- [x] PlatformEditor.tsx：AI URL 自动填充模式（Firecrawl + LLM 解析平台信息）
-- [x] PlatformEditor.tsx：手工输入模式（所有字段横线风格，分区布局）
-- [x] tRPC procedure: ai.extractPlatformFromUrl（adminProcedure）
-- [x] Admin.tsx：新增/编辑平台按鈕指向全屏页面 /admin/platforms/new 和 /admin/platforms/:id/edit
-- [x] App.tsx：注册 PlatformEditor 路由
-
-## 预览功能（当前迭代）
-- [x] PlatformEditor.tsx：底部添加「预览」按鈕，先保存草稿再在新标签页打开前台平台详情页
-- [x] CaseEditor.tsx：底部添加「预览」按鈕，先保存草稿再在新标签页打开前台案例详情页
-
-## 平台 AI 关键词自动填充（当前迭代）
-- [x] routers.ts：新增 ai.extractPlatformByKeyword procedure（LLM 搜索+提取，不依赖 Firecrawl）
-- [x] PlatformEditor.tsx：AI 面板改为关键词输入模式，规则文件保持独立 Firecrawl URL 抓取
-- [x] 关键词模式无需 Firecrawl 配置即可使用
-
-## 案例详情页增强（当前迭代）
-- [x] CaseDetail.tsx：右栏新增「原文全文」展示区块（fullText 字段），支持超长文本折叠展开
-- [x] 原文全文区块：右上角有 Google 翻译按钮，超过 1500 字时显示折叠/展开控件
+## Admin 全屏编辑页面修复（当前迭代）
+- [x] 修复 Admin.tsx：新增案例/平台按钮改为路由跳转（navigate），移除弹窗逻辑
+- [x] 创建 CaseEditor.tsx：全屏案例编辑页，支持 AI URL 提取、原文全文字段
+- [x] 创建 PlatformEditor.tsx：全屏平台编辑页，支持 AI 关键词自动填充（画像/历程/链接）
+- [x] App.tsx 注册所有编辑路由（/admin/cases/new, /admin/cases/:id/edit, /admin/platforms/new, /admin/platforms/:id/edit）
+- [x] Admin.tsx 新增 API 配置 Tab（Firecrawl API Key 管理）
+- [x] schema.ts 添加 api_settings 表和 cases.fullText 字段
+- [x] routers.ts 新增 settings 路由（getAll/upsert/delete）和 ai 路由（extractPlatformByKeyword/extractCaseFromUrl）
+- [x] 数据库迁移执行成功（api_settings 表 + fullText 字段）
+- [x] 修复 Cases.tsx JSX 嵌套标签错误
+- [x] 15 个测试全部通过

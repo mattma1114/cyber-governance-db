@@ -1,12 +1,19 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "454b48d8-c420-41f8-ab3f-a16d17330007",
+  "id": "c3725e1c-80ab-470c-b8fc-c2c61f9fa17b",
   "prevId": "b4e73a2b-7ee2-43aa-a81d-13533d1fc010",
   "tables": {
     "api_settings": {
       "name": "api_settings",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
         "key": {
           "name": "key",
           "type": "varchar(128)",
@@ -28,6 +35,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
         "updatedAt": {
           "name": "updatedAt",
           "type": "timestamp",
@@ -41,14 +56,21 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "api_settings_key": {
-          "name": "api_settings_key",
+        "api_settings_id": {
+          "name": "api_settings_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "api_settings_key_unique": {
+          "name": "api_settings_key_unique",
           "columns": [
             "key"
           ]
         }
       },
-      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "cases": {
@@ -133,6 +155,13 @@
         },
         "aiAnalysis": {
           "name": "aiAnalysis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fullText": {
+          "name": "fullText",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

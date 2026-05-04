@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-const PAGE_SIZE = 12;
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { truncate, cn } from "@/lib/utils";
 
 export default function Platforms() {
@@ -18,31 +17,24 @@ export default function Platforms() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [page, setPage] = useState(1);
 
-  const { data: platformData, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined, page, pageSize: PAGE_SIZE });
+  const { data: platforms, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined });
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
 
-
+  const handleSearch = () => {
+    setKeyword(inputVal);
+  };
 
   const clearFilters = () => {
     setKeyword("");
     setInputVal("");
     setSelectedJurisdictions([]);
     setSelectedTypes([]);
-    setPage(1);
   };
-
-  const handleSearch = () => {
-    setKeyword(inputVal);
-    setPage(1);
-  };
-
-  const totalPages = platformData ? Math.ceil(platformData.total / PAGE_SIZE) : 1;
 
   // Parse jurisdiction and portrait for each platform
   const parsedPlatforms = useMemo(() => {
-    return (platformData?.items ?? []).map((p) => {
+    return (platforms ?? []).map((p) => {
       const jurisArr: string[] = Array.isArray(p.jurisdiction)
         ? p.jurisdiction
         : (p.jurisdiction ? JSON.parse(p.jurisdiction as string) : []);
@@ -52,7 +44,7 @@ export default function Platforms() {
       const types: string[] = portrait?.types ?? [];
       return { ...p, jurisArr, types };
     });
-  }, [platformData]);
+  }, [platforms]);
 
   // Collect all unique platform types from data
   const allTypes = useMemo(() =>
@@ -110,7 +102,7 @@ export default function Platforms() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-white">
+      <div className="border-b border-border bg-white">
         <div className="container py-8">
           <h1 className="text-2xl font-bold mb-1">平台画像库</h1>
           <p className="text-muted-foreground text-sm">
@@ -122,11 +114,20 @@ export default function Platforms() {
       <div className="container py-6">
         <div className="flex gap-6 items-start">
           {/* ── Left: Sidebar Filters ── */}
-          <div className="shrink-0 flex items-start gap-2 sticky top-[57px] self-start z-10">
           <aside className={cn(
-            "flex flex-col gap-4 transition-all duration-200 max-h-[calc(100vh-5rem)] overflow-y-auto",
-            sidebarOpen ? "w-56" : "w-0 overflow-hidden"
+            "shrink-0 flex flex-col gap-4 transition-all duration-200 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto",
+            sidebarOpen ? "w-56" : "w-8"
           )}>
+            {/* Collapse toggle */}
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="flex items-center justify-center w-7 h-7 rounded-md border border-border hover:bg-muted transition-colors self-end shrink-0 mt-0.5"
+              title={sidebarOpen ? "折叠筛选栏" : "展开筛选栏"}
+            >
+              {sidebarOpen
+                ? <PanelLeftClose className="w-3.5 h-3.5 text-muted-foreground" />
+                : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
             {sidebarOpen && (<>
             {/* Search */}
             <div className="flex gap-2">
@@ -157,7 +158,7 @@ export default function Platforms() {
               </Button>
             )}
 
-
+            <Separator />
 
             {/* Platform Type */}
             <div>
@@ -201,7 +202,7 @@ export default function Platforms() {
               </div>
             </div>
 
-
+            <Separator />
 
             {/* Jurisdictions */}
             <div>
@@ -241,56 +242,43 @@ export default function Platforms() {
             </div>
             </>)}
           </aside>
-          {/* Collapse toggle */}
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="flex items-center justify-center w-7 h-7 rounded-md border border-border hover:bg-muted transition-colors shrink-0 mt-0.5"
-            title={sidebarOpen ? "折叠筛选栏" : "展开筛选栏"}
-          >
-            {sidebarOpen
-              ? <PanelLeftClose className="w-3.5 h-3.5 text-muted-foreground" />
-              : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
-          </button>
-          </div>
+
           {/* ── Right: Results ── */}
           <div className="flex-1 min-w-0">
-             {/* Sticky toolbar: active filter tags + result count + view toggle */}
-            <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur-sm flex flex-col gap-1.5 mb-4 py-2 -mx-1 px-1">
-              {/* Active filter badges */}
-              {(selectedTypes.length > 0 || selectedJurisdictions.length > 0) && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedTypes.map((t) => (
+            {/* Result header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-muted-foreground">
+                  {isLoading ? "加载中…" : `共 ${filtered.length} 个平台`}
+                </span>
+                {/* Active filter badges */}
+                {selectedTypes.map((t) => (
+                  <Badge
+                    key={t}
+                    variant="secondary"
+                    className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
+                    onClick={() => toggleType(t)}
+                  >
+                    {t}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedJurisdictions.map((jId) => {
+                  const j = jurisdictions?.find((x) => x.id === jId);
+                  return j ? (
                     <Badge
-                      key={t}
+                      key={jId}
                       variant="secondary"
                       className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
-                      onClick={() => toggleType(t)}
+                      onClick={() => toggleJurisdiction(jId)}
                     >
-                      {t}
+                      {j.flag} {j.label}
                       <X className="w-2.5 h-2.5" />
                     </Badge>
-                  ))}
-                  {selectedJurisdictions.map((jId) => {
-                    const j = jurisdictions?.find((x) => x.id === jId);
-                    return j ? (
-                      <Badge
-                        key={jId}
-                        variant="secondary"
-                        className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
-                        onClick={() => toggleJurisdiction(jId)}
-                      >
-                        {j.flag} {j.label}
-                        <X className="w-2.5 h-2.5" />
-                      </Badge>
-                    ) : null;
-                  })}
-                </div>
-              )}
-              {/* Result count + view toggle */}
-              <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                {isLoading ? "加载中…" : `共 ${platformData?.total ?? 0} 个平台`}
-              </span>
+                  ) : null;
+                })}
+              </div>
+
               {/* View toggle */}
               <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
                 <button
@@ -314,8 +302,8 @@ export default function Platforms() {
                   <List className="w-3.5 h-3.5" />
                 </button>
               </div>
-              </div>
             </div>
+
             {isLoading ? (
               <div className={viewMode === "grid" ? "grid sm:grid-cols-2 lg:grid-cols-3 gap-4" : "flex flex-col gap-2"}>
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -341,7 +329,7 @@ export default function Platforms() {
                     .filter(Boolean);
                   return (
                     <Link key={p.id} href={`/platforms/${p.id}`}>
-                      <Card className="h-full shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group overflow-hidden">
+                      <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group overflow-hidden">
                         <div
                           className="h-1.5 w-full"
                           style={{ background: p.color ?? "var(--primary)" }}
@@ -406,14 +394,14 @@ export default function Platforms() {
               </div>
             ) : (
               /* List View */
-              <div className="flex flex-col rounded-lg overflow-hidden">
+              <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
                 {filtered.map((p) => {
                   const jurisLabels = p.jurisArr
                     .map((id) => jurisdictions?.find((j) => j.id === id))
                     .filter(Boolean);
                   return (
                     <Link key={p.id} href={`/platforms/${p.id}`}>
-                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group border-b border-border/15 last:border-0">
+                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group">
                         {/* Color dot + avatar */}
                         <div
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
@@ -454,52 +442,6 @@ export default function Platforms() {
                     </Link>
                   );
                 })}
-              </div>
-            )}
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-1.5 mt-8 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="w-8 h-8"
-                  disabled={page <= 1}
-                  onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </Button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((item, idx) =>
-                    item === 'ellipsis' ? (
-                      <span key={`e${idx}`} className="w-8 h-8 flex items-center justify-center text-muted-foreground text-sm">…</span>
-                    ) : (
-                      <Button
-                        key={item}
-                        variant={item === page ? 'default' : 'outline'}
-                        size="icon"
-                        className="w-8 h-8 text-xs"
-                        onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                      >
-                        {item}
-                      </Button>
-                    )
-                  )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="w-8 h-8"
-                  disabled={page >= totalPages}
-                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </Button>
-                <span className="text-xs text-muted-foreground ml-1">共 {totalPages} 页</span>
               </div>
             )}
           </div>

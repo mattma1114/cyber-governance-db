@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
-  Tag, Globe, X, Settings, Key, CheckCircle2, AlertCircle, Save
+  Tag, Globe, X, Settings, Key, Save, Loader2
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
@@ -52,7 +52,7 @@ function CaseForm({
     sourceUrl: initial?.sourceUrl ?? "",
     abstract: initial?.abstract ?? "",
     aiSummary: initial?.aiSummary ?? "",
-    fullText: (initial as any)?.fullText ?? "",
+    aiAnalysis: initial?.aiAnalysis ?? "",
     tags: Array.isArray(initial?.tags)
       ? initial.tags.join(", ")
       : (initial?.tags ? JSON.parse(initial.tags).join(", ") : ""),
@@ -134,8 +134,8 @@ function CaseForm({
           <Textarea value={form.aiSummary} onChange={(e) => set("aiSummary", e.target.value)} rows={3} placeholder="AI 摘要解读" />
         </div>
         <div className="col-span-2 space-y-1.5">
-          <Label>原文全文</Label>
-          <Textarea value={form.fullText} onChange={(e) => set("fullText", e.target.value)} rows={4} placeholder="粘贴案例原始文件全文（可选）" />
+          <Label>深度分析</Label>
+          <Textarea value={form.aiAnalysis} onChange={(e) => set("aiAnalysis", e.target.value)} rows={3} placeholder="法律深度分析" />
         </div>
         <div className="col-span-2 space-y-1.5">
           <Label>标签（逗号分隔）</Label>
@@ -193,10 +193,9 @@ const PORTRAIT_DIMS = [
   { key: "governance", label: "治理机制" },
 ];
 
-function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCases }: {
+function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions }: {
   initial?: any; onSave: (d: any) => void; onCancel: () => void; saving: boolean;
   jurisdictions?: Array<{ id: string; label: string; flag?: string | null }>;
-  allCases?: Array<{ id: number; title: string; type?: string | null; date?: string | null }>;
 }) {
   const isEdit = !!initial;
   const initPortrait = initial?.portrait
@@ -208,22 +207,9 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCas
   const initTimeline: Array<{ date: string; event: string }> = initial?.timeline
     ? (typeof initial.timeline === "string" ? JSON.parse(initial.timeline) : initial.timeline)
     : [];
-  // Normalize rules to new versioned format
-  const normalizeAdminRules = (raw: any[]): Array<{
-    id: string; title: string; type: string;
-    versions: Array<{ versionId: string; versionLabel: string; date: string; url: string; content: string }>;
-  }> => raw.map((r, idx) => {
-    if (r.versions && Array.isArray(r.versions)) return r;
-    return {
-      id: r.id ?? `rule-${idx}`,
-      title: r.title ?? "",
-      type: r.type ?? "",
-      versions: [{ versionId: `v-${idx}-0`, versionLabel: "初始版本", date: r.date ?? "", url: r.url ?? "", content: r.content ?? "" }],
-    };
-  });
-  const initRules = normalizeAdminRules(
-    initial?.rules ? (typeof initial.rules === "string" ? JSON.parse(initial.rules) : initial.rules) : []
-  );
+  const initRules: Array<{ date: string; title: string; type: string; url: string }> = initial?.rules
+    ? (typeof initial.rules === "string" ? JSON.parse(initial.rules) : initial.rules)
+    : [];
 
   const [basic, setBasic] = useState({
     id: initial?.id ?? "",
@@ -242,17 +228,8 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCas
     Object.fromEntries(PORTRAIT_DIMS.map((d) => [d.key, initPortrait[d.key] ?? ""]))
   );
   const [timeline, setTimeline] = useState<Array<{ date: string; event: string }>>(initTimeline);
-  const [rules, setRules] = useState<Array<{
-    id: string; title: string; type: string;
-    versions: Array<{ versionId: string; versionLabel: string; date: string; url: string; content: string }>;
-  }>>(initRules);
-  const [expandedRuleIdx, setExpandedRuleIdx] = useState<number | null>(null);
+  const [rules, setRules] = useState<Array<{ date: string; title: string; type: string; url: string }>>(initRules);
   const [formTab, setFormTab] = useState("basic");
-  const initRelatedCaseIds: number[] = initial?.relatedCaseIds
-    ? (typeof initial.relatedCaseIds === "string" ? JSON.parse(initial.relatedCaseIds) : initial.relatedCaseIds)
-    : [];
-  const [relatedCaseIds, setRelatedCaseIds] = useState<number[]>(initRelatedCaseIds);
-  const [caseSearch, setCaseSearch] = useState("");
 
   const setB = (k: string, v: any) => setBasic((p) => ({ ...p, [k]: v }));
   const toggleJuris = (id: string) => setJurisSel((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
@@ -271,7 +248,6 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCas
     portrait: { ...portrait, types: types.split(",").map((t) => t.trim()).filter(Boolean) },
     timeline,
     rules,
-    relatedCaseIds,
   });
 
   return (
@@ -282,7 +258,6 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCas
           <TabsTrigger value="portrait" className="flex-1">结构画像</TabsTrigger>
           <TabsTrigger value="timeline" className="flex-1">时间线</TabsTrigger>
           <TabsTrigger value="rules" className="flex-1">规则文件</TabsTrigger>
-          <TabsTrigger value="related" className="flex-1">关联案例</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basic" className="space-y-3">
@@ -399,161 +374,45 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCas
 
         <TabsContent value="rules" className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">平台规则文件列表（每条规则可添加多个版本）</p>
-            <Button size="sm" variant="outline" className="gap-1" onClick={() => {
-              const newIdx = rules.length;
-              setRules((p) => [...p, { id: `rule-${Date.now()}`, title: "", type: "", versions: [{ versionId: `v-${Date.now()}-0`, versionLabel: "初始版本", date: "", url: "", content: "" }] }]);
-              setExpandedRuleIdx(newIdx);
-            }}>
-              <Plus className="w-3.5 h-3.5" />新增规则
+            <p className="text-xs text-muted-foreground">平台规则文件列表</p>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setRules((p) => [...p, { date: "", title: "", type: "", url: "" }])}>
+              <Plus className="w-3.5 h-3.5" />新增
             </Button>
           </div>
-          {rules.map((rule, i) => (
-            <div key={rule.id ?? i} className="border border-border/50 rounded-lg overflow-hidden">
-              {/* Rule header */}
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/30">
-                <button
-                  type="button"
-                  className="flex-1 flex items-center gap-2 text-left"
-                  onClick={() => setExpandedRuleIdx(expandedRuleIdx === i ? null : i)}
-                >
-                  <ChevronRight className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", expandedRuleIdx === i && "rotate-90")} />
-                  <span className="text-sm font-medium truncate">{rule.title || "（未命名规则）"}</span>
-                  {rule.type && <Badge variant="outline" className="text-[10px] shrink-0">{rule.type}</Badge>}
-                  <span className="text-xs text-muted-foreground shrink-0">{rule.versions?.length ?? 0} 个版本</span>
-                </button>
-                <Button variant="ghost" size="icon" className="w-7 h-7 shrink-0 text-destructive" onClick={() => setRules((p) => p.filter((_, j) => j !== i))}>
-                  <X className="w-3 h-3" />
+          {rules.map((item, i) => (
+            <div key={i} className="border border-border rounded-lg p-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  className="w-28 shrink-0"
+                  value={item.date}
+                  onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}
+                  placeholder="2023-01"
+                />
+                <Input
+                  value={item.type}
+                  onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
+                  placeholder="类型（如隐私政策）"
+                />
+                <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-destructive" onClick={() => setRules((p) => p.filter((_, j) => j !== i))}>
+                  <X className="w-3.5 h-3.5" />
                 </Button>
               </div>
-              {/* Rule body (expanded) */}
-              {expandedRuleIdx === i && (
-                <div className="p-3 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">规则名称</Label>
-                      <Input
-                        value={rule.title}
-                        onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
-                        placeholder="如：用户服务协议"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">规则类型</Label>
-                      <Input
-                        value={rule.type}
-                        onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
-                        placeholder="如：隐私政策"
-                      />
-                    </div>
-                  </div>
-                  {/* Versions */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">版本历史</Label>
-                      <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() =>
-                        setRules((p) => p.map((x, j) => j === i ? {
-                          ...x,
-                          versions: [...(x.versions ?? []), { versionId: `v-${Date.now()}`, versionLabel: "", date: "", url: "", content: "" }]
-                        } : x))
-                      }>
-                        <Plus className="w-3 h-3" />添加版本
-                      </Button>
-                    </div>
-                    {rule.versions?.map((ver, vi) => (
-                      <div key={ver.versionId ?? vi} className="border border-border/30 rounded-md p-2.5 space-y-2">
-                        <div className="flex gap-2 items-center">
-                          <Input
-                            className="w-28 shrink-0 h-7 text-xs"
-                            value={ver.versionLabel}
-                            onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
-                              ...x,
-                              versions: x.versions.map((v, k) => k === vi ? { ...v, versionLabel: e.target.value } : v)
-                            } : x))}
-                            placeholder="版本号（如 v2.0）"
-                          />
-                          <Input
-                            className="w-28 shrink-0 h-7 text-xs"
-                            value={ver.date}
-                            onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
-                              ...x,
-                              versions: x.versions.map((v, k) => k === vi ? { ...v, date: e.target.value } : v)
-                            } : x))}
-                            placeholder="2024-01-01"
-                          />
-                          <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-destructive ml-auto" onClick={() =>
-                            setRules((p) => p.map((x, j) => j === i ? {
-                              ...x,
-                              versions: x.versions.filter((_, k) => k !== vi)
-                            } : x))
-                          }>
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <Input
-                          className="h-7 text-xs"
-                          value={ver.url}
-                          onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
-                            ...x,
-                            versions: x.versions.map((v, k) => k === vi ? { ...v, url: e.target.value } : v)
-                          } : x))}
-                          placeholder="原文链接 https://..."
-                        />
-                        <Textarea
-                          className="text-xs min-h-[60px]"
-                          value={ver.content}
-                          onChange={(e) => setRules((p) => p.map((x, j) => j === i ? {
-                            ...x,
-                            versions: x.versions.map((v, k) => k === vi ? { ...v, content: e.target.value } : v)
-                          } : x))}
-                          placeholder="规则全文（可选，留空则前端显示跳转原文链接）"
-                          rows={3}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <Input
+                value={item.title}
+                onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
+                placeholder="文件标题"
+              />
+              <Input
+                value={item.url}
+                onChange={(e) => setRules((p) => p.map((x, j) => j === i ? { ...x, url: e.target.value } : x))}
+                placeholder="https://..."
+              />
             </div>
           ))}
         </TabsContent>
-
-        <TabsContent value="related" className="space-y-3">
-          <p className="text-xs text-muted-foreground">选择与该平台直接相关的案例，将在平台详情页「关联案例」标签下展示。</p>
-          <Input
-            placeholder="搜索案例名称…"
-            value={caseSearch}
-            onChange={(e) => setCaseSearch(e.target.value)}
-            className="h-8 text-sm"
-          />
-          <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
-            {(allCases ?? []).filter((c) =>
-              !caseSearch || c.title.toLowerCase().includes(caseSearch.toLowerCase())
-            ).map((c) => (
-              <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={relatedCaseIds.includes(c.id)}
-                  onChange={(e) => setRelatedCaseIds((p) =>
-                    e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id)
-                  )}
-                  className="rounded"
-                />
-                <span className="text-sm flex-1 truncate">{c.title}</span>
-                {c.date && <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>}
-              </label>
-            ))}
-            {(allCases ?? []).length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">暂无案例数据</p>
-            )}
-          </div>
-          {relatedCaseIds.length > 0 && (
-            <p className="text-xs text-primary">已选择 {relatedCaseIds.length} 个关联案例</p>
-          )}
-        </TabsContent>
       </Tabs>
 
-<div className="pt-3 mt-3">
+      <div className="pt-3 border-t border-border mt-3">
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>取消</Button>
           <Button onClick={() => onSave(buildPayload())} disabled={saving || !basic.id || !basic.name}>
@@ -565,25 +424,174 @@ function PlatformForm({ initial, onSave, onCancel, saving, jurisdictions, allCas
   );
 }
 
-// ── Main Admin Page ────────────────────────────────────────────────────────────
+/// ── Settings Tab ──────────────────────────────────────────────
+function SettingsTab() {
+  const [keyInput, setKeyInput] = useState("");
+  const [valueInput, setValueInput] = useState("");
+  const [labelInput, setLabelInput] = useState("");
+  const utils = trpc.useUtils();
+
+  const { data: settings, isLoading } = trpc.settings.getAll.useQuery();
+
+  const upsertMutation = trpc.settings.upsert.useMutation({
+    onSuccess: () => {
+      toast.success("API 配置已保存");
+      utils.settings.getAll.invalidate();
+      setKeyInput(""); setValueInput(""); setLabelInput("");
+    },
+    onError: (e) => toast.error(`保存失败：${e.message}`),
+  });
+
+  const deleteMutation = trpc.settings.delete.useMutation({
+    onSuccess: () => { toast.success("已删除"); utils.settings.getAll.invalidate(); },
+    onError: (e) => toast.error(`删除失败：${e.message}`),
+  });
+
+  const PRESET_KEYS = [
+    { key: "FIRECRAWL_API_KEY", label: "Firecrawl API Key", hint: "用于抓取平台规则文件原文" },
+  ];
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h2 className="text-base font-semibold">API 密鑰配置</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          配置第三方 API Key，用于平台规则文件抓取等功能。密鑰加密存储在数据库中。
+        </p>
+      </div>
+
+      {/* Preset keys */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium">Firecrawl 配置</h3>
+        {PRESET_KEYS.map((preset) => {
+          const existing = settings?.find((s) => s.key === preset.key);
+          return (
+            <div key={preset.key} className="rounded-lg border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Key className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{preset.label}</span>
+                    {existing && <Badge variant="secondary" className="text-xs">已配置</Badge>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{preset.hint}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  className="h-8 text-sm font-mono flex-1"
+                  placeholder={existing ? "已配置，输入新密鑰可更新" : "输入 API Key"}
+                  id={`preset-${preset.key}`}
+                />
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    const el = document.getElementById(`preset-${preset.key}`) as HTMLInputElement;
+                    const val = el?.value?.trim();
+                    if (!val) { toast.error("请输入 API Key"); return; }
+                    upsertMutation.mutate({ key: preset.key, value: val, label: preset.label });
+                    if (el) el.value = "";
+                  }}
+                  disabled={upsertMutation.isPending}
+                >
+                  {upsertMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                </Button>
+                {existing && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-destructive hover:text-destructive"
+                    onClick={() => deleteMutation.mutate({ key: preset.key })}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Custom key-value */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium">自定义配置项</h3>
+        <div className="rounded-lg border border-border p-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Key</Label>
+              <Input className="h-8 text-sm font-mono" placeholder="MY_API_KEY" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">展示名称</Label>
+              <Input className="h-8 text-sm" placeholder="配置名称" value={labelInput} onChange={(e) => setLabelInput(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Value</Label>
+              <Input className="h-8 text-sm font-mono" type="password" placeholder="密鑰内容" value={valueInput} onChange={(e) => setValueInput(e.target.value)} />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              if (!keyInput.trim() || !valueInput.trim()) { toast.error("请填写 Key 和 Value"); return; }
+              upsertMutation.mutate({ key: keyInput.trim(), value: valueInput.trim(), label: labelInput.trim() || undefined });
+            }}
+            disabled={upsertMutation.isPending}
+          >
+            {upsertMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
+            添加
+          </Button>
+        </div>
+      </div>
+
+      {/* Existing settings list */}
+      {settings && settings.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">已配置项</h3>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {settings.map((s) => (
+              <div key={s.key} className="flex items-center justify-between px-4 py-2.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-mono">{s.key}</span>
+                    {s.label && <span className="text-xs text-muted-foreground">{s.label}</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {s.value ? `${'*'.repeat(Math.min(s.value.length, 8))}...` : '未配置'}
+                  </p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="w-7 h-7 text-destructive hover:text-destructive"
+                  onClick={() => deleteMutation.mutate({ key: s.key })}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Admin Page ──────────────────────────────────────────────
 export default function Admin() {
   const { user, isAuthenticated, loading } = useAuth();
   const utils = trpc.useUtils();
 
+  const [, navigate] = useLocation();
   const [tab, setTab] = useState("cases");
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [inputVal, setInputVal] = useState("");
 
-  // Case dialog
-  const [, navigate] = useLocation();
-  const [caseDialog, setCaseDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id?: number; title?: string }>({ open: false });
-  // Platform dialog
-  const [platformDialog, setPlatformDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
-  const [platformDeleteDialog, setPlatformDeleteDialog] = useState<{ open: boolean; id?: string; name?: string }>({ open: false });
-  // API Settings
-  const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({});
   // Topic/Jurisdiction dialog
   const [topicDialog, setTopicDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [jurisDialog, setJurisDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
@@ -592,17 +600,13 @@ export default function Admin() {
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: stats } = trpc.cases.stats.useQuery();
 
-  // Fetch all cases (unpaginated) for platform related-cases selector
-  const { data: allCasesForPlatform } = trpc.cases.listAdmin.useQuery({ page: 1, pageSize: 500, keyword: "" });
-
   const { data: casesData, isLoading: casesLoading } = trpc.cases.listAdmin.useQuery({
     page,
     pageSize: PAGE_SIZE,
     keyword: keyword || undefined,
   });
 
-  const { data: platformsData, isLoading: platformsLoading } = trpc.platforms.listAdmin.useQuery();
-  const platforms = platformsData;
+  const { data: platforms, isLoading: platformsLoading } = trpc.platforms.list.useQuery({});
 
   const createTopic = trpc.topics.create.useMutation({
     onSuccess: () => { toast.success("专题已创建"); utils.topics.list.invalidate(); setTopicDialog({ open: false }); },
@@ -628,76 +632,6 @@ export default function Admin() {
     onSuccess: () => { toast.success("辖区已删除"); utils.jurisdictions.list.invalidate(); },
     onError: (e: any) => toast.error(e.message),
   });
-  const createPlatform = trpc.platforms.create.useMutation({
-    onSuccess: () => { toast.success("平台已创建"); utils.platforms.list.invalidate(); setPlatformDialog({ open: false }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-  const updatePlatform = trpc.platforms.update.useMutation({
-    onSuccess: () => { toast.success("平台已更新"); utils.platforms.list.invalidate(); utils.platforms.listAdmin.invalidate(); setPlatformDialog({ open: false }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-  const deletePlatform = trpc.platforms.delete.useMutation({
-    onSuccess: () => { toast.success("平台已删除"); utils.platforms.list.invalidate(); utils.platforms.listAdmin.invalidate(); setPlatformDeleteDialog({ open: false }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-  const togglePlatformActive = trpc.platforms.update.useMutation({
-    onSuccess: () => { utils.platforms.list.invalidate(); utils.platforms.listAdmin.invalidate(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const { data: apiSettingsList, refetch: refetchSettings } = trpc.settings.list.useQuery();
-  const setApiSetting = trpc.settings.set.useMutation({
-    onSuccess: () => { toast.success("配置已保存"); refetchSettings(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-  const deleteApiSetting = trpc.settings.delete.useMutation({
-    onSuccess: () => { toast.success("配置已清除"); refetchSettings(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const API_CONFIG_ITEMS = [
-    {
-      key: "firecrawl_api_key",
-      label: "Firecrawl API Key",
-      description: "用于 AI 自动从 URL 抓取案例内容。在 firecrawl.dev 获取（免费套餐 500 次/月）。",
-      placeholder: "fc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      docsUrl: "https://firecrawl.dev",
-    },
-    {
-      key: "openai_api_key",
-      label: "AI 写作 API Key (OpenAI 兼容)",
-      description: "用于案例内容的 AI 总结、AI 写作辅助功能。支持 OpenAI、DeepSeek、其他兼容接口。",
-      placeholder: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      docsUrl: "https://platform.openai.com/api-keys",
-    },
-    {
-      key: "openai_base_url",
-      label: "AI API Base URL（可选）",
-      description: "自定义 AI API 地址，用于接入 DeepSeek、山岳等国产模型。留空则使用内置模型。",
-      placeholder: "https://api.deepseek.com/v1",
-      docsUrl: "",
-    },
-  ];
-
-  const createCase = trpc.cases.create.useMutation({
-    onSuccess: () => {
-      toast.success("案例已创建");
-      utils.cases.listAdmin.invalidate();
-      utils.cases.stats.invalidate();
-      setCaseDialog({ open: false });
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const updateCase = trpc.cases.update.useMutation({
-    onSuccess: () => {
-      toast.success("案例已更新");
-      utils.cases.listAdmin.invalidate();
-      setCaseDialog({ open: false });
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
   const deleteCase = trpc.cases.delete.useMutation({
     onSuccess: () => {
       toast.success("案例已删除");
@@ -752,18 +686,10 @@ export default function Admin() {
 
   const totalPages = casesData ? Math.ceil(casesData.total / PAGE_SIZE) : 1;
 
-  const handleSaveCase = (data: any) => {
-    if (caseDialog.editing) {
-      updateCase.mutate({ id: caseDialog.editing.id, ...data });
-    } else {
-      createCase.mutate(data);
-    }
-  };
-
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-white">
+      <div className="border-b border-border bg-white">
         <div className="container py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -781,9 +707,8 @@ export default function Admin() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
             {[
-              { label: "平台总数", value: platforms?.length ?? 0 },
               { label: "案例总数", value: stats?.total ?? 0 },
               { label: "司法案例", value: stats?.judicial ?? 0 },
               { label: "监管执法", value: stats?.regulatory ?? 0 },
@@ -813,7 +738,7 @@ export default function Admin() {
               <Tag className="w-3.5 h-3.5" />
               专题/辖区
             </TabsTrigger>
-            <TabsTrigger value="api" className="gap-1.5">
+            <TabsTrigger value="settings" className="gap-1.5">
               <Settings className="w-3.5 h-3.5" />
               API 配置
             </TabsTrigger>
@@ -952,7 +877,6 @@ export default function Admin() {
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">平台</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">母公司</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">总部</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">状态</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground w-28">操作</th>
                     </tr>
                   </thead>
@@ -973,20 +897,6 @@ export default function Admin() {
                         <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{p.company}</td>
                         <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{p.hq}</td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => togglePlatformActive.mutate({ id: p.id, isActive: !p.isActive })}
-                            className={cn(
-                              "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
-                              p.isActive
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                : "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {p.isActive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                            {p.isActive ? "已激活" : "未激活"}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
@@ -1005,14 +915,6 @@ export default function Admin() {
                               <Link href={`/platforms/${p.id}`}>
                                 <Eye className="w-3.5 h-3.5" />
                               </Link>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-7 h-7 text-destructive hover:text-destructive"
-                              onClick={() => setPlatformDeleteDialog({ open: true, id: p.id, name: p.name })}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         </td>
@@ -1114,76 +1016,9 @@ export default function Admin() {
             </div>
           </TabsContent>
 
-          {/* API Config Tab */}
-          <TabsContent value="api">
-            <div className="max-w-2xl space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold mb-1">第三方 API 配置</h3>
-                <p className="text-xs text-muted-foreground mb-4">配置后可在案例录入页面中使用 AI 自动填充、AI 总结和 AI 写作功能。API Key 加密存储，仅显示是否已配置。</p>
-                <div className="space-y-4">
-                  {API_CONFIG_ITEMS.map((item) => {
-                    const existing = apiSettingsList?.find((s: any) => s.key === item.key);
-                    const inputVal = apiKeyInputs[item.key] ?? "";
-                    return (
-                      <div key={item.key} className="border border-border rounded-lg p-4">
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <Key className="w-3.5 h-3.5 text-muted-foreground" />
-                              <span className="font-medium text-sm">{item.label}</span>
-                              {existing?.hasValue ? (
-                                <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                                  <CheckCircle2 className="w-3 h-3" /> 已配置
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                                  <AlertCircle className="w-3 h-3" /> 未配置
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
-                            {item.docsUrl && (
-                              <a href={item.docsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-0.5 inline-block">
-                                获取 API Key ↗
-                              </a>
-                            )}
-                          </div>
-                          {existing?.hasValue && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive shrink-0 h-7 text-xs"
-                              onClick={() => deleteApiSetting.mutate({ key: item.key })}
-                            >
-                              <X className="w-3 h-3 mr-1" />清除
-                            </Button>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            type="password"
-                            placeholder={existing?.hasValue ? "已配置（输入新内容可更新）" : item.placeholder}
-                            value={inputVal}
-                            onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [item.key]: e.target.value }))}
-                            className="flex-1 font-mono text-sm"
-                          />
-                          <Button
-                            size="sm"
-                            disabled={!inputVal.trim() || setApiSetting.isPending}
-                            onClick={() => {
-                              setApiSetting.mutate({ key: item.key, value: inputVal.trim(), label: item.label });
-                              setApiKeyInputs((prev) => ({ ...prev, [item.key]: "" }));
-                            }}
-                          >
-                            <Save className="w-3.5 h-3.5 mr-1" />保存
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+          {/* Settings Tab */}
+          <TabsContent value="settings">
+            <SettingsTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -1216,39 +1051,7 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      {/* Platform Edit Dialog */}
-      <Dialog open={platformDialog.open} onOpenChange={(o) => setPlatformDialog({ open: o })}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{platformDialog.editing ? "编辑平台" : "新增平台"}</DialogTitle></DialogHeader>
-          <PlatformForm
-            initial={platformDialog.editing}
-            jurisdictions={jurisdictions ?? []}
-            allCases={(allCasesForPlatform?.items ?? []).map((c: any) => ({ id: c.id, title: c.title, type: c.type, date: c.date }))}
-            onSave={(d) => platformDialog.editing ? updatePlatform.mutate(d) : createPlatform.mutate(d)}
-            onCancel={() => setPlatformDialog({ open: false })}
-            saving={createPlatform.isPending || updatePlatform.isPending}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Case Create/Edit Dialog */}
-      <Dialog open={caseDialog.open} onOpenChange={(o) => setCaseDialog({ open: o })}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{caseDialog.editing ? "编辑案例" : "新增案例"}</DialogTitle>
-          </DialogHeader>
-          <CaseForm
-            initial={caseDialog.editing}
-            topics={topics ?? []}
-            jurisdictions={jurisdictions ?? []}
-            onSave={handleSaveCase}
-            onCancel={() => setCaseDialog({ open: false })}
-            saving={createCase.isPending || updateCase.isPending}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Case Confirm Dialog */}
+      {/* Delete Confirm Dialog */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(o) => setDeleteDialog({ open: o })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1262,27 +1065,6 @@ export default function Admin() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteDialog.id && deleteCase.mutate({ id: deleteDialog.id })}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Platform Confirm Dialog */}
-      <AlertDialog open={platformDeleteDialog.open} onOpenChange={(o) => setPlatformDeleteDialog({ open: o })}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除平台</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除平台「{platformDeleteDialog.name}」吗？删除后该平台的所有数据将不可恢复。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => platformDeleteDialog.id && deletePlatform.mutate({ id: platformDeleteDialog.id })}
             >
               删除
             </AlertDialogAction>

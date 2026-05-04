@@ -5,9 +5,9 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings } from "../drizzle/schema";
+import { invokeLLM } from "./_core/llm";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { invokeLLM } from "./_core/llm";
 
 // Admin guard middleware
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -254,9 +254,9 @@ export const appRouter = router({
         abstract: z.string().optional(),
         aiSummary: z.string().optional(),
         aiAnalysis: z.string().optional(),
-        fullText: z.string().optional(),
         tags: z.array(z.string()).optional(),
         language: z.string().optional(),
+        fullText: z.string().optional(),
         status: z.enum(["published", "draft"]).default("draft"),
       }))
       .mutation(async ({ input }) => {
@@ -284,9 +284,9 @@ export const appRouter = router({
         abstract: z.string().optional(),
         aiSummary: z.string().optional(),
         aiAnalysis: z.string().optional(),
-        fullText: z.string().optional(),
         tags: z.array(z.string()).optional(),
         language: z.string().optional(),
+        fullText: z.string().optional(),
         status: z.enum(["published", "draft"]).optional(),
       }))
       .mutation(async ({ input }) => {
@@ -325,15 +325,10 @@ export const appRouter = router({
         keyword: z.string().optional(),
         jurisdictionId: z.string().optional(),
         type: z.string().optional(),
-        page: z.number().default(1),
-        pageSize: z.number().default(12),
       }).optional())
       .query(async ({ input }) => {
         const db = await getDb();
-        if (!db) return { items: [], total: 0, page: 1, pageSize: 12 };
-        const page = input?.page ?? 1;
-        const pageSize = input?.pageSize ?? 12;
-        const offset = (page - 1) * pageSize;
+        if (!db) return [];
         const conditions = [eq(platforms.isActive, true)];
         if (input?.keyword) {
           conditions.push(or(
@@ -341,12 +336,7 @@ export const appRouter = router({
             like(platforms.company, `%${input.keyword}%`),
           )!);
         }
-        const where = and(...conditions);
-        const [items, countResult] = await Promise.all([
-          db.select().from(platforms).where(where).orderBy(asc(platforms.sortOrder)).limit(pageSize).offset(offset),
-          db.select({ count: sql<number>`count(*)` }).from(platforms).where(where),
-        ]);
-        return { items, total: Number(countResult[0]?.count ?? 0), page, pageSize };
+        return db.select().from(platforms).where(and(...conditions)).orderBy(asc(platforms.sortOrder));
       }),
 
     listAdmin: adminProcedure.query(async () => {
@@ -424,287 +414,146 @@ export const appRouter = router({
       }),
   }),
 
-  // ── Scheduled endpoint (for future use) ───────────────────────────────────────────
-  scheduled: router({
-    ping: publicProcedure.query(() => ({ ok: true })),
-  }),
-
-  // ── AI URL Extraction ─────────────────────────────────────────────────────────────────────────
-  ai: router({
-    extractFromUrl: adminProcedure
-      .input(z.object({ url: z.string().url() }))
-      .mutation(async ({ input }) => {
-        // Step 1: Fetch page content via Firecrawl REST API
-        // Read Firecrawl key from api_settings table (admin-configurable)
-        const db = await getDb();
-        const [firecrawlRow] = await db!.select().from(apiSettings).where(eq(apiSettings.key, "firecrawl_api_key"));
-        const firecrawlKey = firecrawlRow?.value || process.env.FIRECRAWL_API_KEY;
-        if (!firecrawlKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "未配置 Firecrawl API Key，请前往管理员后台 → API 配置进行配置" });
-
-        let pageContent = "";
-        try {
-          const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${firecrawlKey}` },
-            body: JSON.stringify({ url: input.url, formats: ["markdown"], onlyMainContent: true }),
-          });
-          const scrapeData = await scrapeRes.json() as any;
-          pageContent = scrapeData?.data?.markdown ?? scrapeData?.markdown ?? "";
-        } catch (e) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `网页抓取失败: ${(e as Error).message}` });
-        }
-
-        if (!pageContent || pageContent.length < 50) {
-          throw new TRPCError({ code: "UNPROCESSABLE_CONTENT", message: "未能获取到有效页面内容，请检查 URL 是否可公开访问" });
-        }
-
-        // Step 2: LLM structured extraction
-        const prompt = `你是一个互联网平台治理领域的法律数据库录入助手。请从以下网页内容中提取案例信息，输出为严格 JSON。
-
-网页内容：
-${pageContent.slice(0, 8000)}
-
-请提取并返回以下 JSON 格式（所有字段均为可选，无法确定的留空）：
-{
-  "title": "案例标题（中文）",
-  "titleEn": "案例标题（英文，如有）",
-  "type": "案例类型：judicial/regulatory/legislation 三选一",
-  "date": "日期（YYYY-MM-DD 或 YYYY-MM 或 YYYY）",
-  "source": "来源机构名称",
-  "sourceUrl": "原始来源 URL",
-  "abstract": "案例摘要（200-500字，中文）",
-  "aiSummary": "内容解读（主要事实、监管动态、处罚内容，300-800字）",
-  "aiAnalysis": "法律分析（法律依据、合规启示、影响意义，300-800字）",
-  "tags": ["标签1", "标签2"],
-  "language": "原文语言代码，如 zh/en/de/fr",
-  "topicId": "建议归属的专题ID（如果能判断）",
-  "jurisdictionId": "建议归属的辖区 ID（如果能判断）"
-}
-
-只返回 JSON，不要包含其他文字。`;
-
-        const llmRes = await invokeLLM({
-          messages: [
-            { role: "system", content: "你是一个专业的法律数据提取助手，严格返回 JSON 格式。" },
-            { role: "user", content: prompt },
-          ],
-          response_format: { type: "json_object" },
-        });
-
-        const rawContent2 = llmRes?.choices?.[0]?.message?.content;
-        const raw = (typeof rawContent2 === "string" ? rawContent2 : JSON.stringify(rawContent2)) ?? "{}";
-        let extracted: Record<string, any> = {};
-        try { extracted = JSON.parse(raw); } catch { extracted = {}; }
-
-        return {
-          success: true,
-          data: {
-            title: extracted.title ?? "",
-            titleEn: extracted.titleEn ?? "",
-            type: ["judicial", "regulatory", "legislation"].includes(extracted.type) ? extracted.type : "",
-            date: extracted.date ?? "",
-            source: extracted.source ?? "",
-            sourceUrl: extracted.sourceUrl ?? input.url,
-            abstract: extracted.abstract ?? "",
-            aiSummary: extracted.aiSummary ?? "",
-            aiAnalysis: extracted.aiAnalysis ?? "",
-            tags: Array.isArray(extracted.tags) ? extracted.tags : [],
-            language: extracted.language ?? "zh",
-            topicId: extracted.topicId ?? "",
-            jurisdictionId: extracted.jurisdictionId ?? "",
-          },
-          rawContent: pageContent.slice(0, 2000),
-        };
-      }),
-    generateContent: adminProcedure
-      .input(z.object({
-        type: z.enum(["summary", "analysis"]),
-        title: z.string(),
-        abstract: z.string().optional(),
-        aiSummary: z.string().optional(),
-        type_: z.string().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const typeLabel = input.type_ === "judicial" ? "司法案例" : input.type_ === "regulatory" ? "监管执法" : "立法政策";
-        let systemPrompt = "";
-        let userPrompt = "";
-
-        if (input.type === "summary") {
-          systemPrompt = "你是一位专注于互联网平台治理的资深法律分析师。请基于提供的案例信息，撰写一篇详尽、岂专、客观的内容解读。要求：300-800字，涵盖事件背景、主要事实、处罚结果、平台回应。直接输出正文，不需标题。";
-          userPrompt = `案例类型：${typeLabel}
-案例标题：${input.title}
-摘要：${input.abstract ?? "无"}
-
-请撰写内容解读：`;
-        } else {
-          systemPrompt = "你是一位专注于数字平台合规的资深法律顾问。请基于案例信息，撰写一篇深度、专业、具有实务指导意义的法律分析。要求：300-800字，涵盖适用法律依据、监管逻辑、合规启示、行业影响。直接输出正文，不需标题。";
-          userPrompt = `案例类型：${typeLabel}
-案例标题：${input.title}
-摘要：${input.abstract ?? "无"}
-内容解读：${input.aiSummary ?? "无"}
-
-请撰写法律分析：`;
-        }
-
-        const result = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-        });
-        const content = typeof result.choices[0].message.content === "string"
-          ? result.choices[0].message.content
-          : (result.choices[0].message.content as any[])
-              .filter((c: any) => c.type === "text")
-              .map((c: any) => c.text)
-              .join("");
-        return { content };
-      }),
-
-    extractPlatformFromUrl: adminProcedure
-      .input(z.object({ url: z.string().url() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        const [firecrawlRow] = await db!.select().from(apiSettings).where(eq(apiSettings.key, "firecrawl_api_key"));
-        const firecrawlKey = firecrawlRow?.value || process.env.FIRECRAWL_API_KEY;
-        if (!firecrawlKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "未配置 Firecrawl API Key" });
-
-        let pageContent = "";
-        try {
-          const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${firecrawlKey}` },
-            body: JSON.stringify({ url: input.url, formats: ["markdown"], onlyMainContent: true }),
-          });
-          const fcData = await fcRes.json() as any;
-          pageContent = fcData?.data?.markdown ?? fcData?.markdown ?? "";
-        } catch {
-          pageContent = "";
-        }
-
-        const systemPrompt = `你是互联网平台研究专家，请从给定的网页内容中提取平台结构化信息，以 JSON 格式返回。`;
-        const userPrompt = `网页内容如下：
-${pageContent.slice(0, 6000)}
-
-请提取以下字段并以 JSON 返回（字段不确定时留空字符串）：
-{
-  "id": "平台英文标识符（小写字母+连字符，如 meta、tik-tok）",
-  "name": "平台中文名（含旗下产品，如 Meta（Facebook / Instagram / WhatsApp））",
-  "company": "运营公司全称",
-  "hq": "总部所在地（中文）",
-  "founded": 创立年份（数字）,
-  "abbr": "缩写（1-4字符）",
-  "description": "平台简介（200字以内，中文）",
-  "jurisdiction": ["发源国家辖区ID，如 us、eu、cn"],
-  "portrait": {
-    "types": ["平台类型标签，如 社交、内容、即时通讯"],
-    "structure": "平台结构描述",
-    "contentSource": "内容来源描述",
-    "networkEffect": "网络效应描述",
-    "businessModel": ["商业模式标签"],
-    "openness": "开放程度描述",
-    "crossBorder": "跨境特征描述"
-  },
-  "timeline": [{"date": "年份", "event": "事件描述"}]
-}`;
-
-        const result = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" } as any,
-        });
-        const raw = typeof result.choices[0].message.content === "string"
-          ? result.choices[0].message.content
-          : (result.choices[0].message.content as any[]).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-        let platform: any = {};
-        try { platform = JSON.parse(raw); } catch { platform = {}; }
-        return { platform, rawContent: pageContent.slice(0, 2000) };
-      }),
-
-    extractPlatformByKeyword: adminProcedure
-      .input(z.object({ keyword: z.string().min(1) }))
-      .mutation(async ({ input }) => {
-        const systemPrompt = `你是互联网平台研究专家。用户会给你一个平台名称关键词，你需要基于你的知识提取该平台的完整结构化信息，以 JSON 格式返回。请尽可能详细、准确地填写所有字段。`;
-        const userPrompt = `请研究互联网平台"${input.keyword}"，提取以下结构化信息并以 JSON 格式返回（字段不确定时留空字符串或空数组）：
-{
-  "id": "平台英文标识符（小写字母+连字符，如 meta、tik-tok）",
-  "name": "平台中文名（含旗下主要产品，如 Meta（Facebook / Instagram / WhatsApp））",
-  "company": "运营公司全称（英文）",
-  "hq": "总部所在地（中文，如 美国加利福尼亚州门洛帕克）",
-  "founded": 创立年份数字,
-  "abbr": "缩写（1-4个大写字母）",
-  "description": "平台简介（150-200字，中文，介绍平台定位、主要产品、用户规模）",
-  "jurisdiction": ["发源国家辖区ID，从以下选择：us、eu、cn、uk、sea、jp、kr"],
-  "portrait": {
-    "types": ["平台类型标签，从以下选择：社交、内容、即时通讯、电商、搜索、AIGC、视频、音乐、游戏、职场、新闻"],
-    "structure": "平台结构描述（50字以内）",
-    "contentSource": "内容来源描述（50字以内）",
-    "networkEffect": "网络效应描述（50字以内）",
-    "businessModel": ["商业模式标签，如 广告、订阅、电商佣金"],
-    "openness": "开放程度描述（50字以内）",
-    "crossBorder": "跨境特征描述（50字以内）"
-  },
-  "timeline": [{"date": "年份如2004", "event": "重要事件描述50字以内"}]
-}
-timeline 请列出该平台最重要的 5-10 个发展里程碑，按时间顺序排列。`;
-        const result = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" } as any,
-        });
-        const raw = typeof result.choices[0].message.content === "string"
-          ? result.choices[0].message.content
-          : (result.choices[0].message.content as any[]).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-        let platform: any = {};
-        try { platform = JSON.parse(raw); } catch { platform = {}; }
-        return { platform };
-      }),
-  }),
-
-  // API Settings (admin only)
+  // ── Settings (API keys) ──────────────────────────────────────────────
   settings: router({
-    list: adminProcedure.query(async () => {
+    getAll: adminProcedure.query(async () => {
       const db = await getDb();
-      const rows = await db!.select().from(apiSettings);
-      return rows.map((r: typeof apiSettings.$inferSelect) => ({
-        key: r.key,
-        label: r.label,
-        hasValue: !!r.value,
-        updatedAt: r.updatedAt,
-      }));
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(apiSettings);
+      return rows;
     }),
-    set: adminProcedure
-      .input(z.object({
-        key: z.string().min(1).max(128),
-        value: z.string(),
-        label: z.string().optional(),
-      }))
+    upsert: adminProcedure
+      .input(z.object({ key: z.string(), value: z.string(), label: z.string().optional() }))
       .mutation(async ({ input }) => {
         const db = await getDb();
-        await db!
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db
           .insert(apiSettings)
-          .values({ key: input.key, value: input.value, label: input.label ?? input.key })
-          .onDuplicateKeyUpdate({ set: { value: input.value, label: input.label ?? input.key } });
+          .values({ key: input.key, value: input.value, label: input.label })
+          .onDuplicateKeyUpdate({ set: { value: input.value, label: input.label } });
         return { success: true };
       }),
     delete: adminProcedure
       .input(z.object({ key: z.string() }))
       .mutation(async ({ input }) => {
         const db = await getDb();
-        await db!.delete(apiSettings).where(eq(apiSettings.key, input.key));
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(apiSettings).where(eq(apiSettings.key, input.key));
         return { success: true };
       }),
-    getValue: adminProcedure
-      .input(z.object({ key: z.string() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        const [row] = await db!.select().from(apiSettings).where(eq(apiSettings.key, input.key));
-        return { value: row?.value ?? null };
+  }),
+
+  // ── AI helpers ────────────────────────────────────────────────────────
+  ai: router({
+    // Extract platform info by keyword (no Firecrawl needed)
+    extractPlatformByKeyword: adminProcedure
+      .input(z.object({ keyword: z.string() }))
+      .mutation(async ({ input }) => {
+        const systemPrompt = `You are a research assistant specializing in internet platform governance. Given a platform name or keyword, extract comprehensive information about the platform from your knowledge. Return a JSON object with these fields:
+- name: string (official name)
+- nameEn: string (English name if different)
+- website: string (official website URL)
+- wikipediaUrl: string (Wikipedia URL if exists)
+- crunchbaseUrl: string (Crunchbase URL if exists)
+- description: string (brief description in Chinese, 100-200 chars)
+- descriptionEn: string (brief description in English)
+- founded: string (founding year or date)
+- headquarters: string (headquarters location)
+- category: string (platform category: social_media/search/ecommerce/video/messaging/other)
+- tags: string[] (relevant tags)
+- profileFeatures: string (platform profile features in Chinese, 200-400 chars)
+- developmentHistory: string (development history in Chinese, 200-400 chars)
+Return ONLY valid JSON, no markdown.`;
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Platform keyword: ${input.keyword}` },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "platform_info",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  nameEn: { type: "string" },
+                  website: { type: "string" },
+                  wikipediaUrl: { type: "string" },
+                  crunchbaseUrl: { type: "string" },
+                  description: { type: "string" },
+                  descriptionEn: { type: "string" },
+                  founded: { type: "string" },
+                  headquarters: { type: "string" },
+                  category: { type: "string" },
+                  tags: { type: "array", items: { type: "string" } },
+                  profileFeatures: { type: "string" },
+                  developmentHistory: { type: "string" },
+                },
+                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+        const content = response.choices[0].message.content;
+        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+      }),
+
+    // Extract case info from URL
+    extractCaseFromUrl: adminProcedure
+      .input(z.object({ url: z.string().url() }))
+      .mutation(async ({ input }) => {
+        const systemPrompt = `You are a legal research assistant specializing in internet platform governance cases. Given a URL to a legal case, regulatory enforcement, or legislative document, extract key information. Return a JSON object with:
+- title: string (case title in Chinese)
+- titleEn: string (case title in English)
+- abstract: string (case abstract in Chinese, 200-400 chars)
+- type: string (one of: judicial/enforcement/legislation/policy)
+- date: string (date in YYYY-MM-DD format)
+- jurisdiction: string (jurisdiction name)
+- platform: string (platform name involved)
+- aiSummary: string (AI analysis summary in Chinese, 300-500 chars)
+- aiAnalysis: string (detailed AI analysis in Chinese, 500-800 chars)
+Return ONLY valid JSON, no markdown.`;
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Please extract information from this URL: ${input.url}` },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "case_info",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  titleEn: { type: "string" },
+                  abstract: { type: "string" },
+                  type: { type: "string" },
+                  date: { type: "string" },
+                  jurisdiction: { type: "string" },
+                  platform: { type: "string" },
+                  aiSummary: { type: "string" },
+                  aiAnalysis: { type: "string" },
+                },
+                required: ["title", "titleEn", "abstract", "type", "date", "jurisdiction", "platform", "aiSummary", "aiAnalysis"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+        const content = response.choices[0].message.content;
+        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
       }),
   }),
+
+  // ── Scheduled endpoint (for future use) ─────────────────────────────
+  scheduled: router({
+    ping: publicProcedure.query(() => ({ ok: true })),
+  }),
 });
+
 export type AppRouter = typeof appRouter;
