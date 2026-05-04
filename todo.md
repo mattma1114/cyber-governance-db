@@ -78,13 +78,13 @@
 - [x] Navbar.tsx/About.tsx/Legal.tsx/PlatformDetail.tsx 文字替换
 - [x] 10 个文件全部替换完成，15 个测试全部通过
 
-## Firecrawl API 接入（当前迭代）
-- [ ] 后端创建 server/firecrawl.ts 服务（封装 Firecrawl scrape/crawl API）
-- [ ] routers.ts 新增 firecrawl.scrapeUrl 路由（从 api_settings 读取 API Key）
-- [ ] routers.ts 新增 firecrawl.extractCase 路由（抓取+AI提取内容信息）
-- [ ] PlatformEditor.tsx 规则文件 Tab：URL 输入 → Firecrawl 抓取全文 → 保存
-- [ ] CaseEditor.tsx URL 提取升级：优先使用 Firecrawl 抓取原文，再交 LLM 提取
-- [ ] Admin API 配置 Tab：Firecrawl API Key 配置入口（已有，验证可用）
+## Firecrawl API 接入（已被三 API 梯级方案取代）
+- [x] 后端创建 server/scraper.ts 服务（封装 Firecrawl/Jina/ScrapingBee 降级）
+- [x] routers.ts 新增 scraper.scrapeUrl 路由（从 api_settings 读取 API Key）
+- [x] ai.extractCaseFromUrl 升级：抓取原文+LLM 提取内容信息
+- [x] PlatformEditor.tsx 规则文件 Tab：URL 输入 → 抓取全文 → 保存
+- [x] CaseEditor.tsx URL 提取升级：优先使用 scraper 抓取原文，再交 LLM 提取
+- [x] Admin API 配置 Tab：三个 API Key 配置入口均已完成
 
 ## 三 API 梯级冗余抓取接入（当前迭代）
 - [x] 创建 server/scraper.ts：封装 Firecrawl→Jina Reader→ScrapingBee 降级策略
@@ -92,4 +92,15 @@
 - [x] ai.extractCaseFromUrl 升级：先用 scraper 抓取原文，再交 LLM 提取结构化信息
 - [x] Admin.tsx API 配置 Tab 添加 Jina/ScrapingBee API Key 配置入口，更新降级策略说明
 - [x] PlatformEditor.tsx 规则文件 Tab：每条规则添加「抓取全文」按钮（梯级降级）
+- [x] 15 个测试全部通过
+
+## 规则文件 fullText 持久化验证（当前迭代）
+- [x] platforms.create/update 的 rules 使用 z.any()，fullText 字段可完整传递
+- [x] 数据库 rules 为 JSON 字段，原样存储整个对象（含 fullText）
+- [x] PlatformEditor handleSubmit 中 rules: form.rules 完整传递（含 fullText）
+- [x] 编辑回填时 p.rules 原样赋值给 form.rules，fullText 会重新显示
+
+## API 配置页测试按钮（当前迭代）
+- [x] 后端新增 scraper.testApiKey 路由（分别验证 Firecrawl/Jina/ScrapingBee）
+- [x] Admin.tsx API 配置 Tab：每个 Key 旁添加「测试」按钮，显示验证结果（成功/失败/延迟）
 - [x] 15 个测试全部通过

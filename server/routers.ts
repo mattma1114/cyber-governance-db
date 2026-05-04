@@ -6,7 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
-import { scrapeUrl } from "./scraper";
+import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -469,6 +469,38 @@ export const appRouter = router({
           scrapingbeeKey: get("SCRAPINGBEE_API_KEY"),
         });
         return result;
+      }),
+    testApiKey: adminProcedure
+      .input(z.object({
+        service: z.enum(["firecrawl", "jina", "scrapingbee"]),
+        // If provided, test with this key; otherwise use the saved key from DB
+        apiKey: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // Resolve the key: use provided key or fall back to saved key
+        let key: string | undefined = input.apiKey;
+        if (!key) {
+          const rows = await db.select().from(apiSettings);
+          const keyMap: Record<string, string> = {
+            firecrawl: "FIRECRAWL_API_KEY",
+            jina: "JINA_API_KEY",
+            scrapingbee: "SCRAPINGBEE_API_KEY",
+          };
+          key = rows.find((r) => r.key === keyMap[input.service])?.value ?? undefined;
+        }
+
+        if (input.service === "firecrawl") {
+          if (!key) return { ok: false, latencyMs: 0, message: "未配置 Firecrawl API Key" };
+          return testFirecrawlKey(key);
+        } else if (input.service === "jina") {
+          return testJinaKey(key); // Jina works without a key
+        } else {
+          if (!key) return { ok: false, latencyMs: 0, message: "未配置 ScrapingBee API Key" };
+          return testScrapingBeeKey(key);
+        }
       }),
   }),
   // ── AI helpers ────────────────────────────────────────────────────────

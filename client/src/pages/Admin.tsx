@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
-  Tag, Globe, X, Settings, Key, Save, Loader2
+  Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
@@ -429,7 +429,26 @@ function SettingsTab() {
   const [keyInput, setKeyInput] = useState("");
   const [valueInput, setValueInput] = useState("");
   const [labelInput, setLabelInput] = useState("");
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string } | null>>({});
+  const [testingKey, setTestingKey] = useState<string | null>(null);
   const utils = trpc.useUtils();
+
+  const testApiKeyMutation = trpc.scraper.testApiKey.useMutation({
+    onSuccess: (data, variables) => {
+      setTestResults((prev) => ({ ...prev, [variables.service]: { ok: data.ok, message: data.message } }));
+      setTestingKey(null);
+    },
+    onError: (e, variables) => {
+      setTestResults((prev) => ({ ...prev, [variables.service]: { ok: false, message: e.message } }));
+      setTestingKey(null);
+    },
+  });
+
+  const SERVICE_MAP: Record<string, "firecrawl" | "jina" | "scrapingbee"> = {
+    FIRECRAWL_API_KEY: "firecrawl",
+    JINA_API_KEY: "jina",
+    SCRAPINGBEE_API_KEY: "scrapingbee",
+  };
 
   const { data: settings, isLoading } = trpc.settings.getAll.useQuery();
 
@@ -500,6 +519,29 @@ function SettingsTab() {
                 >
                   {upsertMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 </Button>
+                {/* Test button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5"
+                  title="测试 API Key 是否有效"
+                  disabled={testingKey === preset.key}
+                  onClick={() => {
+                    const service = SERVICE_MAP[preset.key];
+                    if (!service) return;
+                    // Check if there's a new key in the input
+                    const el = document.getElementById(`preset-${preset.key}`) as HTMLInputElement;
+                    const inputVal = el?.value?.trim();
+                    setTestingKey(preset.key);
+                    setTestResults((prev) => ({ ...prev, [service]: null }));
+                    testApiKeyMutation.mutate({ service, apiKey: inputVal || undefined });
+                  }}
+                >
+                  {testingKey === preset.key
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <FlaskConical className="w-3.5 h-3.5" />}
+                  <span className="text-xs">测试</span>
+                </Button>
                 {existing && (
                   <Button
                     size="sm"
@@ -512,6 +554,22 @@ function SettingsTab() {
                   </Button>
                 )}
               </div>
+              {/* Test result */}
+              {(() => {
+                const service = SERVICE_MAP[preset.key];
+                const result = service ? testResults[service] : undefined;
+                if (!result) return null;
+                return (
+                  <div className={`flex items-center gap-1.5 text-xs mt-1 ${
+                    result.ok ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+                  }`}>
+                    {result.ok
+                      ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      : <XCircle className="w-3.5 h-3.5 shrink-0" />}
+                    <span>{result.message}</span>
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
