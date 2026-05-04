@@ -162,7 +162,7 @@ function RelatedCases({ caseId, topicId, jurisdictionId }: { caseId: number; top
     <div className="mt-8">
       <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
         <BookOpen className="w-4 h-4 text-muted-foreground" />
-        同专题关联案例
+        同专题关联内容
       </h3>
       <div className="grid sm:grid-cols-3 gap-3">
         {related.map((rc) => (
@@ -210,9 +210,9 @@ export default function CaseDetail() {
   if (!c) {
     return (
       <div className="container py-20 text-center">
-        <p className="text-muted-foreground mb-4">案例不存在或已删除</p>
+        <p className="text-muted-foreground mb-4">内容不存在或已删除</p>
         <Button asChild variant="outline">
-          <Link href="/cases">返回案例列表</Link>
+          <Link href="/cases">返回内容列表</Link>
         </Button>
       </div>
     );
@@ -234,7 +234,7 @@ export default function CaseDetail() {
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/cases">
               <ArrowLeft className="w-3.5 h-3.5" />
-              返回案例列表
+              返回内容列表
             </Link>
           </Button>
         </div>
@@ -304,7 +304,7 @@ export default function CaseDetail() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  案例摘要
+                  内容摘要
                 </CardTitle>
               </CardHeader>
               <CardContent>

@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2, Wand2, Link2, X, Plus } from "lucide-react";
 
 const CASE_TYPES = [
-  { value: "judicial", label: "司法案例" },
+  { value: "judicial", label: "司法内容" },
   { value: "regulatory", label: "监管执法" },
   { value: "legislation", label: "立法政策" },
 ];
@@ -82,7 +82,7 @@ export default function CaseEditor() {
 
   const createMutation = trpc.cases.create.useMutation({
     onSuccess: (data) => {
-      toast.success("案例已创建");
+      toast.success("内容已创建");
       utils.cases.list.invalidate();
       navigate(`/cases/${data.id}`);
     },
@@ -91,7 +91,7 @@ export default function CaseEditor() {
 
   const updateMutation = trpc.cases.update.useMutation({
     onSuccess: () => {
-      toast.success("案例已更新");
+      toast.success("内容已更新");
       utils.cases.list.invalidate();
       utils.cases.getById.invalidate({ id: caseId! });
       navigate(`/cases/${caseId}`);
@@ -110,7 +110,7 @@ export default function CaseEditor() {
         date: data.date || prev.date,
         aiAnalysis: data.aiAnalysis || prev.aiAnalysis,
       }));
-      toast.success("AI 已自动提取案例信息");
+      toast.success("AI 已自动提取内容信息");
     },
     onError: (e) => toast.error(`AI 提取失败：${e.message}`),
   });
@@ -154,7 +154,7 @@ export default function CaseEditor() {
 
   const handleAiExtract = async () => {
     if (!urlInput.trim()) {
-      toast.error("请输入案例 URL");
+      toast.error("请输入内容 URL");
       return;
     }
     setIsAiLoading(true);
@@ -170,7 +170,7 @@ export default function CaseEditor() {
 
   const handleSubmit = () => {
     if (!form.title.trim()) {
-      toast.error("请填写案例标题");
+      toast.error("请填写内容标题");
       return;
     }
     // map abstract → aiSummary for backward compat
@@ -205,7 +205,7 @@ export default function CaseEditor() {
               <ArrowLeft className="w-4 h-4" />
             </button>
             <h1 className="text-sm font-semibold tracking-wide">
-              {isEdit ? "编辑案例" : "新增案例"}
+              {isEdit ? "编辑内容" : "新增内容"}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -223,7 +223,7 @@ export default function CaseEditor() {
             </Select>
             <Button onClick={handleSubmit} disabled={isSaving} size="sm" className="h-8 text-xs">
               {isSaving && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
-              {isEdit ? "保存更改" : "创建案例"}
+              {isEdit ? "保存更改" : "创建内容"}
             </Button>
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function CaseEditor() {
                 <Link2 className="absolute left-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <input
                   className={ulInput + " pl-5"}
-                  placeholder="粘贴案例原文 URL，AI 自动提取标题、摘要、类型等信息"
+                  placeholder="粘贴内容原文 URL，AI 自动提取标题、摘要、类型等信息"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAiExtract()}
@@ -273,7 +273,7 @@ export default function CaseEditor() {
           {/* Type + Date */}
           <div className="grid grid-cols-2 gap-8">
             <div>
-              <label className={ulLabel}>案例类型 *</label>
+              <label className={ulLabel}>内容类型 *</label>
               <Select value={form.type} onValueChange={(v) => handleChange("type", v)}>
                 <SelectTrigger className="w-full border-0 border-b border-border rounded-none bg-transparent px-0 h-9 text-sm focus:ring-0 focus:border-foreground">
                   <SelectValue />
@@ -298,10 +298,10 @@ export default function CaseEditor() {
 
           {/* Title ZH */}
           <div>
-            <label className={ulLabel}>案例标题（中文）*</label>
+            <label className={ulLabel}>内容标题（中文）*</label>
             <input
               className={ulInput + " text-base font-medium"}
-              placeholder="请输入案例标题"
+              placeholder="请输入内容标题"
               value={form.title}
               onChange={(e) => handleChange("title", e.target.value)}
             />
@@ -309,7 +309,7 @@ export default function CaseEditor() {
 
           {/* Title EN */}
           <div>
-            <label className={ulLabel}>案例标题（英文）</label>
+            <label className={ulLabel}>内容标题（英文）</label>
             <input
               className={ulInput}
               placeholder="Case title in English"
@@ -431,10 +431,10 @@ export default function CaseEditor() {
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">摘要与分析</h2>
 
           <div>
-            <label className={ulLabel}>案例摘要</label>
+            <label className={ulLabel}>内容摘要</label>
             <textarea
               className={ulTextarea + " min-h-[80px]"}
-              placeholder="简要描述案例背景和核心内容（AI 提取后可手动修改）"
+              placeholder="简要描述内容背景和核心要点（AI 提取后可手动修改）"
               value={form.abstract}
               onChange={(e) => handleChange("abstract", e.target.value)}
             />
@@ -471,7 +471,7 @@ export default function CaseEditor() {
         <div className="flex justify-end pt-4 border-t border-border">
           <Button onClick={handleSubmit} disabled={isSaving}>
             {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {isEdit ? "保存更改" : "创建案例"}
+            {isEdit ? "保存更改" : "创建内容"}
           </Button>
         </div>
       </div>

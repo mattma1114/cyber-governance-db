@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  judicial: { label: "司法案例", color: "oklch(46% 0.22 245)" },
+  judicial: { label: "司法内容", color: "oklch(46% 0.22 245)" },
   regulatory: { label: "监管执法", color: "oklch(48% 0.18 162)" },
   legislation: { label: "立法政策", color: "oklch(54% 0.18 55)" },
 };

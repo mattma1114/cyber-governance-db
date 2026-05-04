@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const NAV_LINKS = [
-  { href: "/cases", label: "案例数据库", icon: <Database className="w-4 h-4" /> },
+  { href: "/cases", label: "内容数据库", icon: <Database className="w-4 h-4" /> },
   { href: "/platforms", label: "平台画像库", icon: <LayoutGrid className="w-4 h-4" /> },
   { href: "/about", label: "关于我们", icon: <Info className="w-4 h-4" /> },
 ];

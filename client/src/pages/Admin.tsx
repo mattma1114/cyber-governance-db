@@ -63,7 +63,7 @@ function CaseForm({
 
   const handleSubmit = () => {
     if (!form.title.trim()) { toast.error("标题不能为空"); return; }
-    if (!form.type) { toast.error("请选择案例类型"); return; }
+    if (!form.type) { toast.error("请选择内容类型"); return; }
     onSave({
       ...form,
       tags: form.tags ? form.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
@@ -76,18 +76,18 @@ function CaseForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 space-y-1.5">
           <Label>标题 *</Label>
-          <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="案例标题" />
+          <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="内容标题" />
         </div>
         <div className="col-span-2 space-y-1.5">
           <Label>英文标题</Label>
           <Input value={form.titleEn} onChange={(e) => set("titleEn", e.target.value)} placeholder="English Title" />
         </div>
         <div className="space-y-1.5">
-          <Label>案例类型 *</Label>
+          <Label>内容类型 *</Label>
           <Select value={form.type} onValueChange={(v) => set("type", v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="judicial">司法案例</SelectItem>
+              <SelectItem value="judicial">司法内容</SelectItem>
               <SelectItem value="regulatory">监管执法</SelectItem>
               <SelectItem value="legislation">立法政策</SelectItem>
             </SelectContent>
@@ -126,8 +126,8 @@ function CaseForm({
           <Input value={form.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://..." />
         </div>
         <div className="col-span-2 space-y-1.5">
-          <Label>案例摘要</Label>
-          <Textarea value={form.abstract} onChange={(e) => set("abstract", e.target.value)} rows={3} placeholder="案例摘要" />
+          <Label>内容摘要</Label>
+          <Textarea value={form.abstract} onChange={(e) => set("abstract", e.target.value)} rows={3} placeholder="内容摘要" />
         </div>
         <div className="col-span-2 space-y-1.5">
           <Label>AI 摘要</Label>
@@ -634,7 +634,7 @@ export default function Admin() {
   });
   const deleteCase = trpc.cases.delete.useMutation({
     onSuccess: () => {
-      toast.success("案例已删除");
+      toast.success("内容已删除");
       utils.cases.listAdmin.invalidate();
       utils.cases.stats.invalidate();
       setDeleteDialog({ open: false });
@@ -709,8 +709,8 @@ export default function Admin() {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
             {[
-              { label: "案例总数", value: stats?.total ?? 0 },
-              { label: "司法案例", value: stats?.judicial ?? 0 },
+              { label: "内容总数", value: stats?.total ?? 0 },
+              { label: "司法内容", value: stats?.judicial ?? 0 },
               { label: "监管执法", value: stats?.regulatory ?? 0 },
               { label: "立法政策", value: stats?.legislation ?? 0 },
             ].map((s) => (
@@ -728,7 +728,7 @@ export default function Admin() {
           <TabsList className="mb-6">
             <TabsTrigger value="cases" className="gap-1.5">
               <Database className="w-3.5 h-3.5" />
-              案例管理
+              内容管理
             </TabsTrigger>
             <TabsTrigger value="platforms" className="gap-1.5">
               <LayoutGrid className="w-3.5 h-3.5" />
@@ -751,7 +751,7 @@ export default function Admin() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder="搜索案例…"
+                  placeholder="搜索内容…"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { setKeyword(inputVal); setPage(1); } }}
@@ -765,7 +765,7 @@ export default function Admin() {
                 onClick={() => navigate("/admin/cases/new")}
               >
                 <Plus className="w-4 h-4" />
-                新增案例
+                新增内容
               </Button>
             </div>
 
@@ -1057,7 +1057,7 @@ export default function Admin() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除案例「{deleteDialog.title}」吗？此操作不可撤销。
+              确定要删除内容「{deleteDialog.title}」吗？此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

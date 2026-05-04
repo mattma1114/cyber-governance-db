@@ -185,7 +185,7 @@ export default function PlatformDetail() {
             {relatedCases.length > 0 && (
               <TabsTrigger value="cases" className="gap-1.5">
                 <Scale className="w-3.5 h-3.5" />
-                关联案例
+                关联内容
               </TabsTrigger>
             )}
           </TabsList>

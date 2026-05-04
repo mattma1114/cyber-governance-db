@@ -49,12 +49,12 @@ export default function About() {
           </h2>
           <div className="prose prose-sm max-w-none text-foreground/90 space-y-3">
             <p className="leading-relaxed">
-              本数据库聚焦互联网平台治理这一新兴交叉领域，系统收录司法案例、监管执法决定与立法政策文件三大类型，
+              本数据库聚焦互联网平台治理这一新兴交叉领域，系统收录司法内容、监管执法决定与立法政策文件三大类型，
               为学术研究者、法律实务工作者及政策制定者提供权威、结构化的参考资源。
             </p>
             <p className="leading-relaxed">
               数据库采用结构化摘要与 AI 辅助分析相结合的方式，对每一条目进行多维度标注，
-              包括案例类型、司法辖区、研究专题、关键标签等，支持精准检索与比较研究。
+              包括内容类型、司法辖区、研究专题、关键标签等，支持精准检索与比较研究。
             </p>
           </div>
         </section>
@@ -175,7 +175,7 @@ export default function About() {
             <span>浙江传媒学院</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/cases" className="hover:text-foreground transition-colors">案例数据库</Link>
+            <Link href="/cases" className="hover:text-foreground transition-colors">内容数据库</Link>
             <Link href="/platforms" className="hover:text-foreground transition-colors">平台画像库</Link>
           </div>
         </div>

@@ -14,7 +14,7 @@ import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 const PAGE_SIZE = 12;
 
 const CASE_TYPES = [
-  { value: "judicial", label: "司法案例" },
+  { value: "judicial", label: "司法内容" },
   { value: "regulatory", label: "监管执法" },
   { value: "legislation", label: "立法政策" },
 ];
@@ -154,9 +154,9 @@ export default function Cases() {
             {sidebarOpen && (<>
             {/* Page title */}
             <div className="pb-1">
-              <h1 className="text-xl font-bold mb-0.5">案例数据库</h1>
+              <h1 className="text-xl font-bold mb-0.5">内容数据库</h1>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                司法案例、监管执法与立法政策
+                司法内容、监管执法与立法政策
               </p>
             </div>
             <Separator />
@@ -166,7 +166,7 @@ export default function Cases() {
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
                   className="pl-8 h-8 text-sm"
-                  placeholder="搜索案例…"
+                  placeholder="搜索内容…"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -229,7 +229,7 @@ export default function Cases() {
             <div>
               <div className="flex items-center gap-1.5 mb-3">
                 <Filter className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">案例类型</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">内容类型</span>
               </div>
               <div className="flex flex-col gap-1">
                 {CASE_TYPES.map((t) => {
@@ -374,14 +374,14 @@ export default function Cases() {
                       {/* Search */}
                       <div className="relative">
                         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <Input className="pl-8 h-9 text-sm" placeholder="搜索案例…" value={inputVal}
+                        <Input className="pl-8 h-9 text-sm" placeholder="搜索内容…" value={inputVal}
                           onChange={(e) => setInputVal(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") { handleSearch(); setDrawerOpen(false); } }} />
                       </div>
                       <Separator />
                       {/* Case Type */}
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">案例类型</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">内容类型</p>
                         <div className="flex flex-wrap gap-2">
                           {CASE_TYPES.map((t) => {
                             const active = selectedTypes.includes(t.value);
@@ -500,7 +500,7 @@ export default function Cases() {
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder="搜索案例…"
+                  placeholder="搜索内容…"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -519,7 +519,7 @@ export default function Cases() {
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-20 text-muted-foreground">
                 <SearchIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p>未找到符合条件的案例</p>
+                <p>未找到符合条件的内容</p>
                 <Button variant="link" onClick={clearFilters}>清除筛选条件</Button>
               </div>
             ) : viewMode === "grid" ? (

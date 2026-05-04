@@ -85,7 +85,7 @@ export default function Home() {
               <span className="text-primary block">治理数据库</span>
             </h1>
             <p className="text-base text-muted-foreground leading-relaxed">
-              系统收录全球互联网平台治理领域的司法案例、监管执法与立法政策，
+              系统收录全球互联网平台治理领域的司法内容、监管执法与立法政策，
               覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
               反垂断与内容治理四大专题。
             </p>
@@ -94,9 +94,9 @@ export default function Home() {
           <div className="flex flex-row items-start justify-between gap-4 border-t border-border pt-6 mb-2">
             {stats ? (
               <>
-                <StatCard label="收录案例总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
+                <StatCard label="收录内容总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
                 <div className="w-px self-stretch bg-border" />
-                <StatCard label="司法案例" value={stats.judicial} icon={<Gavel className="w-3.5 h-3.5" />} />
+                <StatCard label="司法内容" value={stats.judicial} icon={<Gavel className="w-3.5 h-3.5" />} />
                 <div className="w-px self-stretch bg-border" />
                 <StatCard label="监管执法" value={stats.regulatory} icon={<Scale className="w-3.5 h-3.5" />} />
                 <div className="w-px self-stretch bg-border" />

@@ -25,7 +25,7 @@ export default function Legal() {
             <h2 className="text-lg font-semibold mb-3 text-foreground">一、版权声明</h2>
             <p className="text-muted-foreground leading-relaxed">
               本数据库（互联网平台治理数据库）由浙江传媒学院建立并运营维护。本数据库中的所有原创内容，
-              包括但不限于案例摘要、分析解读、平台画像及数据库结构，均受中华人民共和国著作权法及相关
+              包括但不限于内容摘要、分析解读、平台画像及数据库结构，均受中华人民共和国著作权法及相关
               国际条约保护，版权归浙江传媒学院所有。
             </p>
             <p className="text-muted-foreground leading-relaxed mt-2">
@@ -37,7 +37,7 @@ export default function Legal() {
           <section>
             <h2 className="text-lg font-semibold mb-3 text-foreground">二、内容免责声明</h2>
             <p className="text-muted-foreground leading-relaxed">
-              本数据库收录的案例信息、法规文本及分析内容仅供学术研究和参考使用，不构成任何法律意见
+              本数据库收录的内容信息、法规文本及分析内容仅供学术研究和参考使用，不构成任何法律意见
               或专业建议。本数据库不对因使用本数据库内容而产生的任何直接或间接损失承担责任。
             </p>
             <p className="text-muted-foreground leading-relaxed mt-2">
