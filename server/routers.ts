@@ -369,6 +369,11 @@ export const appRouter = router({
         rules: z.any().optional(),
         timeline: z.any().optional(),
         relatedCaseIds: z.array(z.string()).optional(),
+        website: z.string().optional(),
+        wikipediaUrl: z.string().optional(),
+        crunchbaseUrl: z.string().optional(),
+        profileFeatures: z.string().optional(),
+        developmentHistory: z.string().optional(),
         sortOrder: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -393,6 +398,11 @@ export const appRouter = router({
         rules: z.any().optional(),
         timeline: z.any().optional(),
         relatedCaseIds: z.array(z.string()).optional(),
+        website: z.string().optional(),
+        wikipediaUrl: z.string().optional(),
+        crunchbaseUrl: z.string().optional(),
+        profileFeatures: z.string().optional(),
+        developmentHistory: z.string().optional(),
         sortOrder: z.number().optional(),
         isActive: z.boolean().optional(),
       }))

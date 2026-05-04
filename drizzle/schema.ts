@@ -107,6 +107,11 @@ export const platforms = mysqlTable("platforms", {
     event: string;
   }>>().default([]),
   relatedCaseIds: json("relatedCaseIds").$type<string[]>().default([]),
+  website: varchar("website", { length: 512 }),
+  wikipediaUrl: varchar("wikipediaUrl", { length: 512 }),
+  crunchbaseUrl: varchar("crunchbaseUrl", { length: 512 }),
+  profileFeatures: text("profileFeatures"),
+  developmentHistory: text("developmentHistory"),
   sortOrder: int("sortOrder").default(0),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

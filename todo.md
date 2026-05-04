@@ -44,9 +44,9 @@
 - [x] TypeScript 编译（仅剩框架层 storageProxy.ts 1个错误，非业务代码）
 
 ## AI 辅助录入
-- [ ] 后端添加 cases.extractFromText tRPC 接口（调用 LLM 提取结构化字段）
-- [ ] 前端 Admin.tsx 案例表单添加"AI 辅助填充"面板（粘贴原文 → 解析 → 自动填充）
-- [ ] 添加对应 vitest 测试
+- [x] 后端添加 ai.extractCaseFromUrl tRPC 接口（调用 LLM 提取结构化字段）
+- [x] 前端 CaseEditor.tsx 添加“AI 辅助填充”面板（URL → AI 提取 → 自动填充）
+- [x] 平台编辑页 PlatformEditor.tsx 支持 AI 关键词自动填充（ai.extractPlatformByKeyword）
 
 ## Admin 全屏编辑页面修复（当前迭代）
 - [x] 修复 Admin.tsx：新增案例/平台按钮改为路由跳转（navigate），移除弹窗逻辑
@@ -57,5 +57,7 @@
 - [x] schema.ts 添加 api_settings 表和 cases.fullText 字段
 - [x] routers.ts 新增 settings 路由（getAll/upsert/delete）和 ai 路由（extractPlatformByKeyword/extractCaseFromUrl）
 - [x] 数据库迁移执行成功（api_settings 表 + fullText 字段）
+- [x] platforms 表新增 website/wikipediaUrl/crunchbaseUrl/profileFeatures/developmentHistory 字段并迁移
+- [x] routers.ts platforms.create/update 添加新字段，确保 AI 填充内容可持久化
 - [x] 修复 Cases.tsx JSX 嵌套标签错误
 - [x] 15 个测试全部通过
