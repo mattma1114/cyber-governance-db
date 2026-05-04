@@ -6,6 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
+import { scrapeUrl } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -453,6 +454,23 @@ export const appRouter = router({
       }),
   }),
 
+  // ── Scraper (Firecrawl → Jina → ScrapingBee fallback) ──────────────────────
+  scraper: router({
+    scrapeUrl: adminProcedure
+      .input(z.object({ url: z.string().url() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rows = await db.select().from(apiSettings);
+        const get = (key: string) => rows.find((r) => r.key === key)?.value ?? undefined;
+        const result = await scrapeUrl(input.url, {
+          firecrawlKey: get("FIRECRAWL_API_KEY"),
+          jinaKey: get("JINA_API_KEY"),
+          scrapingbeeKey: get("SCRAPINGBEE_API_KEY"),
+        });
+        return result;
+      }),
+  }),
   // ── AI helpers ────────────────────────────────────────────────────────
   ai: router({
     // Extract platform info by keyword (no Firecrawl needed)
@@ -515,7 +533,25 @@ Return ONLY valid JSON, no markdown.`;
     extractCaseFromUrl: adminProcedure
       .input(z.object({ url: z.string().url() }))
       .mutation(async ({ input }) => {
-        const systemPrompt = `You are a legal research assistant specializing in internet platform governance cases. Given a URL to a legal case, regulatory enforcement, or legislative document, extract key information. Return a JSON object with:
+        // Step 1: Try to scrape full text with fallback chain
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rows = await db.select().from(apiSettings);
+        const get = (key: string) => rows.find((r) => r.key === key)?.value ?? undefined;
+        let fullText = "";
+        let scrapeSource = "";
+        try {
+          const scraped = await scrapeUrl(input.url, {
+            firecrawlKey: get("FIRECRAWL_API_KEY"),
+            jinaKey: get("JINA_API_KEY"),
+            scrapingbeeKey: get("SCRAPINGBEE_API_KEY"),
+          });
+          fullText = scraped.markdown.slice(0, 12000); // limit to ~12k chars for LLM
+          scrapeSource = scraped.source;
+        } catch {
+          // fallback: LLM will use URL only
+        }
+        const systemPrompt = `You are a legal research assistant specializing in internet platform governance cases. Given content from a legal case, regulatory enforcement, or legislative document, extract key information. Return a JSON object with:
 - title: string (case title in Chinese)
 - titleEn: string (case title in English)
 - abstract: string (case abstract in Chinese, 200-400 chars)
@@ -525,11 +561,15 @@ Return ONLY valid JSON, no markdown.`;
 - platform: string (platform name involved)
 - aiSummary: string (AI analysis summary in Chinese, 300-500 chars)
 - aiAnalysis: string (detailed AI analysis in Chinese, 500-800 chars)
+- fullText: string (the original full text content, preserve as-is, max 8000 chars)
 Return ONLY valid JSON, no markdown.`;
+        const userContent = fullText
+          ? `URL: ${input.url}\n\nFull page content (scraped via ${scrapeSource}):\n\n${fullText}`
+          : `Please extract information from this URL: ${input.url}`;
         const response = await invokeLLM({
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Please extract information from this URL: ${input.url}` },
+            { role: "user", content: userContent },
           ],
           response_format: {
             type: "json_schema",
@@ -548,8 +588,9 @@ Return ONLY valid JSON, no markdown.`;
                   platform: { type: "string" },
                   aiSummary: { type: "string" },
                   aiAnalysis: { type: "string" },
+                  fullText: { type: "string" },
                 },
-                required: ["title", "titleEn", "abstract", "type", "date", "jurisdiction", "platform", "aiSummary", "aiAnalysis"],
+                required: ["title", "titleEn", "abstract", "type", "date", "jurisdiction", "platform", "aiSummary", "aiAnalysis", "fullText"],
                 additionalProperties: false,
               },
             },

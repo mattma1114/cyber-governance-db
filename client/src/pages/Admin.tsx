@@ -448,7 +448,9 @@ function SettingsTab() {
   });
 
   const PRESET_KEYS = [
-    { key: "FIRECRAWL_API_KEY", label: "Firecrawl API Key", hint: "用于抓取平台规则文件原文" },
+    { key: "FIRECRAWL_API_KEY", label: "Firecrawl API Key", hint: "主力抓取服务，用于平台规则文件、内容页面抓取（优先使用）" },
+    { key: "JINA_API_KEY", label: "Jina Reader API Key", hint: "备用抓取服务，无 Key 也可免费使用，配置后可提升额度上限" },
+    { key: "SCRAPINGBEE_API_KEY", label: "ScrapingBee API Key", hint: "底座备用抓取服务，适用于强反爬防护的页面（Cloudflare 等）" },
   ];
 
   return (
@@ -456,7 +458,7 @@ function SettingsTab() {
       <div>
         <h2 className="text-base font-semibold">API 密鑰配置</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          配置第三方 API Key，用于平台规则文件抓取等功能。密鑰加密存储在数据库中。
+          配置第三方抓取 API Key。系统采用梯级降级策略：Firecrawl（主力）→ Jina Reader（备用）→ ScrapingBee（底座），任一成功即返回结果。密鑰加密存储在数据库中。
         </p>
       </div>
 

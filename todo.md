@@ -77,3 +77,19 @@
 - [x] Home.tsx 首页文字替换
 - [x] Navbar.tsx/About.tsx/Legal.tsx/PlatformDetail.tsx 文字替换
 - [x] 10 个文件全部替换完成，15 个测试全部通过
+
+## Firecrawl API 接入（当前迭代）
+- [ ] 后端创建 server/firecrawl.ts 服务（封装 Firecrawl scrape/crawl API）
+- [ ] routers.ts 新增 firecrawl.scrapeUrl 路由（从 api_settings 读取 API Key）
+- [ ] routers.ts 新增 firecrawl.extractCase 路由（抓取+AI提取内容信息）
+- [ ] PlatformEditor.tsx 规则文件 Tab：URL 输入 → Firecrawl 抓取全文 → 保存
+- [ ] CaseEditor.tsx URL 提取升级：优先使用 Firecrawl 抓取原文，再交 LLM 提取
+- [ ] Admin API 配置 Tab：Firecrawl API Key 配置入口（已有，验证可用）
+
+## 三 API 梯级冗余抓取接入（当前迭代）
+- [x] 创建 server/scraper.ts：封装 Firecrawl→Jina Reader→ScrapingBee 降级策略
+- [x] routers.ts 新增 scraper.scrapeUrl 路由（从 api_settings 读取各 API Key）
+- [x] ai.extractCaseFromUrl 升级：先用 scraper 抓取原文，再交 LLM 提取结构化信息
+- [x] Admin.tsx API 配置 Tab 添加 Jina/ScrapingBee API Key 配置入口，更新降级策略说明
+- [x] PlatformEditor.tsx 规则文件 Tab：每条规则添加「抓取全文」按钮（梯级降级）
+- [x] 15 个测试全部通过

@@ -25,6 +25,7 @@ import {
   Globe,
   BookOpen,
   TrendingUp,
+  Download,
 } from "lucide-react";
 
 type PortraitData = {
@@ -42,6 +43,7 @@ type RuleItem = {
   title: string;
   type: string;
   url: string;
+  fullText?: string; // scraped full text via Firecrawl/Jina/ScrapingBee
 };
 
 type TimelineItem = {
@@ -217,6 +219,27 @@ export default function PlatformEditor() {
       setIsAiLoading(false);
     }
   };
+
+  const [scrapingRuleIdx, setScrapingRuleIdx] = useState<number | null>(null);
+  const scrapeUrlMutation = trpc.scraper.scrapeUrl.useMutation({
+    onSuccess: (data, variables) => {
+      // Find the rule index by matching the URL
+      const idx = form.rules.findIndex((r) => r.url === variables.url);
+      if (idx >= 0) {
+        setForm((prev) => {
+          const rules = [...prev.rules];
+          rules[idx] = { ...rules[idx], fullText: data.markdown };
+          return { ...prev, rules };
+        });
+        toast.success(`已通过 ${data.source} 抓取规则文件全文（${data.markdown.length} 字符）`);
+      }
+      setScrapingRuleIdx(null);
+    },
+    onError: (e) => {
+      toast.error(`抓取失败：${e.message}`);
+      setScrapingRuleIdx(null);
+    },
+  });
 
   const addRule = () => {
     setForm((prev) => ({
@@ -717,14 +740,53 @@ export default function PlatformEditor() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">URL</Label>
-                    <Input
-                      className="h-8 text-sm"
-                      placeholder="https://..."
-                      value={rule.url}
-                      onChange={(e) => updateRule(idx, "url", e.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        className="h-8 text-sm flex-1"
+                        placeholder="https://..."
+                        value={rule.url}
+                        onChange={(e) => updateRule(idx, "url", e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 shrink-0"
+                        disabled={!rule.url || scrapingRuleIdx === idx || scrapeUrlMutation.isPending}
+                        onClick={() => {
+                          if (!rule.url) { toast.error("请先填写 URL"); return; }
+                          setScrapingRuleIdx(idx);
+                          scrapeUrlMutation.mutate({ url: rule.url });
+                        }}
+                        title="使用 Firecrawl/Jina/ScrapingBee 抓取全文"
+                      >
+                        {scrapingRuleIdx === idx ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Download className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
+                {/* Full text preview */}
+                {rule.fullText && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">全文预览（{rule.fullText.length} 字符）</Label>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs text-muted-foreground"
+                        onClick={() => updateRule(idx, "fullText" as any, "")}
+                      >
+                        清除
+                      </Button>
+                    </div>
+                    <div className="rounded border border-border bg-muted/30 p-2 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap">
+                      {rule.fullText.slice(0, 500)}{rule.fullText.length > 500 ? "..." : ""}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
