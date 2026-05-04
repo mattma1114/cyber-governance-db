@@ -61,3 +61,8 @@
 - [x] routers.ts platforms.create/update 添加新字段，确保 AI 填充内容可持久化
 - [x] 修复 Cases.tsx JSX 嵌套标签错误
 - [x] 15 个测试全部通过
+
+## CaseEditor 重构（当前迭代）
+- [x] 合并「案例摘要」和「AI 摘要」为单一摘要字段
+- [x] 「原文全文」移至主内容区（非侧边栏），作为主要输入区域
+- [x] 全部表单字段去除方框边框，改为横线（underline）版式
