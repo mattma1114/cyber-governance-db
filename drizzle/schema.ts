@@ -67,7 +67,7 @@ export const cases = mysqlTable("cases", {
   fullText: text("full_text"),
   tags: json("tags").$type<string[]>().default([]),
   language: varchar("language", { length: 8 }).default("zh"),
-  status: mysqlEnum("status", ["published", "draft"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["published", "draft", "unpublished"]).default("draft").notNull(),
   views: int("views").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

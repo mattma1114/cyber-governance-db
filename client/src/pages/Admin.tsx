@@ -20,9 +20,14 @@ import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
-  RefreshCw, FileText
+  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PAGE_SIZE = 15;
 
@@ -652,10 +657,13 @@ export default function Admin() {
   const [keyword, setKeyword] = useState("");
   const [inputVal, setInputVal] = useState("");
 
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id?: number; title?: string }>({ open: false });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id?: number; title?: string; isBatch?: boolean }>({ open: false });
   // Topic/Jurisdiction dialog
   const [topicDialog, setTopicDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [jurisDialog, setJurisDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
+  // Batch selection
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -665,6 +673,7 @@ export default function Admin() {
     page,
     pageSize: PAGE_SIZE,
     keyword: keyword || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
   });
 
   const { data: platforms, isLoading: platformsLoading } = trpc.platforms.list.useQuery({});
@@ -705,6 +714,32 @@ export default function Admin() {
 
   const togglePublish = trpc.cases.togglePublish.useMutation({
     onSuccess: () => utils.cases.listAdmin.invalidate(),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateStatus = trpc.cases.updateStatus.useMutation({
+    onSuccess: () => { utils.cases.listAdmin.invalidate(); utils.cases.stats.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const batchUpdateStatus = trpc.cases.batchUpdateStatus.useMutation({
+    onSuccess: (data) => {
+      toast.success(`已更新 ${data.count} 条内容状态`);
+      setSelectedIds(new Set());
+      utils.cases.listAdmin.invalidate();
+      utils.cases.stats.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const batchDelete = trpc.cases.batchDelete.useMutation({
+    onSuccess: (data) => {
+      toast.success(`已删除 ${data.count} 条内容`);
+      setSelectedIds(new Set());
+      setDeleteDialog({ open: false });
+      utils.cases.listAdmin.invalidate();
+      utils.cases.stats.invalidate();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -824,51 +859,92 @@ export default function Admin() {
 
           {/* Cases Tab */}
           <TabsContent value="cases">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="relative flex-1 max-w-sm">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="relative flex-1 min-w-[180px] max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  className="pl-9"
+                  className="pl-9 h-8 text-sm"
                   placeholder="搜索内容…"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { setKeyword(inputVal); setPage(1); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { setKeyword(inputVal); setPage(1); setSelectedIds(new Set()); } }}
                 />
               </div>
-              <Button size="sm" onClick={() => { setKeyword(inputVal); setPage(1); }}>搜索</Button>
+              <Button size="sm" className="h-8" onClick={() => { setKeyword(inputVal); setPage(1); setSelectedIds(new Set()); }}>搜索</Button>
+              {/* Status filter */}
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); setSelectedIds(new Set()); }}>
+                <SelectTrigger className="h-8 w-28 text-sm">
+                  <SelectValue placeholder="全部状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="published">已发布</SelectItem>
+                  <SelectItem value="draft">草稿</SelectItem>
+                  <SelectItem value="unpublished">已下架</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex-1" />
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5"
+                className="h-8 gap-1.5"
                 disabled={refetchingFullText || !casesData?.items?.length}
                 onClick={() => {
                   const ids = casesData?.items
                     ?.filter((c: any) => c.sourceUrl && !c.hasFullText)
                     ?.map((c: any) => c.id) ?? [];
-                  if (ids.length === 0) {
-                    toast.info("当前页所有内容均已有原文，或缺少原文链接");
-                    return;
-                  }
+                  if (ids.length === 0) { toast.info("当前页所有内容均已有原文，或缺少原文链接"); return; }
                   setRefetchingFullText(true);
                   toast.info(`开始重新抓取 ${ids.length} 条原文，请稍候…`);
                   refetchFullTextMutation.mutate({ ids });
                 }}
               >
-                {refetchingFullText
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <RefreshCw className="w-3.5 h-3.5" />}
+                {refetchingFullText ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 重抓原文
               </Button>
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => navigate("/admin/cases/new")}
-              >
-                <Plus className="w-4 h-4" />
-                新增内容
+              <Button size="sm" className="h-8 gap-1.5" onClick={() => navigate("/admin/cases/new")}>
+                <Plus className="w-4 h-4" />新增内容
               </Button>
             </div>
+
+            {/* Batch action bar — shown when items are selected */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
+                <span className="text-sm font-medium text-primary">已选 {selectedIds.size} 条</span>
+                <div className="flex-1" />
+                <Button
+                  size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+                  disabled={batchUpdateStatus.isPending}
+                  onClick={() => batchUpdateStatus.mutate({ ids: Array.from(selectedIds), status: "published" })}
+                >
+                  <Eye className="w-3 h-3" />批量发布
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+                  disabled={batchUpdateStatus.isPending}
+                  onClick={() => batchUpdateStatus.mutate({ ids: Array.from(selectedIds), status: "unpublished" })}
+                >
+                  <EyeOff className="w-3 h-3" />批量下架
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+                  disabled={batchUpdateStatus.isPending}
+                  onClick={() => batchUpdateStatus.mutate({ ids: Array.from(selectedIds), status: "draft" })}
+                >
+                  <FileText className="w-3 h-3" />设为草稿
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setDeleteDialog({ open: true, isBatch: true, title: `${selectedIds.size} 条内容` })}
+                >
+                  <Trash2 className="w-3 h-3" />批量删除
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+                  <X className="w-3 h-3" />取消选择
+                </Button>
+              </div>
+            )}
 
             {casesLoading ? (
               <div className="space-y-2">
@@ -879,62 +955,111 @@ export default function Admin() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">标题</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">类型</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24 hidden md:table-cell">日期</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">状态</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground w-28">操作</th>
+                      <th className="px-3 py-3 w-10">
+                        <Checkbox
+                          checked={
+                            (casesData?.items?.length ?? 0) > 0 &&
+                            (casesData?.items ?? []).every((c: any) => selectedIds.has(c.id))
+                          }
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedIds(new Set(casesData?.items?.map((c: any) => c.id) ?? []));
+                            } else {
+                              setSelectedIds(new Set());
+                            }
+                          }}
+                          aria-label="全选"
+                        />
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground">标题</th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground w-24">类型</th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground w-24 hidden md:table-cell">日期</th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground w-24">状态</th>
+                      <th className="text-right px-3 py-3 font-medium text-muted-foreground w-16">操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {casesData?.items.map((c: any, i: number) => (
-                      <tr key={c.id} className={cn("border-t border-border hover:bg-muted/30 transition-colors", i % 2 === 0 ? "" : "bg-muted/10")}>
-                        <td className="px-4 py-3">
-                          <div className="font-medium line-clamp-1">{c.title}</div>
-                          {c.titleEn && <div className="text-xs text-muted-foreground line-clamp-1 italic">{c.titleEn}</div>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="secondary" className={cn("text-xs", TYPE_BADGE_CLASS[c.type])}>
-                            {TYPE_LABELS[c.type]?.label}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.date}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => togglePublish.mutate({ id: c.id, published: !c.published })}
-                            className={cn(
-                              "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
-                              c.published
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                : "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {c.published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                            {c.published ? "已发布" : "草稿"}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-7 h-7"
-                              onClick={() => navigate(`/admin/cases/${c.id}/edit`)}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-7 h-7 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteDialog({ open: true, id: c.id, title: c.title })}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {casesData?.items.map((c: any, i: number) => {
+                      const isSelected = selectedIds.has(c.id);
+                      const statusConfig = {
+                        published: { label: "已发布", icon: Eye, cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+                        draft: { label: "草稿", icon: FileText, cls: "bg-muted text-muted-foreground" },
+                        unpublished: { label: "已下架", icon: EyeOff, cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+                      }[c.status as string] ?? { label: c.status, icon: FileText, cls: "bg-muted text-muted-foreground" };
+                      const StatusIcon = statusConfig.icon;
+                      return (
+                        <tr key={c.id} className={cn("border-t border-border hover:bg-muted/30 transition-colors", isSelected ? "bg-primary/5" : i % 2 !== 0 ? "bg-muted/10" : "")}>
+                          <td className="px-3 py-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (checked) next.add(c.id); else next.delete(c.id);
+                                  return next;
+                                });
+                              }}
+                              aria-label={`选择 ${c.title}`}
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="font-medium line-clamp-1">{c.title}</div>
+                            {c.titleEn && <div className="text-xs text-muted-foreground line-clamp-1 italic">{c.titleEn}</div>}
+                          </td>
+                          <td className="px-3 py-3">
+                            <Badge variant="secondary" className={cn("text-xs", TYPE_BADGE_CLASS[c.type])}>
+                              {TYPE_LABELS[c.type]?.label}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground hidden md:table-cell">{c.date}</td>
+                          <td className="px-3 py-3">
+                            <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full", statusConfig.cls)}>
+                              <StatusIcon className="w-3 h-3" />
+                              {statusConfig.label}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center justify-end">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="w-7 h-7">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuItem onClick={() => navigate(`/admin/cases/${c.id}/edit`)}>
+                                    <Pencil className="w-3.5 h-3.5 mr-2" />编辑
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  {c.status !== "published" && (
+                                    <DropdownMenuItem onClick={() => updateStatus.mutate({ id: c.id, status: "published" })}>
+                                      <Eye className="w-3.5 h-3.5 mr-2" />发布
+                                    </DropdownMenuItem>
+                                  )}
+                                  {c.status !== "unpublished" && (
+                                    <DropdownMenuItem onClick={() => updateStatus.mutate({ id: c.id, status: "unpublished" })}>
+                                      <EyeOff className="w-3.5 h-3.5 mr-2" />下架
+                                    </DropdownMenuItem>
+                                  )}
+                                  {c.status !== "draft" && (
+                                    <DropdownMenuItem onClick={() => updateStatus.mutate({ id: c.id, status: "draft" })}>
+                                      <FileText className="w-3.5 h-3.5 mr-2" />设为草稿
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => setDeleteDialog({ open: true, id: c.id, title: c.title })}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" />删除
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 {casesData?.items.length === 0 && (
@@ -1156,17 +1281,27 @@ export default function Admin() {
       <AlertDialog open={deleteDialog.open} onOpenChange={(o) => setDeleteDialog({ open: o })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{deleteDialog.isBatch ? "确认批量删除" : "确认删除"}</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除内容「{deleteDialog.title}」吗？此操作不可撤销。
+              {deleteDialog.isBatch
+                ? `确定要删除所选的 ${deleteDialog.title}吗？删除后相关附件也将一并删除，此操作不可撤销。`
+                : `确定要删除内容「${deleteDialog.title}」吗？此操作不可撤销。`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteDialog.id && deleteCase.mutate({ id: deleteDialog.id })}
+              onClick={() => {
+                if (deleteDialog.isBatch) {
+                  batchDelete.mutate({ ids: Array.from(selectedIds) });
+                } else if (deleteDialog.id) {
+                  deleteCase.mutate({ id: deleteDialog.id });
+                }
+              }}
             >
+              {(deleteCase.isPending || batchDelete.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               删除
             </AlertDialogAction>
           </AlertDialogFooter>

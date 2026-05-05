@@ -156,3 +156,55 @@ describe("jurisdictions admin mutations", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("cases batch operations - access control", () => {
+  it("updateStatus rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.cases.updateStatus({ id: 1, status: "published" })
+    ).rejects.toThrow();
+  });
+
+  it("batchUpdateStatus rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.cases.batchUpdateStatus({ ids: [1, 2], status: "published" })
+    ).rejects.toThrow();
+  });
+
+  it("batchDelete rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(
+      caller.cases.batchDelete({ ids: [1, 2] })
+    ).rejects.toThrow();
+  });
+
+  it("batchUpdateStatus validates status enum", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    await expect(
+      caller.cases.batchUpdateStatus({ ids: [1], status: "invalid" as any })
+    ).rejects.toThrow();
+  });
+
+  it("batchDelete rejects empty ids array", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    await expect(
+      caller.cases.batchDelete({ ids: [] })
+    ).rejects.toThrow();
+  });
+
+  it("batchUpdateStatus rejects empty ids array", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    await expect(
+      caller.cases.batchUpdateStatus({ ids: [], status: "published" })
+    ).rejects.toThrow();
+  });
+
+  it("listAdmin accepts status filter parameter", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.cases.listAdmin({ page: 1, pageSize: 10, status: "published" });
+    expect(result).toHaveProperty("items");
+    expect(result).toHaveProperty("total");
+    expect(Array.isArray(result.items)).toBe(true);
+  });
+});

@@ -376,6 +376,46 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    // Update status of a single case (published / draft / unpublished)
+    updateStatus: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["published", "draft", "unpublished"]),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(cases).set({ status: input.status }).where(eq(cases.id, input.id));
+        return { success: true };
+      }),
+
+    // Batch update status for multiple cases
+    batchUpdateStatus: adminProcedure
+      .input(z.object({
+        ids: z.array(z.number()).min(1).max(100),
+        status: z.enum(["published", "draft", "unpublished"]),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(cases).set({ status: input.status }).where(inArray(cases.id, input.ids));
+        return { success: true, count: input.ids.length };
+      }),
+
+    // Batch delete multiple cases
+    batchDelete: adminProcedure
+      .input(z.object({
+        ids: z.array(z.number()).min(1).max(100),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Also delete associated attachments
+        await db.delete(caseAttachments).where(inArray(caseAttachments.caseId, input.ids));
+        await db.delete(cases).where(inArray(cases.id, input.ids));
+        return { success: true, count: input.ids.length };
+      }),
+
     exportPdf: publicProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
