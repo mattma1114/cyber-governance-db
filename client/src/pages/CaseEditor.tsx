@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Wand2, Link2, X, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles } from "lucide-react";
 
 const CASE_TYPES = [
   { value: "judicial", label: "司法内容" },
@@ -60,6 +60,68 @@ const ulTextarea =
   "w-full bg-transparent border-0 border-b border-border rounded-none px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/50 transition-colors resize-none";
 const ulLabel = "block text-xs text-muted-foreground mb-1";
 
+// AI loading steps definition
+const AI_STEPS = [
+  { id: "scrape", icon: Globe, label: "正在抓取原文内容", desc: "通过多通道爬虫获取页面全文…" },
+  { id: "analyze", icon: Sparkles, label: "AI 深度分析中", desc: "提取关键字段、生成法律分析…" },
+  { id: "fill", icon: FileText, label: "自动填充表单", desc: "将分析结果写入各字段…" },
+];
+
+function AiLoadingOverlay({ step }: { step: number }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="bg-card border border-border rounded-xl shadow-2xl p-8 w-full max-w-sm mx-4">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <Wand2 className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">AI 自动提取</p>
+            <p className="text-xs text-muted-foreground">正在处理，请稍候…</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {AI_STEPS.map((s, i) => {
+            const Icon = s.icon;
+            const isDone = i < step;
+            const isActive = i === step;
+            return (
+              <div key={s.id} className={`flex items-start gap-3 transition-opacity duration-300 ${i > step ? "opacity-30" : "opacity-100"}`}>
+                <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${isDone ? "bg-green-500/20" : isActive ? "bg-primary/15" : "bg-muted"}`}>
+                  {isDone ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  ) : isActive ? (
+                    <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                  ) : (
+                    <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className={`text-xs font-medium ${isActive ? "text-foreground" : isDone ? "text-muted-foreground" : "text-muted-foreground/50"}`}>
+                    {s.label}
+                  </p>
+                  {isActive && (
+                    <p className="text-xs text-muted-foreground mt-0.5 animate-pulse">{s.desc}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Animated progress bar */}
+        <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-700 ease-in-out"
+            style={{ width: `${((step + 0.5) / AI_STEPS.length) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CaseEditor() {
   const params = useParams<{ id?: string }>();
   const [, navigate] = useLocation();
@@ -70,6 +132,8 @@ export default function CaseEditor() {
   const [tagInput, setTagInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiStep, setAiStep] = useState(0);
+  const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -101,18 +165,44 @@ export default function CaseEditor() {
 
   const extractFromUrlMutation = trpc.ai.extractCaseFromUrl.useMutation({
     onSuccess: (data) => {
-      setForm((prev) => ({
-        ...prev,
-        title: data.title || prev.title,
-        titleEn: data.titleEn || prev.titleEn,
-        abstract: data.abstract || data.aiSummary || prev.abstract,
-        type: (data.type as CaseForm["type"]) || prev.type,
-        date: data.date || prev.date,
-        aiAnalysis: data.aiAnalysis || prev.aiAnalysis,
-      }));
-      toast.success("AI 已自动提取内容信息");
+      // Step 3: filling form
+      setAiStep(2);
+      setTimeout(() => {
+        // Map type value: backend may return 'enforcement' or 'policy', normalize to our enum
+        const typeMap: Record<string, CaseForm["type"]> = {
+          judicial: "judicial",
+          regulatory: "regulatory",
+          enforcement: "regulatory",
+          legislation: "legislation",
+          policy: "legislation",
+        };
+        const resolvedType = typeMap[data.type as string] || "judicial";
+
+        setForm((prev) => ({
+          ...prev,
+          title: data.title || prev.title,
+          titleEn: data.titleEn || prev.titleEn,
+          abstract: data.abstract || prev.abstract,
+          type: resolvedType,
+          date: data.date || prev.date,
+          topicId: (data as any).topicId || prev.topicId,
+          jurisdictionId: (data as any).jurisdictionId || prev.jurisdictionId,
+          source: (data as any).source || prev.source,
+          language: (data as any).language || prev.language,
+          tags: (data as any).tags?.length ? (data as any).tags : prev.tags,
+          aiAnalysis: data.aiAnalysis || prev.aiAnalysis,
+          fullText: (data as any).fullText || prev.fullText,
+          sourceUrl: urlInput.trim() || prev.sourceUrl,
+        }));
+
+        setIsAiLoading(false);
+        toast.success("AI 已自动提取并填充所有字段，请核对后保存");
+      }, 600);
     },
-    onError: (e) => toast.error(`AI 提取失败：${e.message}`),
+    onError: (e) => {
+      setIsAiLoading(false);
+      toast.error(`AI 提取失败：${e.message}`);
+    },
   });
 
   useEffect(() => {
@@ -136,6 +226,13 @@ export default function CaseEditor() {
     }
   }, [existingCase]);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+    };
+  }, []);
+
   const handleChange = (field: keyof CaseForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -157,14 +254,18 @@ export default function CaseEditor() {
       toast.error("请输入内容 URL");
       return;
     }
+    setAiStep(0);
     setIsAiLoading(true);
+
+    // Advance step 0 → 1 after ~2s (simulating scrape phase)
+    stepTimerRef.current = setTimeout(() => {
+      setAiStep(1);
+    }, 2200);
+
     try {
       await extractFromUrlMutation.mutateAsync({ url: urlInput.trim() });
-      if (urlInput.trim() && !form.sourceUrl) {
-        setForm((prev) => ({ ...prev, sourceUrl: urlInput.trim() }));
-      }
-    } finally {
-      setIsAiLoading(false);
+    } catch {
+      // error handled in onError
     }
   };
 
@@ -194,6 +295,9 @@ export default function CaseEditor() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* AI Loading Overlay */}
+      {isAiLoading && <AiLoadingOverlay step={aiStep} />}
+
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
@@ -242,7 +346,7 @@ export default function CaseEditor() {
                 <Link2 className="absolute left-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <input
                   className={ulInput + " pl-5"}
-                  placeholder="粘贴内容原文 URL，AI 自动提取标题、摘要、类型等信息"
+                  placeholder="粘贴内容原文 URL，AI 自动提取所有字段"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAiExtract()}
@@ -261,7 +365,7 @@ export default function CaseEditor() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              提取后可手动修改各字段。「原文全文」需单独粘贴。
+              将自动提取：标题、类型、日期、研究专题、司法辖区、来源机构、语言、标签、摘要、AI 分析及原文全文，提取后可手动修改。
             </p>
           </div>
         </div>
@@ -296,7 +400,7 @@ export default function CaseEditor() {
             </div>
           </div>
 
-          {/* Title ZH */}
+          {/* Title */}
           <div>
             <label className={ulLabel}>内容标题（中文）*</label>
             <input
@@ -378,7 +482,7 @@ export default function CaseEditor() {
             </div>
           </div>
 
-          {/* Language */}
+          {/* Language + Tags */}
           <div className="grid grid-cols-2 gap-8">
             <div>
               <label className={ulLabel}>语言</label>
@@ -393,6 +497,7 @@ export default function CaseEditor() {
                   <SelectItem value="de">Deutsch</SelectItem>
                   <SelectItem value="ja">日本語</SelectItem>
                   <SelectItem value="ko">한국어</SelectItem>
+                  <SelectItem value="other">其他</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -443,8 +548,8 @@ export default function CaseEditor() {
           <div>
             <label className={ulLabel}>AI 分析</label>
             <textarea
-              className={ulTextarea + " min-h-[160px]"}
-              placeholder="AI 生成的详细分析内容"
+              className={ulTextarea + " min-h-[200px]"}
+              placeholder="AI 生成的深度法律分析（含法律意义、核心争议、引用条款、合规启示等）"
               value={form.aiAnalysis}
               onChange={(e) => handleChange("aiAnalysis", e.target.value)}
             />
@@ -456,12 +561,12 @@ export default function CaseEditor() {
           <div className="flex items-baseline justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">原文全文</h2>
             <span className="text-xs text-muted-foreground">
-              粘贴判决书、执法决定、法规全文等原始文本
+              AI 提取后自动填充，也可手动粘贴判决书、执法决定、法规全文等
             </span>
           </div>
           <textarea
             className="w-full bg-transparent border-b border-border rounded-none px-0 py-3 text-sm font-mono focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/40 transition-colors resize-none min-h-[400px]"
-            placeholder="在此粘贴原文全文内容…"
+            placeholder="AI 提取后将自动填充原文内容，也可在此手动粘贴…"
             value={form.fullText}
             onChange={(e) => handleChange("fullText", e.target.value)}
           />

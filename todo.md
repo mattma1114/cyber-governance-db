@@ -115,3 +115,11 @@
 - [x] 修复保存逻辑：改为 Array.isArray(result) ? result[0] : result 正确获取 ResultSetHeader，insertId 正常返回
 - [x] 确认内容列表页可实时同步展示新建内容（管理员后台内容管理 Tab 正常显示）
 - [x] 15 个测试全部通过
+
+## AI 提取升级（当前迭代）
+- [x] 后端 ai.extractCaseFromUrl：LLM prompt 补充研究专题/司法辖区/来源机构/语言/标签字段提取，从数据库加载真实选项供 LLM 精确匹配
+- [x] 后端 ai.extractCaseFromUrl：AI 分析内容加深至 800-1200 字，涵盖法律意义、核心争议、引用条款、合规启示、同类案件对比
+- [x] 后端 ai.extractCaseFromUrl：自动抓取原文全文（最多 15000 字），优先使用 scraped 内容
+- [x] 前端 CaseEditor：onSuccess 回调补全所有字段预填（topicId/jurisdictionId/source/language/tags/fullText/sourceUrl）
+- [x] 前端 CaseEditor：新增三步骤 AI 加载动画覆盖层（抓取→分析→填充），含进度条和分步状态
+- [x] 15 个测试全部通过

@@ -572,7 +572,7 @@ Return ONLY valid JSON, no markdown.`;
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const rows = await db.select().from(apiSettings);
         const get = (key: string) => rows.find((r) => r.key === key)?.value ?? undefined;
-        let fullText = "";
+        let scrapedFullText = "";
         let scrapeSource = "";
         try {
           const scraped = await scrapeUrl(input.url, {
@@ -580,26 +580,42 @@ Return ONLY valid JSON, no markdown.`;
             jinaKey: get("JINA_API_KEY"),
             scrapingbeeKey: get("SCRAPINGBEE_API_KEY"),
           });
-          fullText = scraped.markdown.slice(0, 12000); // limit to ~12k chars for LLM
+          scrapedFullText = scraped.markdown;
           scrapeSource = scraped.source;
         } catch {
           // fallback: LLM will use URL only
         }
-        const systemPrompt = `You are a legal research assistant specializing in internet platform governance cases. Given content from a legal case, regulatory enforcement, or legislative document, extract key information. Return a JSON object with:
-- title: string (case title in Chinese)
-- titleEn: string (case title in English)
-- abstract: string (case abstract in Chinese, 200-400 chars)
-- type: string (one of: judicial/enforcement/legislation/policy)
-- date: string (date in YYYY-MM-DD format)
-- jurisdiction: string (jurisdiction name)
-- platform: string (platform name involved)
-- aiSummary: string (AI analysis summary in Chinese, 300-500 chars)
-- aiAnalysis: string (detailed AI analysis in Chinese, 500-800 chars)
-- fullText: string (the original full text content, preserve as-is, max 8000 chars)
-Return ONLY valid JSON, no markdown.`;
-        const userContent = fullText
-          ? `URL: ${input.url}\n\nFull page content (scraped via ${scrapeSource}):\n\n${fullText}`
-          : `Please extract information from this URL: ${input.url}`;
+        // Fetch available topics and jurisdictions for accurate matching
+        const topicsData = await db.select().from(topics).orderBy(asc(topics.sortOrder));
+        const jurisdictionsData = await db.select().from(jurisdictions).orderBy(asc(jurisdictions.sortOrder));
+        const topicsList = topicsData.map((t) => `${t.id}: ${t.label} (${t.labelEn})`).join(", ");
+        const jurisdictionsList = jurisdictionsData.map((j) => `${j.id}: ${j.label} (${j.labelEn})`).join(", ");
+
+        const systemPrompt = `You are a senior legal research analyst specializing in internet platform governance, data protection, antitrust, and AI regulation. Your task is to extract and deeply analyze a legal case, regulatory enforcement action, or legislative document.
+
+Available research topics (use the exact id): ${topicsList}
+Available jurisdictions (use the exact id): ${jurisdictionsList}
+
+Return a JSON object with ALL of the following fields:
+- title: string — case/document title in Chinese (concise, professional)
+- titleEn: string — case/document title in English
+- abstract: string — factual summary in Chinese covering: parties involved, core issue, key facts, outcome/decision, and legal basis (300-500 chars)
+- type: string — one of exactly: judicial | regulatory | legislation
+- date: string — primary date in YYYY-MM-DD format (decision date, enactment date, or publication date)
+- topicId: string — the single most relevant topic id from the available list above
+- jurisdictionId: string — the single most relevant jurisdiction id from the available list above
+- source: string — name of the issuing authority, court, or institution (e.g. "爱尔兰数据保护委员会", "EU Court of Justice", "中国国家互联网信息办公室")
+- language: string — primary language of the source document, one of: zh | en | de | fr | ja | ko | other
+- tags: array of strings — 3-6 precise keyword tags in Chinese (e.g. ["GDPR", "数据跨境传输", "标准合同条款", "Meta"])
+- aiAnalysis: string — DETAILED legal analysis in Chinese (800-1200 chars) covering: (1) legal significance and background context; (2) core legal issues and reasoning; (3) key legal provisions cited; (4) implications for platform operators and compliance practitioners; (5) comparison with similar cases or regulatory trends if relevant
+- fullText: string — the complete original text content as scraped (preserve as-is, up to 15000 chars; if no content was scraped, return empty string)
+
+Return ONLY valid JSON, no markdown, no explanation.`;
+
+        const userContent = scrapedFullText
+          ? `URL: ${input.url}\n\nFull page content (scraped via ${scrapeSource}):\n\n${scrapedFullText.slice(0, 14000)}`
+          : `Please extract and analyze information from this URL: ${input.url}`;
+
         const response = await invokeLLM({
           messages: [
             { role: "system", content: systemPrompt },
@@ -618,20 +634,36 @@ Return ONLY valid JSON, no markdown.`;
                   abstract: { type: "string" },
                   type: { type: "string" },
                   date: { type: "string" },
-                  jurisdiction: { type: "string" },
-                  platform: { type: "string" },
-                  aiSummary: { type: "string" },
+                  topicId: { type: "string" },
+                  jurisdictionId: { type: "string" },
+                  source: { type: "string" },
+                  language: { type: "string" },
+                  tags: { type: "array", items: { type: "string" } },
                   aiAnalysis: { type: "string" },
                   fullText: { type: "string" },
                 },
-                required: ["title", "titleEn", "abstract", "type", "date", "jurisdiction", "platform", "aiSummary", "aiAnalysis", "fullText"],
+                required: ["title", "titleEn", "abstract", "type", "date", "topicId", "jurisdictionId", "source", "language", "tags", "aiAnalysis", "fullText"],
                 additionalProperties: false,
               },
             },
           },
         });
         const content = response.choices[0].message.content;
-        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+        const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+        // Validate topicId and jurisdictionId against actual data; fall back to empty if not found
+        const validTopicIds = topicsData.map((t) => t.id);
+        const validJurisdictionIds = jurisdictionsData.map((j) => j.id);
+        if (!validTopicIds.includes(parsed.topicId)) parsed.topicId = "";
+        if (!validJurisdictionIds.includes(parsed.jurisdictionId)) parsed.jurisdictionId = "";
+        // Always prefer scraped full text over LLM-generated content
+        if (scrapedFullText) {
+          parsed.fullText = scrapedFullText.slice(0, 15000);
+        }
+        // Validate AI analysis depth — if too short, append a note for the editor
+        if (parsed.aiAnalysis && parsed.aiAnalysis.length < 400) {
+          parsed.aiAnalysis = parsed.aiAnalysis + "\n\n[注：AI 分析内容较简短，建议手动补充法律意义、核心争议及合规建议。]";
+        }
+        return parsed;
       }),
   }),
 
