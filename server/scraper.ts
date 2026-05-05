@@ -4,11 +4,19 @@
  *
  * 策略：按顺序尝试三个 API，任一成功即返回 Markdown 内容。
  * 全部失败时抛出错误，由调用方决定是否降级为纯 LLM 提取。
+ *
+ * 正文提取策略：
+ * 1. Firecrawl：使用 onlyMainContent=true（服务端已过滤）+ cleanMarkdown 二次清洗
+ * 2. Jina Reader：返回 Markdown，用 cleanMarkdown 清洗
+ * 3. ScrapingBee：返回原始 HTML，用 Readability 提取正文
+ * 4. 直接 fetch：无 API Key 时直接抓取 HTML，用 Readability 提取正文
  */
+
+import { extractMainContent, cleanMarkdown } from "./content-extractor";
 
 export interface ScrapeResult {
   markdown: string;
-  source: "firecrawl" | "jina" | "scrapingbee";
+  source: "firecrawl" | "jina" | "scrapingbee" | "direct";
   url: string;
 }
 
@@ -38,7 +46,8 @@ async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string>
   if (!data.success || !data.data?.markdown) {
     throw new Error(`Firecrawl returned no markdown: ${data.error ?? "unknown"}`);
   }
-  return data.data.markdown;
+  // Firecrawl 已启用 onlyMainContent，再用 cleanMarkdown 进一步过滤残余噪音
+  return cleanMarkdown(data.data.markdown);
 }
 
 // ── Jina Reader ──────────────────────────────────────────────────────────────
@@ -66,18 +75,17 @@ async function scrapeWithJina(url: string, apiKey?: string): Promise<string> {
   if (!text || text.length < 100) {
     throw new Error("Jina Reader returned empty content");
   }
-  return text;
+  // Jina 返回全页 Markdown，用 cleanMarkdown 过滤导航/广告/底部栏等噪音
+  return cleanMarkdown(text);
 }
 
 // ── ScrapingBee ──────────────────────────────────────────────────────────────
 async function scrapeWithScrapingBee(url: string, apiKey: string): Promise<string> {
+  // 获取原始 HTML，然后用 Readability 提取正文（而非直接提取 body 全文）
   const params = new URLSearchParams({
     api_key: apiKey,
     url,
     render_js: "false",
-    extract_rules: JSON.stringify({
-      text: { selector: "body", output: "markdown" },
-    }),
   });
 
   const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
@@ -89,16 +97,17 @@ async function scrapeWithScrapingBee(url: string, apiKey: string): Promise<strin
     throw new Error(`ScrapingBee error ${res.status}: ${body.slice(0, 200)}`);
   }
 
-  const data = await res.json() as { text?: string } | string;
-  // ScrapingBee returns JSON with extracted fields or raw text
-  if (typeof data === "object" && data.text) {
-    return data.text;
-  }
-  const raw = typeof data === "string" ? data : JSON.stringify(data);
-  if (!raw || raw.length < 100) {
+  const html = await res.text();
+  if (!html || html.length < 100) {
     throw new Error("ScrapingBee returned empty content");
   }
-  return raw;
+
+  // 用 Readability 提取正文，过滤导航/广告/侧边栏/底部栏
+  const extracted = extractMainContent(html, url);
+  if (extracted.text.length < 100) {
+    throw new Error("ScrapingBee: Readability extracted insufficient content");
+  }
+  return extracted.text;
 }
 
 // ── Main scrape function (with fallback) ─────────────────────────────────────
@@ -145,9 +154,32 @@ export async function scrapeUrl(url: string, opts: ScrapeOptions): Promise<Scrap
     }
   }
 
+   // 4. 直接 fetch（最后兑底，无需 API Key）
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; CyberGovDB/1.0; +https://cybergovdb.manus.space)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    if (!html || html.length < 200) throw new Error("Empty response");
+    // 用 Readability + 噪音清洗提取正文
+    const extracted = extractMainContent(html, url);
+    if (extracted.text.length < 100) throw new Error("Readability extracted insufficient content");
+    console.info(`[scraper] Direct fetch succeeded for ${url} (strategy: ${extracted.strategy})`);
+    return { markdown: extracted.text, source: "direct", url };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(`Direct fetch: ${msg}`);
+    console.warn("[scraper] Direct fetch failed:", msg);
+  }
+
   throw new Error(`所有抓取服务均失败：\n${errors.join("\n")}`);
 }
-
 // ── API Key validation ────────────────────────────────────────────────────────
 export interface TestApiKeyResult {
   ok: boolean;

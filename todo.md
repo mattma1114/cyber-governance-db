@@ -137,3 +137,10 @@
 - [x] 前端：底部浮动工具栏（全选/取消全选/导出 X 份 PDF/退出）
 - [x] 前端：导出完成后自动下载 ZIP 并显示 toast 提示
 - [x] 15 个测试全部通过
+
+## 原文全文提取优化（当前迭代）
+- [x] 安装 @mozilla/readability + jsdom，创建 server/content-extractor.ts（三级策略：Readability→语义标签提取→清洗 body）
+- [x] 升级 scraper.ts：Firecrawl+Jina 返回 Markdown 用 cleanMarkdown 二次清洗；ScrapingBee 改为获取 HTML 再用 Readability 提取正文
+- [x] 升级 scraper.ts：新增第 4 级兑底策略（直接 fetch + Readability），无需 API Key 也能提取正文
+- [x] 噪音过滤覆盖 nav/aside/footer/header/广告/侧边栏/弹窗/评论区/社交分享等 50+ 选择器
+- [x] 15 个测试全部通过，TypeScript 编译无新增错误
