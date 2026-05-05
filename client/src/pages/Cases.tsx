@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Drawer } from "vaul";
-import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Eye, Filter, RotateCcw, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download, Loader2, CheckSquare, Square, CheckCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -41,6 +42,30 @@ export default function Cases() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"date" | "views">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  // ── Batch select state ──
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectId = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filteredItems.map((c) => c.id)));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -86,6 +111,28 @@ export default function Cases() {
   }) ?? data?.items ?? [];
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 1;
+
+  const exportBatch = trpc.cases.exportBatchPdf.useMutation({
+    onSuccess: (data) => {
+      const bytes = Uint8Array.from(atob(data.base64), (ch) => ch.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      // toast is imported via sonner in CaseDetail; import it here too
+      import("sonner").then(({ toast }) => toast.success(`已生成 ${selectedIds.size} 份 PDF，正在下载 ZIP`));
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    },
+    onError: (err) => {
+      import("sonner").then(({ toast }) => toast.error(`批量导出失败：${err.message}`));
+    },
+  });
 
   const handleSearch = () => {
     setKeyword(inputVal);
@@ -447,8 +494,26 @@ export default function Cases() {
                 <p className="text-sm text-muted-foreground">
                   {isLoading ? "加载中…" : `共 ${data?.total ?? 0} 条结果`}
                 </p>
+                {selectMode && (
+                  <span className="text-xs text-primary font-medium">
+                    已选 {selectedIds.size} 条
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
+                {/* Batch select toggle */}
+                <Button
+                  variant={selectMode ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5 text-xs h-7 px-2.5"
+                  onClick={toggleSelectMode}
+                >
+                  {selectMode ? (
+                    <><X className="w-3 h-3" />取消选择</>
+                  ) : (
+                    <><CheckSquare className="w-3 h-3" />批量选择</>
+                  )}
+                </Button>
                 {/* Sort selector for grid view */}
                 {viewMode === "grid" && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -527,16 +592,37 @@ export default function Cases() {
                 {filteredItems.map((c) => {
                   const topic = topics?.find((t) => t.id === c.topicId);
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
+                  const isSelected = selectedIds.has(c.id);
                   return (
-                    <Link key={c.id} href={`/cases/${c.id}`}>
-                      <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
-                        <CardContent className="p-4 flex flex-col gap-2 h-full">
-                          <div className="flex items-start justify-between gap-2">
-                            <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
-                              {TYPE_LABELS[c.type]?.label}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>
-                          </div>
+                    <div
+                      key={c.id}
+                      className="relative"
+                      onClick={selectMode ? () => toggleSelectId(c.id) : undefined}
+                    >
+                      {selectMode && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelectId(c.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-background shadow"
+                          />
+                        </div>
+                      )}
+                      {selectMode ? (
+                        <Card className={cn(
+                          "h-full transition-all cursor-pointer group",
+                          isSelected
+                            ? "border-primary shadow-md ring-2 ring-primary/30"
+                            : "hover:shadow-md hover:border-primary/30"
+                        )}>
+                          <CardContent className="p-4 flex flex-col gap-2 h-full pl-8">
+                            <div className="flex items-start justify-between gap-2">
+                              <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
+                                {TYPE_LABELS[c.type]?.label}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>
+                            </div>
                           <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2">
                             {c.title}
                           </h3>
@@ -567,7 +653,49 @@ export default function Cases() {
                           </div>
                         </CardContent>
                       </Card>
-                    </Link>
+                      ) : (
+                        <Link href={`/cases/${c.id}`}>
+                          <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
+                            <CardContent className="p-4 flex flex-col gap-2 h-full">
+                              <div className="flex items-start justify-between gap-2">
+                                <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
+                                  {TYPE_LABELS[c.type]?.label}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>
+                              </div>
+                              <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                {c.title}
+                              </h3>
+                              {c.titleEn && (
+                                <p className="text-xs text-muted-foreground italic line-clamp-1">{c.titleEn}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground line-clamp-5 flex-1">
+                                {truncate(c.abstract || c.aiSummary || "", 280)}
+                              </p>
+                              <div className="flex items-center justify-between mt-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {juris && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <span>{juris.flag}</span>
+                                      {juris.label}
+                                    </span>
+                                  )}
+                                  {topic && (
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                      {topic.label}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  {c.views ?? 0}
+                                </span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -598,43 +726,63 @@ export default function Cases() {
                 {filteredItems.map((c) => {
                   const topic = topics?.find((t) => t.id === c.topicId);
                   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
-                  return (
-                    <Link key={c.id} href={`/cases/${c.id}`}>
-                      <div className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group">
-                        <div className="flex items-start gap-3">
-                          <div className="flex flex-col gap-1 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
-                                {TYPE_LABELS[c.type]?.label}
-                              </Badge>
-                              {juris && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <span>{juris.flag}</span>{juris.label}
-                                </span>
-                              )}
-                              {topic && (
-                                <Badge variant="outline" className="text-xs px-1.5 py-0">
-                                  {topic.label}
-                                </Badge>
-                              )}
-                              <span className="text-xs text-muted-foreground ml-auto">{c.date}</span>
-                            </div>
-                            <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-1">
-                              {c.title}
-                            </h3>
-                            {c.titleEn && (
-                              <p className="text-xs text-muted-foreground italic line-clamp-1">{c.titleEn}</p>
-                            )}
-                            <p className="text-xs text-muted-foreground line-clamp-3">
-                              {truncate(c.abstract || c.aiSummary || "", 300)}
-                            </p>
+                  const isSelected = selectedIds.has(c.id);
+                  const rowContent = (
+                    <div className={cn(
+                      "px-4 py-3 transition-colors cursor-pointer group",
+                      selectMode && isSelected ? "bg-primary/5" : "hover:bg-muted/50"
+                    )}>
+                      <div className="flex items-start gap-3">
+                        {selectMode && (
+                          <div className="pt-0.5 shrink-0">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectId(c.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
                           </div>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 mt-1">
-                            <Eye className="w-3 h-3" />
-                            {c.views ?? 0}
-                          </span>
+                        )}
+                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
+                              {TYPE_LABELS[c.type]?.label}
+                            </Badge>
+                            {juris && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <span>{juris.flag}</span>{juris.label}
+                              </span>
+                            )}
+                            {topic && (
+                              <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                {topic.label}
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground ml-auto">{c.date}</span>
+                          </div>
+                          <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                            {c.title}
+                          </h3>
+                          {c.titleEn && (
+                            <p className="text-xs text-muted-foreground italic line-clamp-1">{c.titleEn}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground line-clamp-3">
+                            {truncate(c.abstract || c.aiSummary || "", 300)}
+                          </p>
                         </div>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 mt-1">
+                          <Eye className="w-3 h-3" />
+                          {c.views ?? 0}
+                        </span>
                       </div>
+                    </div>
+                  );
+                  return selectMode ? (
+                    <div key={c.id} onClick={() => toggleSelectId(c.id)}>
+                      {rowContent}
+                    </div>
+                  ) : (
+                    <Link key={c.id} href={`/cases/${c.id}`}>
+                      {rowContent}
                     </Link>
                   );
                 })}
@@ -668,6 +816,55 @@ export default function Cases() {
           </div>
         </div>
       </div>
+
+      {/* ── Batch export floating toolbar ── */}
+      {selectMode && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-background border border-border rounded-2xl shadow-2xl px-5 py-3">
+          <span className="text-sm font-medium">
+            {selectedIds.size > 0 ? `已选 ${selectedIds.size} 条` : "点击内容进行勾选"}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs h-7"
+              onClick={selectAll}
+              disabled={selectedIds.size === filteredItems.length}
+            >
+              <CheckCheck className="w-3 h-3" />全选
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs h-7"
+              onClick={clearSelection}
+              disabled={selectedIds.size === 0}
+            >
+              <Square className="w-3 h-3" />取消全选
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5 text-xs h-7"
+              disabled={selectedIds.size === 0 || exportBatch.isPending}
+              onClick={() => exportBatch.mutate({ ids: Array.from(selectedIds) })}
+            >
+              {exportBatch.isPending ? (
+                <><Loader2 className="w-3 h-3 animate-spin" />生成中…</>
+              ) : (
+                <><Download className="w-3 h-3" />导出 {selectedIds.size > 0 ? selectedIds.size : ""} 份 PDF</>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs h-7 text-muted-foreground"
+              onClick={toggleSelectMode}
+            >
+              <X className="w-3 h-3" />退出
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

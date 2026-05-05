@@ -1,4 +1,5 @@
 import puppeteer from "puppeteer-core";
+import archiver from "archiver";
 
 interface PdfCaseData {
   title: string;
@@ -331,4 +332,42 @@ export async function generateCasePdf(data: PdfCaseData): Promise<Buffer> {
   } finally {
     await browser.close();
   }
+}
+
+// ── Batch export: generate multiple PDFs and pack into a ZIP buffer ──────────
+export interface BatchPdfItem extends PdfCaseData {
+  filename: string;
+}
+
+export async function generateBatchPdfZip(items: BatchPdfItem[]): Promise<Buffer> {
+  // Generate all PDFs in parallel (max 5 concurrent to avoid memory pressure)
+  const CONCURRENCY = 5;
+  const results: { filename: string; buf: Buffer }[] = [];
+
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    const chunk = items.slice(i, i + CONCURRENCY);
+    const buffers = await Promise.all(
+      chunk.map(async (item) => {
+        const buf = await generateCasePdf(item);
+        return { filename: item.filename, buf };
+      })
+    );
+    results.push(...buffers);
+  }
+
+  // Pack into ZIP
+  return new Promise<Buffer>((resolve, reject) => {
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    const chunks: Buffer[] = [];
+
+    archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+    archive.on("end", () => resolve(Buffer.concat(chunks)));
+    archive.on("error", reject);
+
+    for (const { filename, buf } of results) {
+      archive.append(buf, { name: filename });
+    }
+
+    archive.finalize();
+  });
 }

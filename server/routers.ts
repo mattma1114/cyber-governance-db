@@ -6,7 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
-import { generateCasePdf } from "./pdf";
+import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -367,6 +367,56 @@ export const appRouter = router({
         return {
           base64: pdfBuffer.toString("base64"),
           filename: `${c.title.slice(0, 50).replace(/[/\\?%*:|"<>]/g, "-")}.pdf`,
+        };
+      }),
+
+    exportBatchPdf: publicProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(20) }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // Fetch all requested cases
+        const rows = await db.select().from(cases).where(inArray(cases.id, input.ids));
+        if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "未找到内容" });
+
+        // Fetch topic and jurisdiction lookup tables
+        const [topicsData, jurisdictionsData] = await Promise.all([
+          db.select().from(topics),
+          db.select().from(jurisdictions),
+        ]);
+
+        const items = rows.map((c) => {
+          const topic = topicsData.find((t) => t.id === c.topicId);
+          const juris = jurisdictionsData.find((j) => j.id === c.jurisdictionId);
+          const tags: string[] = Array.isArray(c.tags)
+            ? (c.tags as string[])
+            : c.tags ? JSON.parse(c.tags as string) : [];
+          const safeTitle = c.title.slice(0, 50).replace(/[/\\?%*:|"<>]/g, "-");
+          return {
+            title: c.title,
+            titleEn: c.titleEn,
+            type: c.type,
+            date: c.date,
+            source: c.source,
+            sourceUrl: c.sourceUrl,
+            abstract: c.abstract,
+            aiSummary: c.aiSummary,
+            aiAnalysis: c.aiAnalysis,
+            fullText: c.fullText,
+            topicLabel: topic?.label ?? null,
+            jurisdictionLabel: juris?.label ?? null,
+            jurisdictionFlag: juris?.flag ?? null,
+            tags,
+            filename: `${safeTitle}.pdf`,
+          };
+        });
+
+        const zipBuffer = await generateBatchPdfZip(items);
+        const now = new Date().toISOString().slice(0, 10);
+        return {
+          base64: zipBuffer.toString("base64"),
+          filename: `互联网平台治理数据库_批量报告_${now}.zip`,
         };
       }),
   }),
