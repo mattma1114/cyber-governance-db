@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles, Paperclip, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles, Paperclip, Trash2, Eye } from "lucide-react";
+import { FilePreviewModal, canPreview, type PreviewFile } from "@/components/FilePreviewModal";
 
 const CASE_TYPES = [
   { value: "judicial", label: "司法内容" },
@@ -136,6 +137,7 @@ export default function CaseEditor() {
   const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -674,41 +676,82 @@ export default function CaseEditor() {
 
             {/* 附件列表 */}
             {attachments && attachments.length > 0 ? (
-              <div className="divide-y divide-border">
-                {attachments.map((att) => (
-                  <div key={att.id} className="flex items-center gap-3 py-2.5">
-                    <span className="text-lg shrink-0">{getFileIcon(att.mimeType)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{att.filename}</p>
-                      {att.fileSize && (
-                        <p className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <a
-                        href={att.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
-                      >
-                        <FileText className="w-3 h-3" />
-                        查看
-                      </a>
-                      <button
-                        className="inline-flex items-center gap-1 text-xs text-destructive/70 hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
-                        onClick={() => {
-                          if (confirm(`确定删除文件「${att.filename}」？`)) {
-                            deleteAttachment.mutate({ id: att.id });
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="divide-y divide-border">
+                  {attachments.map((att, idx) => {
+                    const previewFile: PreviewFile = {
+                      id: att.id,
+                      filename: att.filename,
+                      fileUrl: att.fileUrl,
+                      mimeType: att.mimeType ?? undefined,
+                      fileSize: att.fileSize ?? undefined,
+                    };
+                    const previewable = canPreview(previewFile);
+                    return (
+                      <div key={att.id} className="flex items-center gap-3 py-2.5">
+                        <span className="text-lg shrink-0">{getFileIcon(att.mimeType)}</span>
+                        <div className="flex-1 min-w-0">
+                          <button
+                            className="text-sm truncate text-left hover:text-primary transition-colors w-full"
+                            onClick={() => previewable ? setPreviewIndex(idx) : window.open(att.fileUrl, '_blank')}
+                          >
+                            {att.filename}
+                          </button>
+                          {att.fileSize && (
+                            <p className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {previewable ? (
+                            <button
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                              onClick={() => setPreviewIndex(idx)}
+                            >
+                              <Eye className="w-3 h-3" />
+                              预览
+                            </button>
+                          ) : (
+                            <a
+                              href={att.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                            >
+                              <FileText className="w-3 h-3" />
+                              下载
+                            </a>
+                          )}
+                          <button
+                            className="inline-flex items-center gap-1 text-xs text-destructive/70 hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
+                            onClick={() => {
+                              if (confirm(`确定删除文件「${att.filename}」？`)) {
+                                deleteAttachment.mutate({ id: att.id });
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* File preview modal */}
+                {previewIndex !== null && (
+                  <FilePreviewModal
+                    files={(attachments ?? []).map((att) => ({
+                      id: att.id,
+                      filename: att.filename,
+                      fileUrl: att.fileUrl,
+                      mimeType: att.mimeType ?? undefined,
+                      fileSize: att.fileSize ?? undefined,
+                    }))}
+                    initialIndex={previewIndex}
+                    onClose={() => setPreviewIndex(null)}
+                  />
+                )}
+              </>
             ) : (
               <p className="text-sm text-muted-foreground/60 py-3 border-b border-border">
                 暂无相关文件，点击「上传文件」添加

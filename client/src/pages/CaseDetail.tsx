@@ -11,6 +11,7 @@ import {
   Download, Loader2, MapPin, Layers, Paperclip
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
+import { FilePreviewModal, canPreview, type PreviewFile } from "@/components/FilePreviewModal";
 import { toast } from "sonner";
 
 // ── Citation formats ──────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
 // ── Attachments Section ──────────────────────────────────────────────────────
 function AttachmentsSection({ caseId }: { caseId: number }) {
   const { data: attachments, isLoading } = trpc.attachments.listByCaseId.useQuery({ caseId });
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const getFileIcon = (mimeType?: string | null) => {
     if (!mimeType) return "📄";
@@ -180,29 +182,73 @@ function AttachmentsSection({ caseId }: { caseId: number }) {
   if (isLoading) return null;
   if (!attachments || attachments.length === 0) return null;
 
+  const previewFiles: PreviewFile[] = attachments.map(a => ({
+    id: a.id,
+    filename: a.filename,
+    fileUrl: a.fileUrl,
+    mimeType: a.mimeType,
+    fileSize: a.fileSize,
+  }));
+
   return (
-    <CollapsibleSection icon={<Paperclip className="w-3.5 h-3.5" />} title="相关文件" defaultOpen={true}>
-      <div className="divide-y divide-border/50">
-        {attachments.map((att) => (
-          <a
-            key={att.id}
-            href={att.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2.5 py-2 hover:text-primary transition-colors group"
-          >
-            <span className="text-base shrink-0">{getFileIcon(att.mimeType)}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{att.filename}</p>
-              {att.fileSize && (
-                <p className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</p>
-              )}
-            </div>
-            <Download className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary shrink-0 transition-colors" />
-          </a>
-        ))}
-      </div>
-    </CollapsibleSection>
+    <>
+      <CollapsibleSection icon={<Paperclip className="w-3.5 h-3.5" />} title="相关文件" defaultOpen={true}>
+        <div className="divide-y divide-border/50">
+          {attachments.map((att, idx) => {
+            const pf: PreviewFile = {
+              id: att.id, filename: att.filename,
+              fileUrl: att.fileUrl, mimeType: att.mimeType, fileSize: att.fileSize,
+            };
+            const previewable = canPreview(pf);
+            return (
+              <div key={att.id} className="flex items-center gap-2.5 py-2 group">
+                <span className="text-base shrink-0">{getFileIcon(att.mimeType)}</span>
+                <div className="flex-1 min-w-0">
+                  {previewable ? (
+                    <button
+                      className="text-xs font-medium truncate text-left w-full hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => setPreviewIndex(idx)}
+                    >
+                      {att.filename}
+                    </button>
+                  ) : (
+                    <p className="text-xs font-medium truncate">{att.filename}</p>
+                  )}
+                  {att.fileSize && (
+                    <p className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {previewable && (
+                    <button
+                      className="text-xs text-muted-foreground/60 hover:text-primary px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors"
+                      onClick={() => setPreviewIndex(idx)}
+                    >
+                      预览
+                    </button>
+                  )}
+                  <a
+                    href={att.fileUrl}
+                    download={att.filename}
+                    className="inline-flex items-center justify-center"
+                    title="下载"
+                  >
+                    <Download className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
+      {previewIndex !== null && (
+        <FilePreviewModal
+          files={previewFiles}
+          initialIndex={previewIndex}
+          onClose={() => setPreviewIndex(null)}
+        />
+      )}
+    </>
   );
 }
 

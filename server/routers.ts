@@ -166,8 +166,29 @@ export const appRouter = router({
         const where = conditions.length > 0 ? and(...conditions) : undefined;
         const sortCol = sortBy === "views" ? cases.views : cases.createdAt;
         const orderFn = sortDir === "asc" ? asc : desc;
+        // Exclude full_text (large field) from list queries to reduce network transfer
+        const selectFields = {
+          id: cases.id,
+          type: cases.type,
+          title: cases.title,
+          titleEn: cases.titleEn,
+          topicId: cases.topicId,
+          jurisdictionId: cases.jurisdictionId,
+          date: cases.date,
+          source: cases.source,
+          sourceUrl: cases.sourceUrl,
+          abstract: cases.abstract,
+          aiSummary: cases.aiSummary,
+          aiAnalysis: cases.aiAnalysis,
+          tags: cases.tags,
+          language: cases.language,
+          status: cases.status,
+          views: cases.views,
+          createdAt: cases.createdAt,
+          updatedAt: cases.updatedAt,
+        };
         const [items, countResult] = await Promise.all([
-          db.select().from(cases).where(where).orderBy(orderFn(sortCol)).limit(pageSize).offset(offset),
+          db.select(selectFields).from(cases).where(where).orderBy(orderFn(sortCol)).limit(pageSize).offset(offset),
           db.select({ count: sql<number>`count(*)` }).from(cases).where(where),
         ]);
 
@@ -200,8 +221,31 @@ export const appRouter = router({
           ));
         }
         const where = conditions.length > 0 ? and(...conditions) : undefined;
+        // Exclude full_text from admin list queries, but include hasFullText flag
+        const selectFields = {
+          id: cases.id,
+          type: cases.type,
+          title: cases.title,
+          titleEn: cases.titleEn,
+          topicId: cases.topicId,
+          jurisdictionId: cases.jurisdictionId,
+          date: cases.date,
+          source: cases.source,
+          sourceUrl: cases.sourceUrl,
+          abstract: cases.abstract,
+          aiSummary: cases.aiSummary,
+          aiAnalysis: cases.aiAnalysis,
+          tags: cases.tags,
+          language: cases.language,
+          status: cases.status,
+          views: cases.views,
+          createdAt: cases.createdAt,
+          updatedAt: cases.updatedAt,
+          // Lightweight flag instead of returning the full text content
+          hasFullText: sql<number>`CASE WHEN ${cases.fullText} IS NOT NULL AND ${cases.fullText} != '' THEN 1 ELSE 0 END`,
+        };
         const [items, countResult] = await Promise.all([
-          db.select().from(cases).where(where).orderBy(desc(cases.createdAt)).limit(pageSize).offset(offset),
+          db.select(selectFields).from(cases).where(where).orderBy(desc(cases.createdAt)).limit(pageSize).offset(offset),
           db.select({ count: sql<number>`count(*)` }).from(cases).where(where),
         ]);
         return { items, total: Number(countResult[0]?.count ?? 0), page, pageSize };
@@ -219,9 +263,19 @@ export const appRouter = router({
     incrementView: publicProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return;
-        await db.update(cases).set({ views: sql`${cases.views} + 1` }).where(eq(cases.id, input.id));
+        // Fire-and-forget: don't block the response waiting for the DB update
+        getDb().then((db) => {
+          if (!db) return;
+          db.update(cases)
+            .set({ views: sql`${cases.views} + 1` })
+            .where(eq(cases.id, input.id))
+            .catch((err) => {
+              console.warn(`[incrementView] Failed to update views for case ${input.id}:`, err?.message ?? err);
+            });
+        }).catch((err) => {
+          console.warn(`[incrementView] Failed to get DB:`, err?.message ?? err);
+        });
+        return { success: true };
       }),
 
     stats: publicProcedure.query(async () => {
@@ -492,8 +546,12 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
         // 将 base64 解码为 Buffer
         const buffer = Buffer.from(input.dataBase64, "base64");
-        // 上传到 S3
-        const safeFilename = input.filename.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5]/g, "_");
+        // 上传到 S3: 文件名只保留 ASCII 安全字符，中文等 unicode 字符用 UUID 替代
+        // S3/CloudFront 签名 URL 要求路径只含 ASCII 字符
+        const ext = input.filename.split('.').pop()?.toLowerCase() ?? '';
+        const safeExt = /^[a-z0-9]+$/.test(ext) ? `.${ext}` : '';
+        const uuid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const safeFilename = `${uuid}${safeExt}`;
         const fileKey = `attachments/${input.caseId}/${safeFilename}`;
         const { key, url } = await storagePut(fileKey, buffer, input.mimeType);
         // 写入数据库

@@ -173,3 +173,19 @@
 - [x] 前端 CaseEditor.tsx：附件管理区域（上传按钮、已上传列表、删除按钮），支持 PDF/Word/Excel/图片等多种格式
 - [x] 前端 CaseDetail.tsx：左侧「相关文件」模块（学术引用上方），展示文件图标/名称/大小/下载链接
 - [x] 15 个测试全部通过
+
+## 相关文件在线预览功能（当前迭代）
+- [x] 创建 FilePreviewModal 组件：PDF 使用 iframe 内嵌预览（含工具栏），图片使用灯箱全屏展示（含缩放/翻页）
+- [x] CaseDetail.tsx 附件列表：点击文件名触发预览弹窗（PDF/图片），其他格式仍为下载链接
+- [x] CaseEditor.tsx 附件列表：同样支持点击预览（编辑页也可预览已上传文件）
+- [x] 15 个测试全部通过
+
+## 全站性能优化（当前迭代）
+- [x] 诊断加载慢根因：数据库连接延迟 1156ms（每次新建连接），cases 表仅有主键索引，cases.list 返回 full_text 大字段
+- [x] 数据库关键字段添加索引（idx_cases_status/topicId/jurisdictionId/type/status_date/status_views）
+- [x] 修复数据库连接池：server/db.ts 改用 mysql2 createPool（connectionLimit: 10），连接复用后查询从 1156ms 降至 <10ms
+- [x] 优化 cases.list 和 cases.listAdmin：使用 db.select({...}) 明确排除 fullText 大字段，减少网络传输
+- [x] cases.incrementView 异步化：改为 fire-and-forget（不阻塞响应，后台更新浏览量）
+- [x] 前端路由懒加载：App.tsx 使用 React.lazy + Suspense 对 8 个重型页面实现代码分割
+- [x] 修复附件上传中文文件名导致 S3 URL 签名失败：改用 UUID + 扩展名作为存储键
+- [x] 15 个测试全部通过

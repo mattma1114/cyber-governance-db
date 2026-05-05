@@ -844,7 +844,7 @@ export default function Admin() {
                 disabled={refetchingFullText || !casesData?.items?.length}
                 onClick={() => {
                   const ids = casesData?.items
-                    ?.filter((c: any) => c.sourceUrl && !c.fullText)
+                    ?.filter((c: any) => c.sourceUrl && !c.hasFullText)
                     ?.map((c: any) => c.id) ?? [];
                   if (ids.length === 0) {
                     toast.info("当前页所有内容均已有原文，或缺少原文链接");
