@@ -418,9 +418,51 @@ export const appRouter = router({
           base64: zipBuffer.toString("base64"),
           filename: `互联网平台治理数据库_批量报告_${now}.zip`,
         };
+       }),
+
+    // ── Refetch fullText for existing cases ───────────────────────────────
+    refetchFullText: adminProcedure
+      .input(z.object({
+        ids: z.array(z.number()).min(1).max(50),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // Load API settings for scraper (key-value store)
+        const settingsRows = await db.select().from(apiSettings);
+        const getKey = (key: string) => settingsRows.find((r) => r.key === key)?.value ?? undefined;
+        const scrapeOpts = {
+          firecrawlKey: getKey("FIRECRAWL_API_KEY"),
+          jinaKey: getKey("JINA_API_KEY"),
+          scrapingbeeKey: getKey("SCRAPINGBEE_API_KEY"),
+        };
+
+        // Fetch target cases
+        const rows = await db.select().from(cases).where(inArray(cases.id, input.ids));
+        const results: { id: number; success: boolean; error?: string }[] = [];
+
+        for (const c of rows) {
+          if (!c.sourceUrl) {
+            results.push({ id: c.id, success: false, error: "无原文链接" });
+            continue;
+          }
+          try {
+            const scraped = await scrapeUrl(c.sourceUrl, scrapeOpts);
+            const fullText = scraped.markdown.slice(0, 15000);
+            await db.update(cases).set({ fullText }).where(eq(cases.id, c.id));
+            results.push({ id: c.id, success: true });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            results.push({ id: c.id, success: false, error: msg });
+          }
+        }
+
+        const succeeded = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        return { results, succeeded, failed };
       }),
   }),
-
   // ── Platforms ────────────────────────────────────────────────────────
   platforms: router({
     list: publicProcedure

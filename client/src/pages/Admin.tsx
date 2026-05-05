@@ -19,7 +19,8 @@ import { toast } from "sonner";
 import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
-  Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical
+  Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
+  RefreshCw, FileText
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 

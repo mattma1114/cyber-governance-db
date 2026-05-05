@@ -159,3 +159,9 @@
 - [x] 顶部导航栏 sticky：含返回按钮、导出 PDF 、查看原文按钮
 - [x] 移动端响应式：小屏幕单栏堆叠，大屏幕左右两栏
 - [x] 15 个测试全部通过
+
+## 原文正文始终显示 + 批量重抓 fullText（当前迭代）
+- [ ] CaseDetail.tsx：原文正文区域始终显示，fullText 为空时显示占位提示（含编辑入口）
+- [ ] 后端：新增 cases.refetchFullText mutation，接收 id 数组，批量重新抓取 sourceUrl 并更新 fullText
+- [ ] 管理后台：内容管理页新增「批量重抓原文」按钮，触发所有有 sourceUrl 但无 fullText 的内容重新抓取
+- [ ] 测试：验证批量重抓和前端占位提示均正常

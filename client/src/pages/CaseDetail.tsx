@@ -460,12 +460,12 @@ export default function CaseDetail() {
             )}
 
             {/* Full Text – always visible, most important */}
-            {fullTextParagraphs.length > 0 && (
-              <div className="pt-4">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" />
-                  原文正文
-                </h2>
+            <div className="pt-4">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5" />
+                原文正文
+              </h2>
+              {fullTextParagraphs.length > 0 ? (
                 <div className="prose prose-sm max-w-none space-y-4">
                   {fullTextParagraphs.map((para, i) => (
                     <p
@@ -476,8 +476,29 @@ export default function CaseDetail() {
                     </p>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="py-10 border border-dashed border-border rounded-lg text-center">
+                  <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground mb-1">暂无原文正文内容</p>
+                  <p className="text-xs text-muted-foreground/70">
+                    {c.sourceUrl
+                      ? "可在管理后台使用「重新抓取原文」功能自动填充，或手动编辑内容"
+                      : "请在编辑页面填写原文链接后，使用 AI 提取功能自动抓取"}
+                  </p>
+                  {c.sourceUrl && (
+                    <a
+                      href={c.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-3 text-xs text-primary hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      前往原文链接查看
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Fallback if no content */}
             {!c.abstract && analysisParagraphs.length === 0 && fullTextParagraphs.length === 0 && (

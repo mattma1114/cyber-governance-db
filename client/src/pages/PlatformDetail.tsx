@@ -35,6 +35,20 @@ export default function PlatformDetail() {
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: topics } = trpc.topics.list.useQuery();
 
+  // Parse relatedCaseIds BEFORE any conditional returns (Rules of Hooks)
+  const relatedCaseIds: string[] = (() => {
+    if (!p?.relatedCaseIds) return [];
+    return typeof p.relatedCaseIds === "string"
+      ? JSON.parse(p.relatedCaseIds)
+      : (p.relatedCaseIds as string[]);
+  })();
+
+  // Must call useQuery unconditionally before any early returns
+  const { data: relatedCasesData } = trpc.cases.list.useQuery(
+    { page: 1, pageSize: 20 },
+    { enabled: relatedCaseIds.length > 0 }
+  );
+
   if (isLoading) {
     return (
       <div className="container py-8 max-w-4xl">
@@ -73,15 +87,6 @@ export default function PlatformDetail() {
     ? (typeof p.timeline === "string" ? JSON.parse(p.timeline) : p.timeline)
     : [];
 
-  const relatedCaseIds: string[] = p.relatedCaseIds
-    ? (typeof p.relatedCaseIds === "string" ? JSON.parse(p.relatedCaseIds) : p.relatedCaseIds)
-    : [];
-
-  // Fetch related cases
-  const { data: relatedCasesData } = trpc.cases.list.useQuery(
-    { page: 1, pageSize: 20 },
-    { enabled: relatedCaseIds.length > 0 }
-  );
   const relatedCases = relatedCasesData?.items.filter((c) =>
     relatedCaseIds.includes(String(c.id))
   ) ?? [];
