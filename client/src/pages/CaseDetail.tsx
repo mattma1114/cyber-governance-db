@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, Globe, Tag, BookOpen,
-  Sparkles, Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
+  Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
   Download, Loader2
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
@@ -91,23 +90,21 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
   ];
 
   return (
-    <Card className="border-border">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Quote className="w-4 h-4 text-primary" />
-            学术引用
-          </CardTitle>
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
-          >
-            {open ? <><ChevronUp className="w-3.5 h-3.5" />收起</> : <><ChevronDown className="w-3.5 h-3.5" />展开</>}
-          </button>
-        </div>
-      </CardHeader>
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+          <Quote className="w-4 h-4" />
+          学术引用
+        </h2>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          {open ? <><ChevronUp className="w-3.5 h-3.5" />收起</> : <><ChevronDown className="w-3.5 h-3.5" />展开</>}
+        </button>
+      </div>
       {open && (
-        <CardContent className="pt-0">
+        <div>
           {/* Style switcher */}
           <div className="flex gap-1.5 mb-3">
             {styles.map((s) => (
@@ -145,9 +142,9 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
           <p className="text-xs text-muted-foreground mt-2">
             点击文本框可全选，或使用右上角按钮一键复制
           </p>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -160,23 +157,24 @@ function RelatedCases({ caseId, topicId, jurisdictionId }: { caseId: number; top
   const related = sameTopicData?.items.filter((c) => c.id !== caseId).slice(0, 3) ?? [];
   if (related.length === 0) return null;
   return (
-    <div className="mt-8">
-      <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-        <BookOpen className="w-4 h-4 text-muted-foreground" />
+    <div className="mt-2">
+      <Separator className="mb-6" />
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
+        <BookOpen className="w-4 h-4" />
         同专题关联内容
-      </h3>
-      <div className="grid sm:grid-cols-3 gap-3">
+      </h2>
+      <div className="space-y-3">
         {related.map((rc) => (
           <Link key={rc.id} href={`/cases/${rc.id}`}>
-            <Card className="h-full hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
-              <CardContent className="p-4">
-                <Badge variant="secondary" className={cn("text-xs mb-2", TYPE_BADGE_CLASS[rc.type])}>
-                  {TYPE_LABELS[rc.type]?.label}
-                </Badge>
-                <p className="text-sm font-medium line-clamp-2 leading-snug">{rc.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{rc.date}</p>
-              </CardContent>
-            </Card>
+            <div className="flex items-start gap-3 py-3 border-b border-border/50 hover:text-primary transition-colors cursor-pointer group">
+              <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[rc.type])}>
+                {TYPE_LABELS[rc.type]?.label}
+              </Badge>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium line-clamp-2 leading-snug group-hover:text-primary transition-colors">{rc.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{rc.date}</p>
+              </div>
+            </div>
           </Link>
         ))}
       </div>
@@ -316,59 +314,52 @@ export default function CaseDetail() {
 
         <Separator className="mb-8" />
 
-        <div className="space-y-6">
+        <div className="space-y-0">
           {/* Abstract */}
           {c.abstract && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-primary" />
-                  内容摘要
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-relaxed text-foreground/90">{c.abstract}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* AI Summary */}
-          {c.aiSummary && (
-            <Card className="border-primary/20 bg-primary/3">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  AI 摘要解读
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-relaxed text-foreground/90">{c.aiSummary}</p>
-              </CardContent>
-            </Card>
+            <div className="py-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                内容摘要
+              </h2>
+              <p className="text-base leading-relaxed text-foreground/90">{c.abstract}</p>
+              <Separator className="mt-6" />
+            </div>
           )}
 
           {/* AI Analysis */}
           {c.aiAnalysis && (
-            <Card className="border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-900/10">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                  <Scale className="w-4 h-4" />
-                  深度法律分析
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-relaxed text-foreground/90">{c.aiAnalysis}</p>
-              </CardContent>
-            </Card>
+            <div className="py-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                <Scale className="w-4 h-4" />
+                深度法律分析
+              </h2>
+              <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">{c.aiAnalysis}</p>
+              <Separator className="mt-6" />
+            </div>
+          )}
+
+          {/* Full Text */}
+          {c.fullText && (
+            <div className="py-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                原文正文
+              </h2>
+              <div className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
+                {c.fullText}
+              </div>
+              <Separator className="mt-6" />
+            </div>
           )}
 
           {/* Tags */}
           {tags.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+            <div className="py-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                <Tag className="w-4 h-4" />
                 相关标签
-              </h3>
+              </h2>
               <div className="flex flex-wrap gap-2">
                 {tags.map((tag) => (
                   <Link key={tag} href={`/cases?q=${encodeURIComponent(tag)}`}>
@@ -378,15 +369,18 @@ export default function CaseDetail() {
                   </Link>
                 ))}
               </div>
+              <Separator className="mt-6" />
             </div>
           )}
 
           {/* Citation */}
-          <CitationBox
-            c={c}
-            jurisLabel={juris?.label}
-            typeLabel={TYPE_LABELS[c.type]?.label}
-          />
+          <div className="py-6">
+            <CitationBox
+              c={c}
+              jurisLabel={juris?.label}
+              typeLabel={TYPE_LABELS[c.type]?.label}
+            />
+          </div>
         </div>
 
         {/* Related Cases */}
