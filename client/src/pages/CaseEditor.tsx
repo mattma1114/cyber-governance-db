@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles, Paperclip, Trash2 } from "lucide-react";
 
 const CASE_TYPES = [
   { value: "judicial", label: "司法内容" },
@@ -134,6 +134,8 @@ export default function CaseEditor() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiStep, setAiStep] = useState(0);
   const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -284,6 +286,72 @@ export default function CaseEditor() {
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  // Attachments
+  const { data: attachments, refetch: refetchAttachments } = trpc.attachments.listByCaseId.useQuery(
+    { caseId: caseId! },
+    { enabled: !!caseId }
+  );
+  const uploadAttachment = trpc.attachments.upload.useMutation({
+    onSuccess: () => {
+      toast.success("附件上传成功");
+      refetchAttachments();
+      setIsUploadingFile(false);
+    },
+    onError: (e) => {
+      toast.error(`上传失败：${e.message}`);
+      setIsUploadingFile(false);
+    },
+  });
+  const deleteAttachment = trpc.attachments.delete.useMutation({
+    onSuccess: () => {
+      toast.success("附件已删除");
+      refetchAttachments();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !caseId) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("文件大小不能超过 20MB");
+      return;
+    }
+    setIsUploadingFile(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      uploadAttachment.mutate({
+        caseId,
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        fileSize: file.size,
+        dataBase64: base64,
+      });
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-uploaded
+    e.target.value = "";
+  };
+
+  const getFileIcon = (mimeType?: string | null) => {
+    if (!mimeType) return "📄";
+    if (mimeType.includes("pdf")) return "📄";
+    if (mimeType.includes("word") || mimeType.includes("document")) return "📝";
+    if (mimeType.includes("image")) return "🖼️";
+    if (mimeType.includes("excel") || mimeType.includes("spreadsheet")) return "📊";
+    if (mimeType.includes("powerpoint") || mimeType.includes("presentation")) return "📊";
+    if (mimeType.includes("text")) return "📃";
+    return "📄";
+  };
+
+  const formatFileSize = (bytes?: number | null) => {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
 
   if (isEdit && caseLoading) {
     return (
@@ -571,6 +639,83 @@ export default function CaseEditor() {
             onChange={(e) => handleChange("fullText", e.target.value)}
           />
         </section>
+
+        {/* Section: 相关文件 — 仅编辑模式显示 */}
+        {isEdit && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Paperclip className="w-3.5 h-3.5" />
+                相关文件
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">支持 PDF、Word、图片等，单文件最大 20MB</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 h-7 text-xs"
+                  disabled={isUploadingFile}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploadingFile
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <Plus className="w-3 h-3" />}
+                  上传文件
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip"
+                  onChange={handleFileSelect}
+                />
+              </div>
+            </div>
+
+            {/* 附件列表 */}
+            {attachments && attachments.length > 0 ? (
+              <div className="divide-y divide-border">
+                {attachments.map((att) => (
+                  <div key={att.id} className="flex items-center gap-3 py-2.5">
+                    <span className="text-lg shrink-0">{getFileIcon(att.mimeType)}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{att.filename}</p>
+                      {att.fileSize && (
+                        <p className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a
+                        href={att.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                      >
+                        <FileText className="w-3 h-3" />
+                        查看
+                      </a>
+                      <button
+                        className="inline-flex items-center gap-1 text-xs text-destructive/70 hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
+                        onClick={() => {
+                          if (confirm(`确定删除文件「${att.filename}」？`)) {
+                            deleteAttachment.mutate({ id: att.id });
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground/60 py-3 border-b border-border">
+                暂无相关文件，点击「上传文件」添加
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Bottom save */}
         <div className="flex justify-end pt-4 border-t border-border">

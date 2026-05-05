@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, Building2, Tag, BookOpen,
   Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
-  Download, Loader2, MapPin, Layers
+  Download, Loader2, MapPin, Layers, Paperclip
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -151,6 +151,57 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
         </button>
       </div>
       <p className="text-xs text-muted-foreground mt-1.5">点击文本框可全选，或使用右上角按钮一键复制</p>
+    </CollapsibleSection>
+  );
+}
+
+// ── Attachments Section ──────────────────────────────────────────────────────
+function AttachmentsSection({ caseId }: { caseId: number }) {
+  const { data: attachments, isLoading } = trpc.attachments.listByCaseId.useQuery({ caseId });
+
+  const getFileIcon = (mimeType?: string | null) => {
+    if (!mimeType) return "📄";
+    if (mimeType.includes("pdf")) return "📄";
+    if (mimeType.includes("word") || mimeType.includes("document")) return "📝";
+    if (mimeType.includes("image")) return "🖼️";
+    if (mimeType.includes("excel") || mimeType.includes("spreadsheet")) return "📊";
+    if (mimeType.includes("powerpoint") || mimeType.includes("presentation")) return "📊";
+    if (mimeType.includes("text")) return "📃";
+    return "📄";
+  };
+
+  const formatFileSize = (bytes?: number | null) => {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  if (isLoading) return null;
+  if (!attachments || attachments.length === 0) return null;
+
+  return (
+    <CollapsibleSection icon={<Paperclip className="w-3.5 h-3.5" />} title="相关文件" defaultOpen={true}>
+      <div className="divide-y divide-border/50">
+        {attachments.map((att) => (
+          <a
+            key={att.id}
+            href={att.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 py-2 hover:text-primary transition-colors group"
+          >
+            <span className="text-base shrink-0">{getFileIcon(att.mimeType)}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{att.filename}</p>
+              {att.fileSize && (
+                <p className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</p>
+              )}
+            </div>
+            <Download className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary shrink-0 transition-colors" />
+          </a>
+        ))}
+      </div>
     </CollapsibleSection>
   );
 }
@@ -417,6 +468,9 @@ export default function CaseDetail() {
               </>
             )}
 
+            {/* Related Files */}
+            <AttachmentsSection caseId={c.id} />
+            <Separator />
             {/* Citation */}
             <CitationBox
               c={c}

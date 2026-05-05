@@ -166,3 +166,10 @@
 - [x] 管理后台：内容管理页工具栏新增「重抓原文」按钮，自动过滤当前页有 sourceUrl 但无 fullText 的内容并批量抓取
 - [x] 修复 PlatformDetail.tsx Rules of Hooks 错误（trpc.cases.list.useQuery 移至所有条件返回之前）
 - [x] 15 个测试全部通过
+
+## 内容详情页「相关文件」模块（当前迭代）
+- [x] 数据库新增 case_attachments 表（id/caseId/filename/fileKey/fileUrl/fileSize/mimeType/createdAt），直接执行 SQL 迁移
+- [x] 后端：新增 attachments.upload（base64 编码上传到 S3，单文件限制 20MB）、attachments.listByCaseId、attachments.delete 路由
+- [x] 前端 CaseEditor.tsx：附件管理区域（上传按钮、已上传列表、删除按钮），支持 PDF/Word/Excel/图片等多种格式
+- [x] 前端 CaseDetail.tsx：左侧「相关文件」模块（学术引用上方），展示文件图标/名称/大小/下载链接
+- [x] 15 个测试全部通过

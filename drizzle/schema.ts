@@ -130,3 +130,18 @@ export const apiSettings = mysqlTable("api_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type ApiSetting = typeof apiSettings.$inferSelect;
+
+// 内容附件
+export const caseAttachments = mysqlTable("case_attachments", {
+  id: int("id").autoincrement().primaryKey(),
+  caseId: int("case_id").notNull(),
+  filename: varchar("filename", { length: 512 }).notNull(),
+  fileKey: varchar("file_key", { length: 512 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: int("file_size"),
+  mimeType: varchar("mime_type", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CaseAttachment = typeof caseAttachments.$inferSelect;
+export type InsertCaseAttachment = typeof caseAttachments.$inferInsert;

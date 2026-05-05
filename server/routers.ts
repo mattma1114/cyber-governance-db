@@ -4,7 +4,8 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { cases, platforms, topics, jurisdictions, apiSettings } from "../drizzle/schema";
+import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments } from "../drizzle/schema";
+import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
@@ -463,6 +464,63 @@ export const appRouter = router({
         return { results, succeeded, failed };
       }),
   }),
+
+  // ── Attachments ──────────────────────────────────────────────────────
+  attachments: router({
+    // 获取某内容的所有附件
+    listByCaseId: publicProcedure
+      .input(z.object({ caseId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(caseAttachments)
+          .where(eq(caseAttachments.caseId, input.caseId))
+          .orderBy(asc(caseAttachments.createdAt));
+      }),
+
+    // 上传附件（base64 编码，管理员专用）
+    upload: adminProcedure
+      .input(z.object({
+        caseId: z.number(),
+        filename: z.string().max(512),
+        mimeType: z.string().max(128),
+        fileSize: z.number().optional(),
+        dataBase64: z.string(), // base64 encoded file content
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
+        // 将 base64 解码为 Buffer
+        const buffer = Buffer.from(input.dataBase64, "base64");
+        // 上传到 S3
+        const safeFilename = input.filename.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5]/g, "_");
+        const fileKey = `attachments/${input.caseId}/${safeFilename}`;
+        const { key, url } = await storagePut(fileKey, buffer, input.mimeType);
+        // 写入数据库
+        const result = await db.insert(caseAttachments).values({
+          caseId: input.caseId,
+          filename: input.filename,
+          fileKey: key,
+          fileUrl: url,
+          fileSize: input.fileSize,
+          mimeType: input.mimeType,
+        });
+        const header = Array.isArray(result) ? result[0] : result;
+        const insertId = (header as any).insertId;
+        return { id: Number(insertId), filename: input.filename, fileUrl: url, fileKey: key };
+      }),
+
+    // 删除附件（管理员专用）
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
+        await db.delete(caseAttachments).where(eq(caseAttachments.id, input.id));
+        return { success: true };
+      }),
+  }),
+
   // ── Platforms ────────────────────────────────────────────────────────
   platforms: router({
     list: publicProcedure
