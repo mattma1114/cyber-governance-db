@@ -123,3 +123,9 @@
 - [x] 前端 CaseEditor：onSuccess 回调补全所有字段预填（topicId/jurisdictionId/source/language/tags/fullText/sourceUrl）
 - [x] 前端 CaseEditor：新增三步骤 AI 加载动画覆盖层（抓取→分析→填充），含进度条和分步状态
 - [x] 15 个测试全部通过
+
+## 内容详情页导出 PDF（当前迭代）
+- [x] 后端：新增 cases.exportPdf 路由，服务端生成包含标题/摘要/AI分析/原文全文的 PDF（base64 返回）
+- [x] 前端：CaseDetail.tsx 添加「导出 PDF」按钮，调用路由后触发浏览器下载
+- [x] PDF 样式：中文字体支持（Noto Serif CJK SC）、封面展示元数据、章节标题、页脚（来源机构+导出日期）
+- [x] 测试：PDF 生成成功，显示「PDF 已生成，正在下载」 toast，15 个测试全部通过

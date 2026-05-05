@@ -6,6 +6,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
+import { generateCasePdf } from "./pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -318,6 +319,55 @@ export const appRouter = router({
           .set({ status: input.published ? "published" : "draft" })
           .where(eq(cases.id, input.id));
         return { success: true };
+      }),
+
+    exportPdf: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // Fetch case
+        const result = await db.select().from(cases).where(eq(cases.id, input.id)).limit(1);
+        const c = result[0];
+        if (!c) throw new TRPCError({ code: "NOT_FOUND", message: "内容不存在" });
+
+        // Fetch topic and jurisdiction labels
+        const [topicsData, jurisdictionsData] = await Promise.all([
+          db.select().from(topics),
+          db.select().from(jurisdictions),
+        ]);
+        const topic = topicsData.find((t) => t.id === c.topicId);
+        const juris = jurisdictionsData.find((j) => j.id === c.jurisdictionId);
+
+        const tags: string[] = Array.isArray(c.tags)
+          ? (c.tags as string[])
+          : c.tags
+          ? JSON.parse(c.tags as string)
+          : [];
+
+        const pdfBuffer = await generateCasePdf({
+          title: c.title,
+          titleEn: c.titleEn,
+          type: c.type,
+          date: c.date,
+          source: c.source,
+          sourceUrl: c.sourceUrl,
+          abstract: c.abstract,
+          aiSummary: c.aiSummary,
+          aiAnalysis: c.aiAnalysis,
+          fullText: c.fullText,
+          topicLabel: topic?.label ?? null,
+          jurisdictionLabel: juris?.label ?? null,
+          jurisdictionFlag: juris?.flag ?? null,
+          tags,
+        });
+
+        // Return as base64 so tRPC can serialize it
+        return {
+          base64: pdfBuffer.toString("base64"),
+          filename: `${c.title.slice(0, 50).replace(/[/\\?%*:|"<>]/g, "-")}.pdf`,
+        };
       }),
   }),
 

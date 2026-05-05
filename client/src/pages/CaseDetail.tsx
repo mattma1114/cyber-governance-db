@@ -8,7 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, Globe, Tag, BookOpen,
-  Sparkles, Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp
+  Sparkles, Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
+  Download, Loader2
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -191,6 +192,24 @@ export default function CaseDetail() {
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const incrementView = trpc.cases.incrementView.useMutation();
+  const exportPdf = trpc.cases.exportPdf.useMutation({
+    onSuccess: (data) => {
+      const bytes = Uint8Array.from(atob(data.base64), (ch) => ch.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("PDF 已生成，正在下载");
+    },
+    onError: (err) => {
+      toast.error(`PDF 生成失败：${err.message}`);
+    },
+  });
 
   useEffect(() => {
     if (caseId) incrementView.mutate({ id: caseId });
@@ -381,14 +400,28 @@ export default function CaseDetail() {
               返回列表
             </Link>
           </Button>
-          {c.sourceUrl && (
-            <Button asChild variant="default" className="gap-2">
-              <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4" />
-                查看原始来源
-              </a>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => exportPdf.mutate({ id: c.id })}
+              disabled={exportPdf.isPending}
+            >
+              {exportPdf.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />生成 PDF 中…</>
+              ) : (
+                <><Download className="w-4 h-4" />导出 PDF</>
+              )}
             </Button>
-          )}
+            {c.sourceUrl && (
+              <Button asChild variant="default" className="gap-2">
+                <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" />
+                  查看原始来源
+                </a>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
