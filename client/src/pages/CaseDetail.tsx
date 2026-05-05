@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, ExternalLink, Eye, Calendar, Globe, Tag, BookOpen,
+  ArrowLeft, ExternalLink, Eye, Calendar, Building2, Tag, BookOpen,
   Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
-  Download, Loader2
+  Download, Loader2, MapPin, Layers
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -35,7 +35,6 @@ function buildCitation(
   const org = "浙江传媒学院";
 
   if (style === "gb") {
-    // GB/T 7714-2015
     let cite = `${source ?? org}. ${title}[EB/OL]. `;
     if (jurisLabel) cite += `${jurisLabel}, `;
     cite += `${year}`;
@@ -45,7 +44,6 @@ function buildCitation(
   }
 
   if (style === "apa") {
-    // APA 7th
     let cite = `${source ?? org}. (${year}). `;
     cite += titleEn ? `${titleEn}` : title;
     if (jurisLabel) cite += ` [${jurisLabel} ${typeLabel ?? "case"}]`;
@@ -64,7 +62,39 @@ function buildCitation(
   return cite;
 }
 
-// ── Citation Box Component ────────────────────────────────────────────────────
+// ── Collapsible Section ───────────────────────────────────────────────────────
+function CollapsibleSection({
+  icon,
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between py-3 group"
+      >
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2 group-hover:text-foreground transition-colors">
+          {icon}
+          {title}
+        </h2>
+        {open
+          ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+          : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+      {open && <div className="pb-4">{children}</div>}
+    </div>
+  );
+}
+
+// ── Citation Box ──────────────────────────────────────────────────────────────
 function CitationBox({ c, jurisLabel, typeLabel }: {
   c: { title: string; titleEn?: string | null; source?: string | null; sourceUrl?: string | null; date?: string | null };
   jurisLabel?: string;
@@ -72,7 +102,6 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
 }) {
   const [style, setStyle] = useState<CitationStyle>("gb");
   const [copied, setCopied] = useState(false);
-  const [open, setOpen] = useState(false);
 
   const citation = buildCitation(style, { ...c, jurisLabel, typeLabel });
 
@@ -90,98 +119,73 @@ function CitationBox({ c, jurisLabel, typeLabel }: {
   ];
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-          <Quote className="w-4 h-4" />
-          学术引用
-        </h2>
+    <CollapsibleSection icon={<Quote className="w-3.5 h-3.5" />} title="学术引用" defaultOpen={false}>
+      <div className="flex gap-1.5 mb-3 flex-wrap">
+        {styles.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setStyle(s.key)}
+            className={cn(
+              "px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors border",
+              style === s.key
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border text-muted-foreground hover:bg-muted"
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <div className="relative">
+        <div className="bg-muted/60 rounded-md px-3 py-2.5 pr-10 text-xs leading-relaxed font-mono text-foreground/80 select-all break-all">
+          {citation}
+        </div>
         <button
-          onClick={() => setOpen((v) => !v)}
-          className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+          onClick={handleCopy}
+          className="absolute top-2 right-2 p-1.5 rounded hover:bg-background border border-border transition-colors"
+          title="复制引用"
         >
-          {open ? <><ChevronUp className="w-3.5 h-3.5" />收起</> : <><ChevronDown className="w-3.5 h-3.5" />展开</>}
+          {copied
+            ? <Check className="w-3 h-3 text-green-500" />
+            : <Copy className="w-3 h-3 text-muted-foreground" />}
         </button>
       </div>
-      {open && (
-        <div>
-          {/* Style switcher */}
-          <div className="flex gap-1.5 mb-3">
-            {styles.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setStyle(s.key)}
-                className={cn(
-                  "px-3 py-1 rounded-full text-xs font-medium transition-colors border",
-                  style === s.key
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Citation text */}
-          <div className="relative">
-            <div className="bg-muted/60 rounded-lg px-4 py-3 pr-12 text-sm leading-relaxed font-mono text-foreground/90 select-all">
-              {citation}
-            </div>
-            <button
-              onClick={handleCopy}
-              className="absolute top-2.5 right-2.5 p-1.5 rounded-md hover:bg-background border border-border transition-colors"
-              title="复制引用"
-            >
-              {copied
-                ? <Check className="w-3.5 h-3.5 text-green-500" />
-                : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
-            </button>
-          </div>
-
-          <p className="text-xs text-muted-foreground mt-2">
-            点击文本框可全选，或使用右上角按钮一键复制
-          </p>
-        </div>
-      )}
-    </div>
+      <p className="text-xs text-muted-foreground mt-1.5">点击文本框可全选，或使用右上角按钮一键复制</p>
+    </CollapsibleSection>
   );
 }
 
-// ── Related Cases Component ────────────────────────────────────────────────────
-function RelatedCases({ caseId, topicId, jurisdictionId }: { caseId: number; topicId: string; jurisdictionId: string }) {
+// ── Related Cases ─────────────────────────────────────────────────────────────
+function RelatedCases({ caseId, topicId }: { caseId: number; topicId: string }) {
   const { data: sameTopicData } = trpc.cases.list.useQuery(
     { page: 1, pageSize: 4, topicId: topicId || undefined },
     { enabled: !!topicId }
   );
-  const related = sameTopicData?.items.filter((c) => c.id !== caseId).slice(0, 3) ?? [];
+  const related = sameTopicData?.items.filter((c) => c.id !== caseId).slice(0, 4) ?? [];
   if (related.length === 0) return null;
+
   return (
-    <div className="mt-2">
-      <Separator className="mb-6" />
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
-        <BookOpen className="w-4 h-4" />
-        同专题关联内容
-      </h2>
-      <div className="space-y-3">
+    <CollapsibleSection icon={<BookOpen className="w-3.5 h-3.5" />} title="同专题关联" defaultOpen={true}>
+      <div className="space-y-0">
         {related.map((rc) => (
           <Link key={rc.id} href={`/cases/${rc.id}`}>
-            <div className="flex items-start gap-3 py-3 border-b border-border/50 hover:text-primary transition-colors cursor-pointer group">
-              <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[rc.type])}>
+            <div className="flex items-start gap-2 py-2.5 border-b border-border/40 hover:text-primary transition-colors cursor-pointer group last:border-0">
+              <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5 px-1.5 py-0", TYPE_BADGE_CLASS[rc.type])}>
                 {TYPE_LABELS[rc.type]?.label}
               </Badge>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium line-clamp-2 leading-snug group-hover:text-primary transition-colors">{rc.title}</p>
+                <p className="text-xs font-medium line-clamp-2 leading-snug group-hover:text-primary transition-colors">{rc.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{rc.date}</p>
               </div>
             </div>
           </Link>
         ))}
       </div>
-    </div>
+    </CollapsibleSection>
   );
 }
 
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const caseId = parseInt(id ?? "0");
@@ -215,11 +219,17 @@ export default function CaseDetail() {
 
   if (isLoading) {
     return (
-      <div className="container py-8 max-w-4xl">
+      <div className="container py-8 max-w-6xl">
         <Skeleton className="h-8 w-32 mb-6" />
-        <Skeleton className="h-12 w-full mb-4" />
-        <Skeleton className="h-6 w-2/3 mb-8" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-10 w-3/4 mb-3" />
+        <Skeleton className="h-5 w-1/2 mb-8" />
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
+          <div className="space-y-4">
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+          <Skeleton className="h-96 w-full" />
+        </div>
       </div>
     );
   }
@@ -239,183 +249,244 @@ export default function CaseDetail() {
   const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
   const tags: string[] = Array.isArray(c.tags) ? c.tags : (c.tags ? JSON.parse(c.tags as string) : []);
 
-  const typeIcon = c.type === "judicial" ? <Gavel className="w-4 h-4" /> :
-    c.type === "regulatory" ? <Scale className="w-4 h-4" /> :
-    <FileText className="w-4 h-4" />;
+  const typeIcon = c.type === "judicial" ? <Gavel className="w-3.5 h-3.5" /> :
+    c.type === "regulatory" ? <Scale className="w-3.5 h-3.5" /> :
+    <FileText className="w-3.5 h-3.5" />;
+
+  // Split fullText into paragraphs for better readability
+  const fullTextParagraphs = c.fullText
+    ? c.fullText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    : [];
+
+  // Split aiAnalysis into paragraphs
+  const analysisParagraphs = c.aiAnalysis
+    ? c.aiAnalysis.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    : [];
 
   return (
-    <div className="min-h-screen">
-      {/* Breadcrumb */}
-      <div className="border-b border-border bg-white">
-        <div className="container py-3">
+    <div className="min-h-screen bg-background">
+      {/* Top bar */}
+      <div className="border-b border-border bg-white sticky top-0 z-10">
+        <div className="container max-w-6xl py-3 flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/cases">
               <ArrowLeft className="w-3.5 h-3.5" />
               返回内容列表
             </Link>
           </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => exportPdf.mutate({ id: c.id })}
+              disabled={exportPdf.isPending}
+            >
+              {exportPdf.isPending
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />生成中…</>
+                : <><Download className="w-3.5 h-3.5" />导出 PDF</>}
+            </Button>
+            {c.sourceUrl && (
+              <Button asChild size="sm" className="gap-1.5">
+                <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  查看原文
+                </a>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="container py-8 max-w-4xl">
-        {/* Header */}
+      <div className="container max-w-6xl py-8">
+        {/* Page title area */}
         <div className="mb-8">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <Badge variant="secondary" className={cn("gap-1.5", TYPE_BADGE_CLASS[c.type])}>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <Badge variant="secondary" className={cn("gap-1.5 text-xs", TYPE_BADGE_CLASS[c.type])}>
               {typeIcon}
               {TYPE_LABELS[c.type]?.label}
             </Badge>
             {juris && (
-              <Badge variant="outline" className="gap-1.5">
+              <Badge variant="outline" className="gap-1.5 text-xs">
                 <span>{juris.flag}</span>
                 {juris.label}
               </Badge>
             )}
             {topic && (
-              <Badge variant="outline" style={{ borderColor: topic.color ?? undefined, color: topic.color ?? undefined }}>
+              <Badge variant="outline" className="text-xs" style={{ borderColor: topic.color ?? undefined, color: topic.color ?? undefined }}>
                 {topic.label}
               </Badge>
             )}
           </div>
-
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight mb-2">{c.title}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight mb-1.5">{c.title}</h1>
           {c.titleEn && (
-            <p className="text-base text-muted-foreground italic mb-4">{c.titleEn}</p>
+            <p className="text-sm text-muted-foreground italic">{c.titleEn}</p>
           )}
-
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5" />
-              {formatDate(c.date)}
-            </span>
-            {c.source && (
-              <span className="flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5" />
-                {c.source}
-              </span>
-            )}
-            <span className="flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5" />
-              {(c.views ?? 0) + 1} 次浏览
-            </span>
-            {c.sourceUrl && (
-              <a
-                href={c.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-primary hover:underline"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                查看原文
-              </a>
-            )}
-          </div>
         </div>
 
-        <Separator className="mb-8" />
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 items-start">
 
-        <div className="space-y-0">
-          {/* Abstract */}
-          {c.abstract && (
-            <div className="py-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                <BookOpen className="w-4 h-4" />
-                内容摘要
-              </h2>
-              <p className="text-base leading-relaxed text-foreground/90">{c.abstract}</p>
-              <Separator className="mt-6" />
+          {/* ── LEFT SIDEBAR ─────────────────────────────────────────────── */}
+          {/* On mobile: order-2 (shown below main); on desktop: order-1 (left column) */}
+          <aside className="space-y-0 lg:sticky lg:top-[57px] order-2 lg:order-1">
+
+            {/* Meta info */}
+            <div className="pb-4">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">基本信息</h2>
+              <dl className="space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <dt className="text-xs text-muted-foreground">发布日期</dt>
+                    <dd className="text-sm font-medium">{formatDate(c.date)}</dd>
+                  </div>
+                </div>
+                {c.source && (
+                  <div className="flex items-start gap-2">
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <dt className="text-xs text-muted-foreground">发布机构</dt>
+                      <dd className="text-sm font-medium">{c.source}</dd>
+                    </div>
+                  </div>
+                )}
+                {juris && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <dt className="text-xs text-muted-foreground">司法辖区</dt>
+                      <dd className="text-sm font-medium">{juris.flag} {juris.label}</dd>
+                    </div>
+                  </div>
+                )}
+                {topic && (
+                  <div className="flex items-start gap-2">
+                    <Layers className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <dt className="text-xs text-muted-foreground">研究专题</dt>
+                      <dd className="text-sm font-medium" style={{ color: topic.color ?? undefined }}>{topic.label}</dd>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-start gap-2">
+                  <Eye className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <dt className="text-xs text-muted-foreground">浏览次数</dt>
+                    <dd className="text-sm font-medium">{(c.views ?? 0) + 1}</dd>
+                  </div>
+                </div>
+                {c.sourceUrl && (
+                  <div className="flex items-start gap-2">
+                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <dt className="text-xs text-muted-foreground">原文链接</dt>
+                      <dd>
+                        <a
+                          href={c.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline break-all line-clamp-2"
+                        >
+                          {c.sourceUrl}
+                        </a>
+                      </dd>
+                    </div>
+                  </div>
+                )}
+              </dl>
             </div>
-          )}
 
-          {/* AI Analysis */}
-          {c.aiAnalysis && (
-            <div className="py-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                <Scale className="w-4 h-4" />
-                深度法律分析
-              </h2>
-              <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">{c.aiAnalysis}</p>
-              <Separator className="mt-6" />
-            </div>
-          )}
+            <Separator />
 
-          {/* Full Text */}
-          {c.fullText && (
-            <div className="py-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                原文正文
-              </h2>
-              <div className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
-                {c.fullText}
-              </div>
-              <Separator className="mt-6" />
-            </div>
-          )}
+            {/* Tags */}
+            {tags.length > 0 && (
+              <>
+                <CollapsibleSection icon={<Tag className="w-3.5 h-3.5" />} title="相关标签" defaultOpen={true}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map((tag) => (
+                      <Link key={tag} href={`/cases?q=${encodeURIComponent(tag)}`}>
+                        <Badge variant="secondary" className="cursor-pointer text-xs hover:bg-primary/10 hover:text-primary transition-colors">
+                          {tag}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                </CollapsibleSection>
+                <Separator />
+              </>
+            )}
 
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="py-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                <Tag className="w-4 h-4" />
-                相关标签
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <Link key={tag} href={`/cases?q=${encodeURIComponent(tag)}`}>
-                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors">
-                      {tag}
-                    </Badge>
-                  </Link>
-                ))}
-              </div>
-              <Separator className="mt-6" />
-            </div>
-          )}
-
-          {/* Citation */}
-          <div className="py-6">
+            {/* Citation */}
             <CitationBox
               c={c}
               jurisLabel={juris?.label}
               typeLabel={TYPE_LABELS[c.type]?.label}
             />
-          </div>
-        </div>
 
-        {/* Related Cases */}
-        <RelatedCases caseId={c.id} topicId={c.topicId ?? ""} jurisdictionId={c.jurisdictionId ?? ""} />
+            <Separator />
 
-        {/* Bottom nav */}
-        <div className="mt-12 pt-6 border-t border-border flex items-center justify-between">
-          <Button variant="outline" asChild>
-            <Link href="/cases">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              返回列表
-            </Link>
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => exportPdf.mutate({ id: c.id })}
-              disabled={exportPdf.isPending}
-            >
-              {exportPdf.isPending ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />生成 PDF 中…</>
-              ) : (
-                <><Download className="w-4 h-4" />导出 PDF</>
-              )}
-            </Button>
-            {c.sourceUrl && (
-              <Button asChild variant="default" className="gap-2">
-                <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4" />
-                  查看原始来源
-                </a>
-              </Button>
+            {/* Related */}
+            <RelatedCases caseId={c.id} topicId={c.topicId ?? ""} />
+
+          </aside>
+
+          {/* ── RIGHT MAIN CONTENT ───────────────────────────────────────── */}
+          {/* On mobile: order-1 (shown above aside); on desktop: order-2 (right column) */}
+          <main className="space-y-0 min-w-0 order-1 lg:order-2">
+
+            {/* Abstract – collapsible */}
+            {c.abstract && (
+              <>
+                <CollapsibleSection icon={<BookOpen className="w-3.5 h-3.5" />} title="内容摘要" defaultOpen={true}>
+                  <p className="text-[15px] leading-[1.8] text-foreground/85">{c.abstract}</p>
+                </CollapsibleSection>
+                <Separator />
+              </>
             )}
-          </div>
+
+            {/* AI Analysis – collapsible, paragraphs */}
+            {analysisParagraphs.length > 0 && (
+              <>
+                <CollapsibleSection icon={<Scale className="w-3.5 h-3.5" />} title="深度法律分析" defaultOpen={true}>
+                  <div className="space-y-4">
+                    {analysisParagraphs.map((para, i) => (
+                      <p key={i} className="text-[15px] leading-[1.8] text-foreground/85">{para}</p>
+                    ))}
+                  </div>
+                </CollapsibleSection>
+                <Separator />
+              </>
+            )}
+
+            {/* Full Text – always visible, most important */}
+            {fullTextParagraphs.length > 0 && (
+              <div className="pt-4">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" />
+                  原文正文
+                </h2>
+                <div className="prose prose-sm max-w-none space-y-4">
+                  {fullTextParagraphs.map((para, i) => (
+                    <p
+                      key={i}
+                      className="text-[15px] leading-[1.9] text-foreground/90 indent-[2em] first:indent-0"
+                    >
+                      {para}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fallback if no content */}
+            {!c.abstract && analysisParagraphs.length === 0 && fullTextParagraphs.length === 0 && (
+              <div className="py-16 text-center text-muted-foreground text-sm">
+                暂无正文内容，请查看原文链接
+              </div>
+            )}
+
+          </main>
         </div>
       </div>
     </div>
