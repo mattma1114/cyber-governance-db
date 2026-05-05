@@ -268,7 +268,9 @@ export const appRouter = router({
           tags: input.tags ?? [],
           views: 0,
         });
-        return { success: true, id: Number((result as any).insertId) };
+        // Drizzle MySQL2 returns [ResultSetHeader, FieldPacket[]] for insert
+        const resultHeader = Array.isArray(result) ? result[0] : result;
+        return { success: true, id: Number((resultHeader as any).insertId) };
       }),
 
     update: adminProcedure
