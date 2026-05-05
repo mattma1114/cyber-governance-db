@@ -161,7 +161,8 @@
 - [x] 15 个测试全部通过
 
 ## 原文正文始终显示 + 批量重抓 fullText（当前迭代）
-- [ ] CaseDetail.tsx：原文正文区域始终显示，fullText 为空时显示占位提示（含编辑入口）
-- [ ] 后端：新增 cases.refetchFullText mutation，接收 id 数组，批量重新抓取 sourceUrl 并更新 fullText
-- [ ] 管理后台：内容管理页新增「批量重抓原文」按钮，触发所有有 sourceUrl 但无 fullText 的内容重新抓取
-- [ ] 测试：验证批量重抓和前端占位提示均正常
+- [x] CaseDetail.tsx：原文正文区域始终显示，fullText 为空时显示占位提示（含编辑入口和原文链接）
+- [x] 后端：新增 cases.refetchFullText mutation，接收 id 数组，批量重新抓取 sourceUrl 并更新 fullText
+- [x] 管理后台：内容管理页工具栏新增「重抓原文」按钮，自动过滤当前页有 sourceUrl 但无 fullText 的内容并批量抓取
+- [x] 修复 PlatformDetail.tsx Rules of Hooks 错误（trpc.cases.list.useQuery 移至所有条件返回之前）
+- [x] 15 个测试全部通过

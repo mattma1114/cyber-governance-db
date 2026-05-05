@@ -708,6 +708,23 @@ export default function Admin() {
     onError: (e) => toast.error(e.message),
   });
 
+  const [refetchingFullText, setRefetchingFullText] = useState(false);
+  const refetchFullTextMutation = trpc.cases.refetchFullText.useMutation({
+    onSuccess: (data) => {
+      setRefetchingFullText(false);
+      utils.cases.listAdmin.invalidate();
+      if (data.failed === 0) {
+        toast.success(`原文抓取完成：${data.succeeded} 条成功`);
+      } else {
+        toast.warning(`原文抓取完成：${data.succeeded} 条成功，${data.failed} 条失败（无原文链接或抓取超时）`);
+      }
+    },
+    onError: (e) => {
+      setRefetchingFullText(false);
+      toast.error(e.message);
+    },
+  });
+
   if (loading) {
     return (
       <div className="container py-20 flex items-center justify-center">
@@ -820,6 +837,29 @@ export default function Admin() {
               </div>
               <Button size="sm" onClick={() => { setKeyword(inputVal); setPage(1); }}>搜索</Button>
               <div className="flex-1" />
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={refetchingFullText || !casesData?.items?.length}
+                onClick={() => {
+                  const ids = casesData?.items
+                    ?.filter((c: any) => c.sourceUrl && !c.fullText)
+                    ?.map((c: any) => c.id) ?? [];
+                  if (ids.length === 0) {
+                    toast.info("当前页所有内容均已有原文，或缺少原文链接");
+                    return;
+                  }
+                  setRefetchingFullText(true);
+                  toast.info(`开始重新抓取 ${ids.length} 条原文，请稍候…`);
+                  refetchFullTextMutation.mutate({ ids });
+                }}
+              >
+                {refetchingFullText
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <RefreshCw className="w-3.5 h-3.5" />}
+                重抓原文
+              </Button>
               <Button
                 size="sm"
                 className="gap-1.5"
