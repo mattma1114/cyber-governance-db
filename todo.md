@@ -104,3 +104,8 @@
 - [x] 后端新增 scraper.testApiKey 路由（分别验证 Firecrawl/Jina/ScrapingBee）
 - [x] Admin.tsx API 配置 Tab：每个 Key 旁添加「测试」按钮，显示验证结果（成功/失败/延迟）
 - [x] 15 个测试全部通过
+
+## API 配置页输入框修复（当前迭代）
+- [x] 修复 api_settings 表结构与 Drizzle schema 不一致导致 getAll 500 错误（缺少 id/createdAt 字段）
+- [x] 重建 api_settings 表（包含 id/key/value/label/createdAt/updatedAt 字段）
+- [x] 输入框可正常填写，保存成功后显示「已配置」徽章 + 删除按钮
