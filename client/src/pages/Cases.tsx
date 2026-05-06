@@ -221,54 +221,6 @@ export default function Cases() {
               </div>
             </div>
 
-            {/* Clear filters */}
-            {hasFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                className="gap-1.5 text-muted-foreground w-full justify-start text-xs"
-              >
-                <RotateCcw className="w-3 h-3" />
-                清除全部筛选
-                {activeTagCount > 0 && (
-                  <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">
-                    {activeTagCount}
-                  </Badge>
-                )}
-              </Button>
-            )}
-
-            {/* Active filter tags - shown below clear button */}
-            {hasFilters && (
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {selectedTypes.map((v) => (
-                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
-                    {CASE_TYPES.find((t) => t.value === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedTopics.map((v) => (
-                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
-                    {topics?.find((t) => t.id === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedJurisdictions.map((v) => (
-                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
-                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
-                    {jurisdictions?.find((j) => j.id === v)?.label}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {keyword && (
-                  <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
-                    "{keyword}"
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                )}
-              </div>
-            )}
 
             <Separator />
 
@@ -558,6 +510,48 @@ export default function Cases() {
               </div>
               </div>
             </div>
+            {/* Active filter tags - shown below result count */}
+            {hasFilters && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-2.5 py-1 hover:bg-muted"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  清除全部筛选
+                  {activeTagCount > 0 && (
+                    <span className="ml-0.5 bg-muted text-muted-foreground rounded-full px-1.5 py-0 text-xs font-medium">
+                      {activeTagCount}
+                    </span>
+                  )}
+                </button>
+                {selectedTypes.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleType(v)}>
+                    {CASE_TYPES.find((t) => t.value === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedTopics.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleTopic(v)}>
+                    {topics?.find((t) => t.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedJurisdictions.map((v) => (
+                  <Badge key={v} variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => toggleJurisdiction(v)}>
+                    {jurisdictions?.find((j) => j.id === v)?.flag}{" "}
+                    {jurisdictions?.find((j) => j.id === v)?.label}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {keyword && (
+                  <Badge variant="secondary" className="gap-1 cursor-pointer text-xs" onClick={() => { setKeyword(""); setInputVal(""); }}>
+                    "{keyword}"
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                )}
+              </div>
+            )}
 
             {/* Mobile search bar */}
             <div className="flex gap-2 mb-4 md:hidden">
