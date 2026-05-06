@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { RotateCcw, Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { truncate, cn } from "@/lib/utils";
 
 export default function Platforms() {
@@ -146,17 +146,7 @@ export default function Platforms() {
               </Button>
             </div>
 
-            {hasFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="h-7 gap-1.5 text-xs text-muted-foreground justify-start px-2"
-              >
-                <X className="w-3 h-3" />
-                清除全部筛选 {activeFilterCount > 0 && `(${activeFilterCount})`}
-              </Button>
-            )}
+
 
             <Separator />
 
@@ -247,37 +237,9 @@ export default function Platforms() {
           <div className="flex-1 min-w-0">
             {/* Result header */}
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-muted-foreground">
-                  {isLoading ? "加载中…" : `共 ${filtered.length} 个平台`}
-                </span>
-                {/* Active filter badges */}
-                {selectedTypes.map((t) => (
-                  <Badge
-                    key={t}
-                    variant="secondary"
-                    className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
-                    onClick={() => toggleType(t)}
-                  >
-                    {t}
-                    <X className="w-2.5 h-2.5" />
-                  </Badge>
-                ))}
-                {selectedJurisdictions.map((jId) => {
-                  const j = jurisdictions?.find((x) => x.id === jId);
-                  return j ? (
-                    <Badge
-                      key={jId}
-                      variant="secondary"
-                      className="text-xs gap-1 cursor-pointer hover:bg-destructive/10"
-                      onClick={() => toggleJurisdiction(jId)}
-                    >
-                      {j.flag} {j.label}
-                      <X className="w-2.5 h-2.5" />
-                    </Badge>
-                  ) : null;
-                })}
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {isLoading ? "加载中…" : `共 ${filtered.length} 个平台`}
+              </span>
 
               {/* View toggle */}
               <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
@@ -304,6 +266,58 @@ export default function Platforms() {
               </div>
             </div>
 
+            {/* Active filter tags - shown below result count */}
+            {hasFilters && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-2.5 py-1 hover:bg-muted"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  清除全部筛选
+                  {activeFilterCount > 0 && (
+                    <span className="ml-0.5 bg-muted text-muted-foreground rounded-full px-1.5 py-0 text-xs font-medium">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                {selectedTypes.map((t) => (
+                  <Badge
+                    key={t}
+                    variant="secondary"
+                    className="text-xs gap-1 cursor-pointer"
+                    onClick={() => toggleType(t)}
+                  >
+                    {t}
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                ))}
+                {selectedJurisdictions.map((jId) => {
+                  const j = jurisdictions?.find((x) => x.id === jId);
+                  return j ? (
+                    <Badge
+                      key={jId}
+                      variant="secondary"
+                      className="text-xs gap-1 cursor-pointer"
+                      onClick={() => toggleJurisdiction(jId)}
+                    >
+                      {j.flag} {j.label}
+                      <X className="w-2.5 h-2.5" />
+                    </Badge>
+                  ) : null;
+                })}
+                {keyword && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs gap-1 cursor-pointer"
+                    onClick={() => { setKeyword(""); setInputVal(""); }}
+                  >
+                    "{keyword}"
+                    <X className="w-2.5 h-2.5" />
+                  </Badge>
+                )}
+              </div>
+            )}
             {isLoading ? (
               <div className={viewMode === "grid" ? "grid sm:grid-cols-2 lg:grid-cols-3 gap-4" : "flex flex-col gap-2"}>
                 {Array.from({ length: 6 }).map((_, i) => (
