@@ -226,3 +226,9 @@
 ## PDF 档案加入规则文件模块（当前迭代）
 - [x] handleExportPdf 中解析 rules 字段，按名称分组，每组列出所有版本（日期、链接）
 - [x] HTML 模板中在「发展历程」之后插入「规则文件」模块
+
+## 专题/辖区新增弹窗 AI 自动预填写（当前迭代）
+- [x] 后端 ai.suggestTagFields 路由：根据中文名称生成 id/labelEn/color（专题）或 id/labelEn（辖区）
+- [x] 前端 SimpleTagForm 加入 tagType prop 和 debounce 600ms 的 AI 预填写逻辑
+- [x] 专题和辖区两处 SimpleTagForm 调用均传入 tagType
+- [x] 颜色字段加入色块预览（专题）

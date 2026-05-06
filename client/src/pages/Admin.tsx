@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
@@ -163,21 +163,75 @@ function CaseForm({
 }
 
 // ── Simple Tag Form (Topics & Jurisdictions) ─────────────────────────────────
-function SimpleTagForm({ initial, fields, onSave, onCancel, saving }: {
-  initial?: any; fields: string[];
+function SimpleTagForm({ initial, fields, onSave, onCancel, saving, tagType }: {
+  initial?: any; fields: string[]; tagType: "topic" | "jurisdiction";
   onSave: (d: any) => void; onCancel: () => void; saving: boolean;
 }) {
   const LABELS: Record<string, string> = { id: "ID（唯一标识）", label: "中文名称", labelEn: "英文名称", color: "颜色（HEX）", flag: "旗帜 Emoji", desc: "描述" };
+  const isNew = !initial;
   const [form, setForm] = useState<Record<string, string>>(
     Object.fromEntries(fields.map((f) => [f, initial?.[f] ?? ""]))
   );
+  const [suggesting, setSuggesting] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestMutation = trpc.ai.suggestTagFields.useMutation();
+
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleLabelChange = (v: string) => {
+    set("label", v);
+    if (!isNew) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!v.trim() || v.trim().length < 2) return;
+    debounceRef.current = setTimeout(async () => {
+      setSuggesting(true);
+      try {
+        const result = await suggestMutation.mutateAsync({ label: v.trim(), type: tagType });
+        setForm((prev) => ({
+          ...prev,
+          ...(result.id && !prev.id ? { id: result.id } : {}),
+          ...(result.labelEn && !prev.labelEn ? { labelEn: result.labelEn } : {}),
+          ...((result as any).color && !prev.color ? { color: (result as any).color } : {}),
+        }));
+      } catch {
+        // silently ignore
+      } finally {
+        setSuggesting(false);
+      }
+    }, 600);
+  };
+
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
   return (
     <div className="space-y-3">
+      {suggesting && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 rounded px-3 py-1.5">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          AI 正在自动预填写其它字段…
+        </div>
+      )}
       {fields.map((f) => (
         <div key={f} className="space-y-1.5">
           <Label>{LABELS[f] ?? f}</Label>
-          <Input value={form[f]} onChange={(e) => set(f, e.target.value)} disabled={f === "id" && !!initial} />
+          {f === "label" ? (
+            <Input
+              value={form[f]}
+              onChange={(e) => handleLabelChange(e.target.value)}
+              placeholder="输入名称后 AI 自动预填其它字段"
+            />
+          ) : f === "color" ? (
+            <div className="flex gap-2 items-center">
+              <Input value={form[f]} onChange={(e) => set(f, e.target.value)} placeholder="#1a73e8" className="flex-1" />
+              {form[f] && <div className="w-9 h-9 rounded border shrink-0" style={{ background: form[f] }} />}
+            </div>
+          ) : (
+            <Input
+              value={form[f]}
+              onChange={(e) => set(f, e.target.value)}
+              disabled={f === "id" && !!initial}
+            />
+          )}
         </div>
       ))}
       <DialogFooter>
@@ -1256,6 +1310,7 @@ export default function Admin() {
           <SimpleTagForm
             initial={topicDialog.editing}
             fields={["id", "label", "labelEn", "color"]}
+            tagType="topic"
             onSave={(d) => topicDialog.editing ? updateTopic.mutate(d) : createTopic.mutate(d)}
             onCancel={() => setTopicDialog({ open: false })}
             saving={createTopic.isPending || updateTopic.isPending}
@@ -1270,6 +1325,7 @@ export default function Admin() {
           <SimpleTagForm
             initial={jurisDialog.editing}
             fields={["id", "label", "labelEn", "flag"]}
+            tagType="jurisdiction"
             onSave={(d) => jurisDialog.editing ? updateJuris.mutate(d) : createJuris.mutate(d)}
             onCancel={() => setJurisDialog({ open: false })}
             saving={createJuris.isPending || updateJuris.isPending}

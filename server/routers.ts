@@ -1020,6 +1020,60 @@ Return ONLY valid JSON, no markdown, no explanation.`;
         }
         return parsed;
       }),
+    // ── Tag auto-suggest ────────────────────────────────────────────────
+    suggestTagFields: adminProcedure
+      .input(z.object({
+        label: z.string().min(1),
+        type: z.enum(["topic", "jurisdiction"]),
+      }))
+      .mutation(async ({ input }) => {
+        const isJuris = input.type === "jurisdiction";
+        const systemPrompt = isJuris
+          ? `You are a database assistant. Given a Chinese jurisdiction name, return a JSON object with:
+- id: a short lowercase kebab-case English identifier (e.g. "european-union", "united-states", "china")
+- labelEn: the standard English name of the jurisdiction
+Return ONLY valid JSON, no explanation.`
+          : `You are a database assistant. Given a Chinese research topic name for an internet governance database, return a JSON object with:
+- id: a short lowercase kebab-case English identifier (e.g. "data-privacy", "content-moderation", "antitrust")
+- labelEn: the standard English name of the topic
+- color: a semantically appropriate HEX color code (e.g. "#1a73e8" for data, "#e8710a" for content, "#34a853" for competition)
+Return ONLY valid JSON, no explanation.`;
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: input.label },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "tag_fields",
+              strict: true,
+              schema: isJuris
+                ? {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      labelEn: { type: "string" },
+                    },
+                    required: ["id", "labelEn"],
+                    additionalProperties: false,
+                  }
+                : {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      labelEn: { type: "string" },
+                      color: { type: "string" },
+                    },
+                    required: ["id", "labelEn", "color"],
+                    additionalProperties: false,
+                  },
+            },
+          },
+        });
+        const content = response.choices[0].message.content;
+        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+      }),
   }),
 
   // ── Scheduled endpoint (for future use) ─────────────────────────────
