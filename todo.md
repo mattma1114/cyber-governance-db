@@ -217,3 +217,8 @@
 - [x] 加载中显示「获取中…」（Loader2 动画 + 文字）
 - [x] 抓取成功后全文预览区显示绿色「全文已获取」状态标识 + 字符数统计 + 前 800 字符预览
 - [x] 抓取中（无全文）时显示 Loader2 加载状态指示器
+
+## 平台详情页 PDF 导出空白修复（当前迭代）
+- [x] 诊断空白 PDF 根因（display:none 元素在 Chrome 打印时不渲染内容）
+- [x] 改用新窗口打印方案（window.open + document.write + window.print()），彻底绕开 display:none 限制
+- [x] 修复 TypeScript 编译错误（jurisLabels 在 useCallback 中的引用顺序问题）

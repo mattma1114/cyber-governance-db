@@ -115,12 +115,112 @@ export default function PlatformDetail() {
   );
 
   const handleExportPdf = useCallback(() => {
+    if (!p) return;
     setIsPrinting(true);
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => setIsPrinting(false), 800);
-    }, 200);
-  }, []);
+
+    // 构建打印内容 HTML
+    const jurisArrLocal: string[] = Array.isArray(p.jurisdiction)
+      ? p.jurisdiction
+      : (p.jurisdiction ? JSON.parse(p.jurisdiction as string) : []);
+    const jurisLabelsLocal = jurisArrLocal
+      .map((jid) => jurisdictions?.find((j) => j.id === jid))
+      .filter(Boolean);
+    const jurisLabelStrLocal = jurisLabelsLocal
+      .map((j: any) => `${j?.flag ?? ""} ${j?.label ?? ""}`)
+      .join("  ·  ");
+
+    const portraitLocal: any = p.portrait
+      ? (typeof p.portrait === "string" ? JSON.parse(p.portrait) : p.portrait)
+      : null;
+
+    const timelineLocal: any[] = p.timeline
+      ? (typeof p.timeline === "string" ? JSON.parse(p.timeline) : p.timeline)
+      : [];
+
+    const portraitLabels: Record<string, string> = {
+      types: "平台类型",
+      structure: "市场结构",
+      contentSource: "内容来源",
+      networkEffect: "网络效应",
+      businessModel: "商业模式",
+      openness: "开放程度",
+      crossBorder: "跨境运营",
+    };
+
+    const portraitRows = portraitLocal
+      ? Object.entries(portraitLabels)
+          .map(([key, label]) => {
+            const val = portraitLocal[key];
+            if (!val) return "";
+            const display = Array.isArray(val) ? val.join("、") : val;
+            return `<tr>
+              <td style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;width:90px;padding:8px 12px 8px 0;vertical-align:top;border-bottom:1px solid #f3f4f6">${label}</td>
+              <td style="font-size:13px;color:#333;line-height:1.6;padding:8px 0;border-bottom:1px solid #f3f4f6">${display}</td>
+            </tr>`;
+          })
+          .join("")
+      : "";
+
+    const timelineRows = timelineLocal
+      .map(
+        (item: any) =>
+          `<tr>
+            <td style="font-size:11px;font-family:monospace;color:#888;width:80px;padding:8px 12px 8px 0;vertical-align:top;border-bottom:1px solid #f3f4f6">${item.date ?? ""}</td>
+            <td style="font-size:13px;color:#333;line-height:1.7;padding:8px 0;border-bottom:1px solid #f3f4f6">${item.event ?? ""}</td>
+          </tr>`
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${p.name} — 平台档案</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif; color: #222; background: #fff; padding: 0; }
+    @page { margin: 20mm 18mm; size: A4; }
+    @media print { body { padding: 0; } }
+    .page { max-width: 170mm; margin: 0 auto; padding: 20mm 0; }
+    h1 { font-size: 22px; font-weight: bold; color: #1e3a5f; margin-bottom: 4px; }
+    .meta { font-size: 12px; color: #888; display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+    .section-title { font-size: 14px; font-weight: 700; color: #1e3a5f; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; margin-top: 24px; }
+    .desc { font-size: 13px; line-height: 1.8; color: #333; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #aaa; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div style="border-bottom:3px solid #1e3a5f;padding-bottom:16px;margin-bottom:8px">
+    <h1>${p.name}${p.abbr && p.abbr !== p.name ? ` (${p.abbr})` : ""}</h1>
+    ${p.company ? `<div style="font-size:13px;color:#555;margin-top:4px">${p.company}</div>` : ""}
+    <div class="meta">
+      ${p.hq ? `<span>总部：${p.hq}</span>` : ""}
+      ${p.founded ? `<span>创立：${p.founded} 年</span>` : ""}
+      ${jurisLabelStrLocal ? `<span>司法辖区：${jurisLabelStrLocal}</span>` : ""}
+      ${p.website ? `<span>官网：${p.website}</span>` : ""}
+    </div>
+  </div>
+  ${p.description ? `<p class="desc">${p.description}</p>` : ""}
+  ${portraitRows ? `<div class="section-title">平台结构画像</div><table>${portraitRows}</table>` : ""}
+  ${timelineRows ? `<div class="section-title">发展历程</div><table>${timelineRows}</table>` : ""}
+  <div class="footer">
+    <span>互联网平台治理数据库</span>
+    <span>导出日期：${new Date().toLocaleDateString("zh-CN")}</span>
+  </div>
+</div>
+<script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };<\/script>
+</body>
+</html>`;
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+    setTimeout(() => setIsPrinting(false), 1500);
+  }, [p, jurisdictions]);
 
   if (isLoading) {
     return (
@@ -383,17 +483,32 @@ export default function PlatformDetail() {
       {/* ── Print-only archive ── */}
       <style>{`
         @media print {
-          body > *:not(#platform-print-root) { display: none !important; }
-          #platform-print-root { display: block !important; }
-          .no-print { display: none !important; }
+          /* 隐藏页面上所有屏幕内容 */
+          .platform-screen-content { display: none !important; }
+          /* 显示打印内容 */
+          #platform-print-root {
+            position: static !important;
+            left: auto !important;
+            visibility: visible !important;
+            display: block !important;
+            width: 100% !important;
+          }
           @page { margin: 20mm 18mm; size: A4; }
         }
         @media screen {
-          #platform-print-root { display: none; }
+          /* 屏幕上不可见但保持布局（避免 Chrome 打印空白） */
+          #platform-print-root {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            width: 210mm;
+            visibility: hidden;
+            pointer-events: none;
+          }
         }
       `}</style>
 
-      <div id="platform-print-root" aria-hidden="true">
+      <div id="platform-print-root">
         {/* Cover */}
         <div style={{ borderBottom: "3px solid #1e3a5f", paddingBottom: "16px", marginBottom: "24px" }}>
           <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1e3a5f", marginBottom: "4px" }}>
@@ -462,7 +577,7 @@ export default function PlatformDetail() {
 
       {/* ── Screen view ── */}
       {/* Breadcrumb */}
-      <div className="border-b border-border bg-white no-print">
+      <div className="border-b border-border bg-white platform-screen-content">
         <div className="container py-3 flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/platforms">
@@ -488,9 +603,9 @@ export default function PlatformDetail() {
       </div>
 
       {/* Color bar */}
-      <div className="h-1.5 w-full" style={{ background: p.color ?? "var(--primary)" }} />
+      <div className="h-1.5 w-full platform-screen-content" style={{ background: p.color ?? "var(--primary)" }} />
 
-      <div className="container py-8">
+      <div className="container py-8 platform-screen-content">
         {/* Platform header */}
         <div className="flex items-start gap-5 mb-6">
           <div
