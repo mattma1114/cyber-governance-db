@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,70 @@ import {
   BookOpen,
   TrendingUp,
   Download,
+  Sparkles,
+  FileText,
+  CheckCircle2,
 } from "lucide-react";
+
+// ── AI loading steps for platform extraction ─────────────────────────────────
+const PLATFORM_AI_STEPS = [
+  { id: "search", icon: Globe, label: "正在检索平台信息", desc: "通过官网、Wikipedia、Crunchbase 多渠道获取数据…" },
+  { id: "analyze", icon: Sparkles, label: "AI 深度分析中", desc: "提取画像特征、发展历程、监管信息…" },
+  { id: "fill", icon: FileText, label: "自动填充表单", desc: "将分析结果写入各字段…" },
+];
+
+function PlatformAiLoadingOverlay({ step }: { step: number }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="bg-card border border-border rounded-xl shadow-2xl p-8 w-full max-w-sm mx-4">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <Wand2 className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">AI 自动提取</p>
+            <p className="text-xs text-muted-foreground">正在处理，请稍候…</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {PLATFORM_AI_STEPS.map((s, i) => {
+            const Icon = s.icon;
+            const isDone = i < step;
+            const isActive = i === step;
+            return (
+              <div key={s.id} className={`flex items-start gap-3 transition-opacity duration-300 ${i > step ? "opacity-30" : "opacity-100"}`}>
+                <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${isDone ? "bg-green-500/20" : isActive ? "bg-primary/15" : "bg-muted"}`}>
+                  {isDone ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  ) : isActive ? (
+                    <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                  ) : (
+                    <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className={`text-xs font-medium ${isActive ? "text-foreground" : isDone ? "text-muted-foreground" : "text-muted-foreground/50"}`}>
+                    {s.label}
+                  </p>
+                  {isActive && (
+                    <p className="text-xs text-muted-foreground mt-0.5 animate-pulse">{s.desc}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Animated progress bar */}
+        <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-700 ease-in-out"
+            style={{ width: `${((step + 0.5) / PLATFORM_AI_STEPS.length) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type PortraitData = {
   types: string[];
@@ -117,6 +180,8 @@ export default function PlatformEditor() {
   const [form, setForm] = useState<PlatformForm>(defaultForm);
   const [keyword, setKeyword] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiStep, setAiStep] = useState(0);
+  const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState<"basic" | "portrait" | "rules" | "timeline">("basic");
 
   const { data: existingPlatform, isLoading: platformLoading } = trpc.platforms.getById.useQuery(
@@ -148,11 +213,12 @@ export default function PlatformEditor() {
   });
 
   const aiExtractMutation = trpc.ai.extractPlatformByKeyword.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setForm((prev) => ({
         ...prev,
+        // 基本信息
         name: data.name || prev.name,
-        company: data.name || prev.company,
+        company: data.nameEn || data.name || prev.company,
         hq: data.headquarters || prev.hq,
         founded: data.founded || prev.founded,
         description: data.description || prev.description,
@@ -161,12 +227,38 @@ export default function PlatformEditor() {
         crunchbaseUrl: data.crunchbaseUrl || prev.crunchbaseUrl,
         profileFeatures: data.profileFeatures || prev.profileFeatures,
         developmentHistory: data.developmentHistory || prev.developmentHistory,
+        // 画像特征
         portrait: {
-          ...prev.portrait,
-          types: data.tags?.slice(0, 3) || prev.portrait.types,
+          types: data.portrait_types?.length ? data.portrait_types : (data.tags?.slice(0, 3) || prev.portrait.types),
+          structure: data.portrait_structure || prev.portrait.structure,
+          contentSource: data.portrait_contentSource || prev.portrait.contentSource,
+          networkEffect: data.portrait_networkEffect || prev.portrait.networkEffect,
+          businessModel: data.portrait_businessModel?.length ? data.portrait_businessModel : prev.portrait.businessModel,
+          openness: data.portrait_openness || prev.portrait.openness,
+          crossBorder: data.portrait_crossBorder || prev.portrait.crossBorder,
         },
+        // 规则文件（保留已有规则，追加 AI 提取的）
+        rules: data.rules?.length
+          ? [
+              ...prev.rules,
+              ...data.rules.filter((r: any) =>
+                r.url && !prev.rules.some((existing) => existing.url === r.url)
+              ),
+            ]
+          : prev.rules,
+        // 发展历程（保留已有时间线，追加 AI 提取的）
+        timeline: data.timeline?.length
+          ? [
+              ...prev.timeline,
+              ...data.timeline.filter((t: any) =>
+                t.date && t.event && !prev.timeline.some((existing) => existing.date === t.date && existing.event === t.event)
+              ),
+            ].sort((a, b) => a.date.localeCompare(b.date))
+          : prev.timeline,
       }));
-      toast.success("AI 已自动填充平台信息（规则文件需单独抓取）");
+      const rulesCount = data.rules?.length ?? 0;
+      const timelineCount = data.timeline?.length ?? 0;
+      toast.success(`AI 已自动填充全部模块：基本信息、画像特征、${rulesCount} 条规则文件、${timelineCount} 个时间节点`);
     },
     onError: (e) => toast.error(`AI 提取失败：${e.message}`),
   });
@@ -212,11 +304,24 @@ export default function PlatformEditor() {
       toast.error("请输入平台关键词");
       return;
     }
+    // Clear any existing timer
+    if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+    setAiStep(0);
     setIsAiLoading(true);
+    // Advance step 0 → 1 after ~2s (simulating search phase)
+    stepTimerRef.current = setTimeout(() => {
+      setAiStep(1);
+      // Advance step 1 → 2 after another ~2s (simulating analyze phase)
+      stepTimerRef.current = setTimeout(() => {
+        setAiStep(2);
+      }, 2000);
+    }, 2000);
     try {
       await aiExtractMutation.mutateAsync({ keyword: keyword.trim() });
     } finally {
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
       setIsAiLoading(false);
+      setAiStep(0);
     }
   };
 
@@ -333,6 +438,8 @@ export default function PlatformEditor() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* AI Loading Overlay */}
+      {isAiLoading && <PlatformAiLoadingOverlay step={aiStep} />}
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="container py-3 flex items-center justify-between gap-4">

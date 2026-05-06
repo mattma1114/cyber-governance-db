@@ -809,21 +809,45 @@ export const appRouter = router({
     extractPlatformByKeyword: adminProcedure
       .input(z.object({ keyword: z.string() }))
       .mutation(async ({ input }) => {
-        const systemPrompt = `You are a research assistant specializing in internet platform governance. Given a platform name or keyword, extract comprehensive information about the platform from your knowledge. Return a JSON object with these fields:
-- name: string (official name)
-- nameEn: string (English name if different)
-- website: string (official website URL)
-- wikipediaUrl: string (Wikipedia URL if exists)
-- crunchbaseUrl: string (Crunchbase URL if exists)
-- description: string (brief description in Chinese, 100-200 chars)
-- descriptionEn: string (brief description in English)
-- founded: string (founding year or date)
-- headquarters: string (headquarters location)
-- category: string (platform category: social_media/search/ecommerce/video/messaging/other)
-- tags: string[] (relevant tags)
-- profileFeatures: string (platform profile features in Chinese, 200-400 chars)
-- developmentHistory: string (development history in Chinese, 200-400 chars)
-Return ONLY valid JSON, no markdown.`;
+        const systemPrompt = `You are a senior research analyst specializing in internet platform governance, digital regulation, and platform economics. Given a platform name or keyword, extract comprehensive information about the platform from your knowledge. Return a JSON object with ALL of the following fields:
+
+## Basic Info
+- name: string (official Chinese name or transliteration)
+- nameEn: string (official English name)
+- website: string (official website URL, e.g. https://www.tiktok.com)
+- wikipediaUrl: string (Wikipedia URL, e.g. https://en.wikipedia.org/wiki/TikTok)
+- crunchbaseUrl: string (Crunchbase URL, e.g. https://www.crunchbase.com/organization/tiktok)
+- description: string (brief description in Chinese, 100-200 chars, covering what the platform does and its significance)
+- descriptionEn: string (brief description in English, 80-150 words)
+- founded: string (founding year, e.g. "2016")
+- headquarters: string (headquarters city and country in Chinese, e.g. "北京，中国")
+- category: string (one of: social_media | search | ecommerce | video | messaging | cloud | fintech | other)
+- tags: string[] (3-6 relevant keyword tags in Chinese)
+- profileFeatures: string (detailed platform profile features in Chinese, 300-500 chars, covering: user scale, core product features, content ecosystem, monetization model, cross-border presence)
+- developmentHistory: string (development history summary in Chinese, 300-500 chars, covering: founding background, key milestones, major acquisitions, regulatory events)
+
+## Portrait (platform characteristics)
+- portrait_types: string[] (platform types, 1-3 items from: 社交媒体 | 短视频 | 搜索引擎 | 电商平台 | 即时通讯 | 长视频 | 新闻资讯 | 云服务 | 支付平台 | 游戏平台 | 内容创作 | 职业社交)
+- portrait_structure: string (platform structure type: UGC | PGC | PUGC | B2C | B2B | B2B2C | C2C | 混合)
+- portrait_contentSource: string (content source: 用户生成 | 专业生产 | 混合 | 算法推荐 | 爬取聚合)
+- portrait_networkEffect: string (network effect type: 直接网络效应 | 间接网络效应 | 双边市场 | 多边市场 | 无明显网络效应)
+- portrait_businessModel: string[] (business models, 1-3 items from: 广告 | 订阅 | 电商佣金 | 增值服务 | 数据变现 | SaaS | 交易手续费 | 内容付费)
+- portrait_openness: string (openness level: 开放平台 | 半开放 | 封闭生态)
+- portrait_crossBorder: string (cross-border presence: 全球化运营 | 区域性平台 | 本土平台 | 出海扩张中)
+
+## Rules (major regulatory documents/policies, up to 5 most important)
+- rules: array of objects, each with:
+  - date: string (YYYY-MM-DD or YYYY-MM or YYYY)
+  - title: string (document title in Chinese)
+  - type: string (one of: privacy_policy | terms_of_service | community_guidelines | transparency_report | other)
+  - url: string (direct URL to the document)
+
+## Timeline (key development milestones, 5-10 items)
+- timeline: array of objects, each with:
+  - date: string (YYYY-MM-DD or YYYY-MM or YYYY)
+  - event: string (milestone description in Chinese, 30-80 chars)
+
+Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real and verifiable.`;
         const response = await invokeLLM({
           messages: [
             { role: "system", content: systemPrompt },
@@ -850,8 +874,41 @@ Return ONLY valid JSON, no markdown.`;
                   tags: { type: "array", items: { type: "string" } },
                   profileFeatures: { type: "string" },
                   developmentHistory: { type: "string" },
+                  portrait_types: { type: "array", items: { type: "string" } },
+                  portrait_structure: { type: "string" },
+                  portrait_contentSource: { type: "string" },
+                  portrait_networkEffect: { type: "string" },
+                  portrait_businessModel: { type: "array", items: { type: "string" } },
+                  portrait_openness: { type: "string" },
+                  portrait_crossBorder: { type: "string" },
+                  rules: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        date: { type: "string" },
+                        title: { type: "string" },
+                        type: { type: "string" },
+                        url: { type: "string" },
+                      },
+                      required: ["date", "title", "type", "url"],
+                      additionalProperties: false,
+                    },
+                  },
+                  timeline: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        date: { type: "string" },
+                        event: { type: "string" },
+                      },
+                      required: ["date", "event"],
+                      additionalProperties: false,
+                    },
+                  },
                 },
-                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory"],
+                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory", "portrait_types", "portrait_structure", "portrait_contentSource", "portrait_networkEffect", "portrait_businessModel", "portrait_openness", "portrait_crossBorder", "rules", "timeline"],
                 additionalProperties: false,
               },
             },
