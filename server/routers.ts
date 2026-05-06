@@ -4,7 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments } from "../drizzle/schema";
+import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
@@ -1107,6 +1107,60 @@ Return ONLY valid JSON, no explanation.`;
   // ── Scheduled endpoint (for future use) ──────────────────────────────
   scheduled: router({
     ping: publicProcedure.query(() => ({ ok: true })),
+  }),
+
+  // ── Site Settings ─────────────────────────────────────────────────────
+  siteSettings: router({
+    // 获取所有设置（管理员）
+    getAll: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(siteSettings).orderBy(asc(siteSettings.group), asc(siteSettings.key));
+    }),
+    // 按 group 获取设置（公开）
+    getByGroup: publicProcedure
+      .input(z.object({ group: z.string() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(siteSettings).where(eq(siteSettings.group, input.group));
+      }),
+    // 获取所有公开设置（公开，用于前端批量加载）
+    getPublic: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(siteSettings).orderBy(asc(siteSettings.group), asc(siteSettings.key));
+    }),
+    // 更新单个设置（管理员）
+    update: adminProcedure
+      .input(z.object({
+        key: z.string(),
+        value: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(siteSettings)
+          .set({ value: input.value })
+          .where(eq(siteSettings.key, input.key));
+        return { success: true };
+      }),
+    // 批量更新设置（管理员）
+    updateBatch: adminProcedure
+      .input(z.array(z.object({
+        key: z.string(),
+        value: z.string(),
+      })))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        for (const item of input) {
+          await db.update(siteSettings)
+            .set({ value: item.value })
+            .where(eq(siteSettings.key, item.key));
+        }
+        return { success: true };
+      }),
   }),
 });
 

@@ -1,8 +1,12 @@
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Legal() {
+  const { data: siteSettingsData } = trpc.siteSettings.getPublic.useQuery();
+  const getSetting = (key: string, fallback = "") =>
+    siteSettingsData?.find((s: { key: string; value: string }) => s.key === key)?.value ?? fallback;
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-12 max-w-3xl">
@@ -15,7 +19,7 @@ export default function Legal() {
           </Button>
           <div className="flex items-center gap-3 mb-2">
             <Scale className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">法律声明</h1>
+            <h1 className="text-2xl font-bold text-foreground">{getSetting("legal.title", "法律声明")}</h1>
           </div>
           <p className="text-sm text-muted-foreground">最后更新：2025年1月</p>
         </div>

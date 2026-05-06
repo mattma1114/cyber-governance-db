@@ -20,7 +20,7 @@ import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
-  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp} from "lucide-react";
+  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -1060,6 +1060,149 @@ function SettingsTab() {
   );
 }
 
+// ── Site Settings Tab ─────────────────────────────────────────────────────────
+function SiteSettingsTab() {
+  const utils = trpc.useUtils();
+  const { data: allSettings, isLoading } = trpc.siteSettings.getAll.useQuery();
+  const updateMutation = trpc.siteSettings.updateBatch.useMutation({
+    onSuccess: () => {
+      toast.success("网站信息已保存");
+      utils.siteSettings.getAll.invalidate();
+      utils.siteSettings.getPublic.invalidate();
+    },
+    onError: (e) => toast.error(`保存失败：${e.message}`),
+  });
+
+  // Local edits state: key -> value
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState(false);
+
+  // Initialize edits from loaded settings
+  useEffect(() => {
+    if (allSettings) {
+      const init: Record<string, string> = {};
+      allSettings.forEach((s) => { init[s.key] = s.value; });
+      setEdits(init);
+      setDirty(false);
+    }
+  }, [allSettings]);
+
+  const set = (key: string, value: string) => {
+    setEdits((prev) => ({ ...prev, [key]: value }));
+    setDirty(true);
+  };
+
+  const handleSave = () => {
+    const items = Object.entries(edits).map(([key, value]) => ({ key, value }));
+    updateMutation.mutate(items);
+  };
+
+  const GROUPS = [
+    { key: "home", label: "首页内容", icon: "🏠" },
+    { key: "about", label: "关于我们", icon: "ℹ️" },
+    { key: "legal", label: "法律声明", icon: "⚖️" },
+    { key: "org", label: "主办机构", icon: "🏛️" },
+    { key: "footer", label: "底部栏", icon: "📋" },
+    { key: "cases", label: "内容数据库说明", icon: "🗂️" },
+    { key: "platforms", label: "平台画像库说明", icon: "🖼️" },
+  ];
+
+  const FIELD_LABELS: Record<string, { label: string; multiline?: boolean; hint?: string }> = {
+    "home.badge": { label: "首页标签文字", hint: "显示在主标题上方的小标签" },
+    "home.title_line1": { label: "主标题第一行" },
+    "home.title_line2": { label: "主标题第二行" },
+    "home.description": { label: "首页描述文字", multiline: true },
+    "about.title": { label: "关于我们标题" },
+    "about.content": { label: "关于我们正文", multiline: true },
+    "about.team": { label: "团队介绍", multiline: true },
+    "about.contact": { label: "联系方式", hint: "可填写邮箱或联系地址" },
+    "legal.title": { label: "法律声明标题" },
+    "legal.content": { label: "法律声明正文", multiline: true },
+    "org.name": { label: "机构名称" },
+    "org.department": { label: "院系名称" },
+    "org.website": { label: "机构官网 URL", hint: "以 https:// 开头" },
+    "org.email": { label: "联系邮箱" },
+    "footer.copyright": { label: "版权声明" },
+    "footer.disclaimer": { label: "免责声明" },
+    "cases.page_title": { label: "页面标题" },
+    "cases.page_description": { label: "页面描述", multiline: true },
+    "platforms.page_title": { label: "页面标题" },
+    "platforms.page_description": { label: "页面描述", multiline: true },
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1,2,3].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">网站信息管理</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">管理首页内容、关于我们、法律声明等网站公开信息</p>
+        </div>
+        <Button
+          onClick={handleSave}
+          disabled={!dirty || updateMutation.isPending}
+          className="gap-1.5"
+        >
+          {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {dirty ? "保存修改" : "已保存"}
+        </Button>
+      </div>
+
+      {GROUPS.map((group) => {
+        const groupSettings = allSettings?.filter((s) => s.group === group.key) ?? [];
+        if (groupSettings.length === 0) return null;
+        return (
+          <Card key={group.key}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span>{group.icon}</span>
+                {group.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {groupSettings.map((setting) => {
+                const meta = FIELD_LABELS[setting.key];
+                const isMultiline = meta?.multiline ?? false;
+                return (
+                  <div key={setting.key} className="space-y-1.5">
+                    <Label className="text-sm font-medium">
+                      {meta?.label ?? setting.label ?? setting.key}
+                    </Label>
+                    {meta?.hint && (
+                      <p className="text-xs text-muted-foreground">{meta.hint}</p>
+                    )}
+                    {isMultiline ? (
+                      <Textarea
+                        value={edits[setting.key] ?? ""}
+                        onChange={(e) => set(setting.key, e.target.value)}
+                        rows={4}
+                        className="text-sm resize-y"
+                      />
+                    ) : (
+                      <Input
+                        value={edits[setting.key] ?? ""}
+                        onChange={(e) => set(setting.key, e.target.value)}
+                        className="text-sm"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Admin Page ──────────────────────────────────────────────
 export default function Admin() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -1268,6 +1411,10 @@ export default function Admin() {
             <TabsTrigger value="settings" className="gap-1.5">
               <Settings className="w-3.5 h-3.5" />
               API 配置
+            </TabsTrigger>
+            <TabsTrigger value="siteinfo" className="gap-1.5">
+              <Info className="w-3.5 h-3.5" />
+              网站信息
             </TabsTrigger>
           </TabsList>
 
@@ -1659,6 +1806,11 @@ export default function Admin() {
           {/* Settings Tab */}
           <TabsContent value="settings">
             <SettingsTab />
+          </TabsContent>
+
+          {/* Site Info Tab */}
+          <TabsContent value="siteinfo">
+            <SiteSettingsTab />
           </TabsContent>
         </Tabs>
       </div>

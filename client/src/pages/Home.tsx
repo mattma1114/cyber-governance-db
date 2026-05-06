@@ -60,9 +60,14 @@ export default function Home() {
   const { data: topicsData } = trpc.topics.list.useQuery();
   const { data: jurisdictionsData } = trpc.jurisdictions.list.useQuery();
   const { data: recentCases } = trpc.cases.list.useQuery({ page: 1, pageSize: 6 });
+  const { data: siteSettingsData } = trpc.siteSettings.getPublic.useQuery();
 
   const topics = topicsData ?? [];
   const jurisdictions = jurisdictionsData ?? [];
+
+  // Helper to get a site setting value by key
+  const getSetting = (key: string, fallback = "") =>
+    siteSettingsData?.find((s) => s.key === key)?.value ?? fallback;
 
   return (
     <div className="min-h-screen">
@@ -74,17 +79,15 @@ export default function Home() {
           <div className="max-w-2xl mb-10">
             <div className="flex items-center gap-2 mb-4">
               <Badge variant="outline" className="text-xs">
-                全球平台治理研究
+                {getSetting("home.badge", "全球平台治理研究")}
               </Badge>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight mb-4">
-              互联网平台
-              <span className="text-primary block">治理数据库</span>
+              {getSetting("home.title_line1", "互联网平台")}
+              <span className="text-primary block">{getSetting("home.title_line2", "治理数据库")}</span>
             </h1>
             <p className="text-base text-muted-foreground leading-relaxed">
-              系统收录全球互联网平台治理领域的司法内容、监管执法与立法政策，
-              覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、
-              反垂断与内容治理四大专题。
+              {getSetting("home.description", "系统收录全球互联网平台治理领域的司法内容、监管执法与立法政策，覆盖中国、欧盟、美国、东南亚四大司法辖区，聚焦数据隐私、人工智能治理、反垄断与内容治理四大专题。")}
             </p>
           </div>
           {/* Stats: left-aligned compact grid */}
@@ -234,15 +237,15 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">主办机构</h4>
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs text-muted-foreground">浙江传媒学院</span>
-                <span className="text-xs text-muted-foreground">数字媒体与网络传播学院</span>
+                <span className="text-xs text-muted-foreground">{getSetting("org.name", "浙江传媒学院")}</span>
+                <span className="text-xs text-muted-foreground">{getSetting("org.department", "数字媒体与网络传播学院")}</span>
               </div>
             </div>
           </div>
           {/* Bottom row: copyright */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-6 text-xs text-muted-foreground">
-            <span>© 2026 互联网平台治理数据库。保留所有权利。</span>
-            <span className="text-muted-foreground/60">本数据库仅供学术研究与教育目的使用</span>
+            <span>{getSetting("footer.copyright", "© 2026 互联网平台治理数据库。保留所有权利。")}</span>
+            <span className="text-muted-foreground/60">{getSetting("footer.disclaimer", "本数据库仅供学术研究与教育目的使用")}</span>
           </div>
         </div>
       </footer>

@@ -145,3 +145,14 @@ export const caseAttachments = mysqlTable("case_attachments", {
 
 export type CaseAttachment = typeof caseAttachments.$inferSelect;
 export type InsertCaseAttachment = typeof caseAttachments.$inferInsert;
+
+// 网站基本信息配置表
+export const siteSettings = mysqlTable("site_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 128 }).notNull().unique(),
+  value: text("value").notNull(),
+  label: varchar("label", { length: 256 }),
+  group: varchar("group", { length: 64 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SiteSetting = typeof siteSettings.$inferSelect;

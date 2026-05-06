@@ -21,6 +21,9 @@ export default function Platforms() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data: platforms, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined });
+  const { data: siteSettingsData } = trpc.siteSettings.getPublic.useQuery();
+  const getSetting = (key: string, fallback = "") =>
+    siteSettingsData?.find((s: { key: string; value: string }) => s.key === key)?.value ?? fallback;
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
 
   const handleSearch = () => setKeyword(inputVal);
@@ -182,7 +185,7 @@ export default function Platforms() {
         {/* ── Mobile: page header + filter drawer trigger ── */}
         <div className="flex md:hidden items-center justify-between mb-4">
           <div>
-            <h1 className="text-lg font-bold leading-tight">平台画像库</h1>
+            <h1 className="text-lg font-bold leading-tight">{getSetting("platforms.page_title", "平台画像库")}</h1>
             <p className="text-xs text-muted-foreground mt-0.5">全球典型互联网平台结构画像</p>
           </div>
           <div className="flex items-center gap-2">
@@ -259,7 +262,7 @@ export default function Platforms() {
             {sidebarOpen && (
               <>
                 <div className="pb-1">
-                  <h1 className="text-xl font-bold mb-0.5">平台画像库</h1>
+                  <h1 className="text-xl font-bold mb-0.5">{getSetting("platforms.page_title", "平台画像库")}</h1>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     全球典型互联网平台结构画像，涵盖商业模式、治理规则与监管动态
                   </p>

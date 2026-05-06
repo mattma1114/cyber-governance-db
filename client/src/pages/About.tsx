@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +24,9 @@ const TOPICS = [
 ];
 
 export default function About() {
+  const { data: siteSettingsData } = trpc.siteSettings.getPublic.useQuery();
+  const getSetting = (key: string, fallback = "") =>
+    siteSettingsData?.find((s: { key: string; value: string }) => s.key === key)?.value ?? fallback;
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -32,10 +36,9 @@ export default function About() {
             <Building2 className="w-3 h-3" />
             浙江传媒学院
           </Badge>
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">关于本数据库</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">{getSetting("about.title", "关于我们")}</h1>
           <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
-            互联网平台治理数据库是由浙江传媒学院主办的学术研究型数据库，
-            致力于系统收录、整理和分析全球互联网平台治理领域的法律实践与政策动态。
+            {getSetting("about.content", "互联网平台治理数据库是由浙江传媒学院主办的学术研究型数据库，致力于系统收录、整理和分析全球互联网平台治理领域的法律实践与政策动态。")}
           </p>
         </div>
       </div>
@@ -120,11 +123,9 @@ export default function About() {
                   <Building2 className="w-7 h-7 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold mb-1">浙江传媒学院</h3>
+                  <h3 className="text-lg font-bold mb-1">{getSetting("org.name", "浙江传媒学院")}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                    浙江传媒学院是一所以传媒为特色、多学科协调发展的高等院校，
-                    在数字媒体法律、互联网平台治理等交叉领域具有深厚的学术积累。
-                    本数据库由学院相关研究团队负责建设与维护。
+                    {getSetting("about.team", "浙江传媒学院是一所以传媒为特色、多学科协调发展的高等院校，在数字媒体法律、互联网平台治理等交叉领域具有深厚的学术积累。本数据库由学院相关研究团队负责建设与维护。")}
                   </p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="w-3.5 h-3.5" />
@@ -172,7 +173,7 @@ export default function About() {
             <Database className="w-4 h-4" />
             <span>互联网平台治理数据库</span>
             <span className="text-border">|</span>
-            <span>浙江传媒学院</span>
+            <span>{getSetting("org.name", "浙江传媒学院")}</span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/cases" className="hover:text-foreground transition-colors">内容数据库</Link>

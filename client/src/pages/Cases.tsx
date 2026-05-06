@@ -68,6 +68,9 @@ export default function Cases() {
   const clearSelection = () => setSelectedIds(new Set());
 
   const { data: topics } = trpc.topics.list.useQuery();
+  const { data: siteSettingsData } = trpc.siteSettings.getPublic.useQuery();
+  const getSetting = (key: string, fallback = "") =>
+    siteSettingsData?.find((s: { key: string; value: string }) => s.key === key)?.value ?? fallback;
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: statsRaw } = trpc.cases.stats.useQuery();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -201,7 +204,7 @@ export default function Cases() {
             {sidebarOpen && (<>
             {/* Page title */}
             <div className="pb-1">
-              <h1 className="text-xl font-bold mb-0.5">内容数据库</h1>
+              <h1 className="text-xl font-bold mb-0.5">{getSetting("cases.page_title", "内容数据库")}</h1>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 司法内容、监管执法与立法政策
               </p>
