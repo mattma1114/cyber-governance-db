@@ -146,10 +146,6 @@ export default function Platforms() {
               </Button>
             </div>
 
-
-
-            <Separator />
-
             {/* Platform Type */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
