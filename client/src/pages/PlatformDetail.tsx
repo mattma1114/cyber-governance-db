@@ -171,6 +171,39 @@ export default function PlatformDetail() {
       )
       .join("");
 
+    // 规则文件模块：按名称分组，每组列出所有版本（名称、日期、链接）
+    const rulesLocal: any[] = p.rules
+      ? (typeof p.rules === "string" ? JSON.parse(p.rules) : p.rules)
+      : [];
+    // 按 title 分组
+    const ruleGroupsLocal = new Map<string, any[]>();
+    rulesLocal.forEach((r: any) => {
+      const key = r.title ?? r.type ?? "未命名协议";
+      if (!ruleGroupsLocal.has(key)) ruleGroupsLocal.set(key, []);
+      ruleGroupsLocal.get(key)!.push(r);
+    });
+    const rulesHtml = Array.from(ruleGroupsLocal.entries())
+      .map(([groupTitle, versions]) => {
+        const sortedV = [...versions].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+        const versionRows = sortedV
+          .map((r: any) => {
+            const vLabel = [r.date, r.version].filter(Boolean).join("  ·  ");
+            const linkCell = r.url
+              ? `<a href="${r.url}" style="font-size:12px;color:#1e3a5f;word-break:break-all">${r.url}</a>`
+              : `<span style="font-size:12px;color:#bbb">无链接</span>`;
+            return `<tr>
+              <td style="font-size:12px;color:#555;width:100px;padding:6px 12px 6px 0;vertical-align:top;border-bottom:1px solid #f3f4f6">${vLabel || "—"}</td>
+              <td style="padding:6px 0;border-bottom:1px solid #f3f4f6">${linkCell}</td>
+            </tr>`;
+          })
+          .join("");
+        return `<div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px">${groupTitle}</div>
+          <table style="width:100%;border-collapse:collapse">${versionRows}</table>
+        </div>`;
+      })
+      .join("");
+
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -205,6 +238,7 @@ export default function PlatformDetail() {
   ${p.description ? `<p class="desc">${p.description}</p>` : ""}
   ${portraitRows ? `<div class="section-title">平台结构画像</div><table>${portraitRows}</table>` : ""}
   ${timelineRows ? `<div class="section-title">发展历程</div><table>${timelineRows}</table>` : ""}
+  ${rulesHtml ? `<div class="section-title">规则文件</div>${rulesHtml}` : ""}
   <div class="footer">
     <span>互联网平台治理数据库</span>
     <span>导出日期：${new Date().toLocaleDateString("zh-CN")}</span>

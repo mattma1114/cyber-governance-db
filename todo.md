@@ -222,3 +222,7 @@
 - [x] 诊断空白 PDF 根因（display:none 元素在 Chrome 打印时不渲染内容）
 - [x] 改用新窗口打印方案（window.open + document.write + window.print()），彻底绕开 display:none 限制
 - [x] 修复 TypeScript 编译错误（jurisLabels 在 useCallback 中的引用顺序问题）
+
+## PDF 档案加入规则文件模块（当前迭代）
+- [x] handleExportPdf 中解析 rules 字段，按名称分组，每组列出所有版本（日期、链接）
+- [x] HTML 模板中在「发展历程」之后插入「规则文件」模块
