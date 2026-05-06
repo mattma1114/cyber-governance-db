@@ -9,12 +9,12 @@ import { cn } from "@/lib/utils";
 
 function StatCard({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5 py-2 px-2">
-      <div className="flex items-center gap-1 text-muted-foreground">
+    <div className="flex flex-col gap-1 py-3 pr-8">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
         {icon}
-        <span className="text-[11px] leading-none">{label}</span>
+        <span className="text-xs leading-none tracking-wide">{label}</span>
       </div>
-      <div className="text-2xl font-bold text-foreground leading-tight" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>{value}</div>
+      <div className="text-3xl font-bold text-foreground leading-none mt-0.5" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>{value}</div>
     </div>
   );
 }
@@ -87,22 +87,21 @@ export default function Home() {
               反垂断与内容治理四大专题。
             </p>
           </div>
-          {/* Stats: horizontal, evenly distributed */}
-          <div className="flex flex-row items-start justify-between gap-4 border-t border-border pt-3 mb-1">
+          {/* Stats: left-aligned compact grid */}
+          <div className="border-t border-border pt-4 mb-1">
             {stats ? (
-              <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-0">
                 <StatCard label="收录内容总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
-                <div className="w-px self-stretch bg-border" />
                 <StatCard label="司法内容" value={stats.judicial} icon={<Gavel className="w-3.5 h-3.5" />} />
-                <div className="w-px self-stretch bg-border" />
                 <StatCard label="监管执法" value={stats.regulatory} icon={<Scale className="w-3.5 h-3.5" />} />
-                <div className="w-px self-stretch bg-border" />
                 <StatCard label="立法政策" value={stats.legislation} icon={<FileText className="w-3.5 h-3.5" />} />
-              </>
+              </div>
             ) : (
-              Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 flex-1 rounded-lg" />
-              ))
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16" />
+                ))}
+              </div>
             )}
           </div>
           {/* Scroll hint */}
