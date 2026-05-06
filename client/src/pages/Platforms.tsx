@@ -101,16 +101,6 @@ export default function Platforms() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <div className="border-b border-border bg-white">
-        <div className="container py-8">
-          <h1 className="text-2xl font-bold mb-1">平台画像库</h1>
-          <p className="text-muted-foreground text-sm">
-            全球典型互联网平台结构画像，涵盖商业模式、治理规则与监管动态
-          </p>
-        </div>
-      </div>
-
       <div className="container py-6">
         <div className="flex gap-6 items-start">
           {/* ── Left: Sidebar Filters ── */}
@@ -129,6 +119,14 @@ export default function Platforms() {
                 : <PanelLeftOpen className="w-3.5 h-3.5 text-muted-foreground" />}
             </button>
             {sidebarOpen && (<>
+            {/* Page title */}
+            <div className="pb-1">
+              <h1 className="text-xl font-bold mb-0.5">平台画像库</h1>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                全球典型互联网平台结构画像，涵盖商业模式、治理规则与监管动态
+              </p>
+            </div>
+            <Separator />
             {/* Search */}
             <div className="flex gap-2">
               <div className="relative flex-1">
