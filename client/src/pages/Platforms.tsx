@@ -146,7 +146,7 @@ export default function Platforms() {
             </div>
 
             {/* Platform Type */}
-            <div>
+            <div className="mt-2">
               <div className="flex items-center gap-1.5 mb-3">
                 <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">平台类型</span>
