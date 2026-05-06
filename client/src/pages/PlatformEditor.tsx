@@ -25,7 +25,7 @@ import {
   Globe,
   BookOpen,
   TrendingUp,
-  Download,
+  Zap,
   Sparkles,
   FileText,
   CheckCircle2,
@@ -856,44 +856,55 @@ export default function PlatformEditor() {
                       />
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="h-8 shrink-0"
+                        variant="default"
+                        className="h-8 shrink-0 gap-1.5 text-xs px-3 whitespace-nowrap"
                         disabled={!rule.url || scrapingRuleIdx === idx || scrapeUrlMutation.isPending}
                         onClick={() => {
-                          if (!rule.url) { toast.error("请先填写 URL"); return; }
+                          if (!rule.url) { toast.error("请先填写规则文件 URL"); return; }
                           setScrapingRuleIdx(idx);
                           scrapeUrlMutation.mutate({ url: rule.url });
                         }}
-                        title="使用 Firecrawl/Jina/ScrapingBee 抓取全文"
+                        title="自动抓取该 URL 的规则全文（支持 Firecrawl / Jina / ScrapingBee）"
                       >
                         {scrapingRuleIdx === idx ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" />获取中…</>
                         ) : (
-                          <Download className="w-3.5 h-3.5" />
+                          <><Zap className="w-3.5 h-3.5" />一键获取</>
                         )}
                       </Button>
                     </div>
                   </div>
                 </div>
                 {/* Full text preview */}
-                {rule.fullText && (
-                  <div className="space-y-1">
+                {rule.fullText ? (
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs">全文预览（{rule.fullText.length} 字符）</Label>
+                      <Label className="text-xs flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                          <Zap className="w-3 h-3" />
+                          全文已获取
+                        </span>
+                        <span className="text-muted-foreground font-normal">（{rule.fullText.length.toLocaleString()} 字符）</span>
+                      </Label>
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 text-xs text-muted-foreground"
+                        className="h-6 text-xs text-muted-foreground hover:text-destructive"
                         onClick={() => updateRule(idx, "fullText" as any, "")}
                       >
-                        清除
+                        清除全文
                       </Button>
                     </div>
-                    <div className="rounded border border-border bg-muted/30 p-2 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap">
-                      {rule.fullText.slice(0, 500)}{rule.fullText.length > 500 ? "..." : ""}
+                    <div className="rounded border border-emerald-200 bg-emerald-50/30 dark:border-emerald-900 dark:bg-emerald-950/20 p-3 text-xs text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                      {rule.fullText.slice(0, 800)}{rule.fullText.length > 800 ? `\n\n…（共 ${rule.fullText.length.toLocaleString()} 字符，保存后在平台详情页查看完整内容）` : ""}
                     </div>
                   </div>
-                )}
+                ) : scrapingRuleIdx === idx ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 pl-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    正在抓取全文，请稍候…
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
