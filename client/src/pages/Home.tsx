@@ -2,10 +2,9 @@ import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, Database, LayoutGrid, Scale, Gavel, FileText, Globe, TrendingUp, BookOpen, ChevronDown } from "lucide-react";
-import { TYPE_BADGE_CLASS, TYPE_LABELS, formatDate, truncate } from "@/lib/utils";
+import { ArrowRight, Database, Scale, Gavel, FileText, Globe, TrendingUp, BookOpen, ChevronDown } from "lucide-react";
+import { TYPE_BADGE_CLASS, TYPE_LABELS, truncate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 function StatCard({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
@@ -25,35 +24,33 @@ function CaseCard({ c, topics, jurisdictions }: { c: any; topics: any[]; jurisdi
   const juris = jurisdictions.find((j) => j.id === c.jurisdictionId);
   return (
     <Link href={`/cases/${c.id}`}>
-      <Card className="h-full hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
-        <CardContent className="p-5 flex flex-col gap-3 h-full">
-          <div className="flex items-start justify-between gap-2">
-            <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
-              {TYPE_LABELS[c.type]?.label}
+      <div className="group border-b border-border py-4 hover:bg-muted/30 transition-colors cursor-pointer px-1">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <Badge variant="secondary" className={cn("text-xs shrink-0", TYPE_BADGE_CLASS[c.type])}>
+            {TYPE_LABELS[c.type]?.label}
+          </Badge>
+          <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>
+        </div>
+        <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2 mb-1.5">
+          {c.title}
+        </h3>
+        <p className="text-xs text-muted-foreground line-clamp-2">
+          {truncate(c.abstract || c.aiSummary || "", 100)}
+        </p>
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          {juris && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <span>{juris.flag}</span>
+              {juris.label}
+            </span>
+          )}
+          {topic && (
+            <Badge variant="outline" className="text-xs px-1.5 py-0">
+              {topic.label}
             </Badge>
-            <span className="text-xs text-muted-foreground shrink-0">{c.date}</span>
-          </div>
-          <h3 className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2">
-            {c.title}
-          </h3>
-          <p className="text-xs text-muted-foreground line-clamp-3 flex-1">
-            {truncate(c.abstract || c.aiSummary || "", 120)}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap mt-auto">
-            {juris && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <span>{juris.flag}</span>
-                {juris.label}
-              </span>
-            )}
-            {topic && (
-              <Badge variant="outline" className="text-xs px-1.5 py-0">
-                {topic.label}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }
@@ -120,8 +117,8 @@ export default function Home() {
 
       {/* Recent Cases */}
       <section className="container pb-10 density-section">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">最新收录</h2>
+        <div className="flex items-center justify-between py-5 border-b border-border mb-0">
+          <h2 className="text-base font-semibold">最新收录</h2>
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground">
             <Link href="/cases">
               查看全部
@@ -129,14 +126,14 @@ export default function Home() {
             </Link>
           </Button>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6">
           {recentCases?.items ? (
             recentCases.items.map((c) => (
               <CaseCard key={c.id} c={c} topics={topics} jurisdictions={jurisdictions} />
             ))
           ) : (
             Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 rounded-xl" />
+              <Skeleton key={i} className="h-32 my-2" />
             ))
           )}
         </div>
@@ -144,24 +141,25 @@ export default function Home() {
 
       {/* Coverage */}
       <section className="container pb-16 density-section">
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
           {/* Jurisdictions */}
-          <div className="rounded-xl border border-border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <div>
+            <div className="flex items-center gap-2 py-4 border-t border-b border-border mb-0">
               <Globe className="w-4 h-4 text-primary" />
-              覆盖司法辖区
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
+              <h2 className="text-base font-semibold">覆盖司法辖区</h2>
+            </div>
+            <div>
               {jurisdictions.map((j) => {
                 const count = stats?.byJurisdiction.find((b) => b.jurisdictionId === j.id)?.count ?? 0;
                 return (
                   <Link key={j.id} href={`/cases?jurisdiction=${j.id}`}>
-                    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer">
-                      <span className="text-2xl">{j.flag}</span>
-                      <div>
+                    <div className="flex items-center gap-3 py-3 border-b border-border hover:bg-muted/30 transition-colors cursor-pointer px-1">
+                      <span className="text-xl">{j.flag}</span>
+                      <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium">{j.label}</div>
-                        <div className="text-xs text-muted-foreground">{count} 条记录</div>
+                        {j.labelEn && <div className="text-xs text-muted-foreground">{j.labelEn}</div>}
                       </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{count} 条</span>
                     </div>
                   </Link>
                 );
@@ -170,26 +168,30 @@ export default function Home() {
           </div>
 
           {/* Topics */}
-          <div className="rounded-xl border border-border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <div>
+            <div className="flex items-center gap-2 py-4 border-t border-b border-border mb-0">
               <TrendingUp className="w-4 h-4 text-primary" />
-              核心研究专题
-            </h2>
-            <div className="flex flex-col gap-3">
+              <h2 className="text-base font-semibold">核心研究专题</h2>
+            </div>
+            <div>
               {topics.map((t) => {
                 const count = stats?.byTopic.find((b) => b.topicId === t.id)?.count ?? 0;
                 const pct = stats?.total ? Math.round((count / stats.total) * 100) : 0;
                 return (
                   <Link key={t.id} href={`/cases?topic=${t.id}`}>
-                    <div className="flex items-center gap-3 cursor-pointer group">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-3 py-3 border-b border-border cursor-pointer group px-1">
+                      <div
+                        className="w-1 self-stretch rounded-full shrink-0"
+                        style={{ background: t.color ?? "var(--primary)" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1.5">
                           <span className="text-sm font-medium group-hover:text-primary transition-colors">{t.label}</span>
-                          <span className="text-xs text-muted-foreground">{count} 条</span>
+                          <span className="text-xs text-muted-foreground shrink-0 ml-2">{count} 条</span>
                         </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-1 bg-muted overflow-hidden">
                           <div
-                            className="h-full rounded-full transition-all"
+                            className="h-full transition-all"
                             style={{ width: `${pct}%`, background: t.color ?? "var(--primary)" }}
                           />
                         </div>

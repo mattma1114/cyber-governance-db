@@ -251,6 +251,11 @@
 - [x] 修复信息密度 CSS：补充 density-compact / density-airy 规则
 - [x] 首页统计数据区域改得更紧凑（视觉编辑批注）
 
+## 首页方框改横线风格（当前迭代）
+- [x] CaseCard 去掉圆角边框，改为 border-b 横线分隔风格
+- [x] 覆盖司法辖区区块去掉 rounded-xl border bg-card，改为 border-t/border-b 标题横线 + 条目 border-b 分隔线
+- [x] 核心研究专题区块同上，进度条改为左侧彩色竖线 + 无圆角进度条
+
 ## 平台画像库移动端自适应适配（当前迭代）
 - [x] 优化 Platforms.tsx 移动端布局（筛选栏折叠、卡片网格响应式）
 - [x] 优化 PlatformDetail.tsx 移动端布局（Tab 导航、侧边栏、规则文件表格）
