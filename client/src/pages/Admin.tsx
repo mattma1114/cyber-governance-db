@@ -491,6 +491,14 @@ function SettingsTab() {
   const [labelInput, setLabelInput] = useState("");
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string } | null>>({});
   const [testingKey, setTestingKey] = useState<string | null>(null);
+  // LLM config state
+  const [llmProvider, setLlmProvider] = useState<string>("");
+  const [llmApiKey, setLlmApiKey] = useState<string>("");
+  const [llmModel, setLlmModel] = useState<string>("");
+  const [llmBaseUrl, setLlmBaseUrl] = useState<string>("");
+  const [llmApiVersion, setLlmApiVersion] = useState<string>("");
+  const [llmTestResult, setLlmTestResult] = useState<{ ok: boolean; message: string; provider?: string; model?: string } | null>(null);
+  const [llmTesting, setLlmTesting] = useState(false);
   const utils = trpc.useUtils();
 
   const testApiKeyMutation = trpc.scraper.testApiKey.useMutation({
@@ -525,6 +533,52 @@ function SettingsTab() {
     onSuccess: () => { toast.success("已删除"); utils.settings.getAll.invalidate(); },
     onError: (e) => toast.error(`删除失败：${e.message}`),
   });
+  const testLlmMutation = trpc.ai.testLlm.useMutation({
+    onSuccess: (data) => {
+      setLlmTestResult({ ok: data.ok, message: data.message, provider: data.provider, model: data.model });
+      setLlmTesting(false);
+    },
+    onError: (e) => {
+      setLlmTestResult({ ok: false, message: e.message });
+      setLlmTesting(false);
+    },
+  });
+  const saveLlmConfig = () => {
+    if (!llmProvider || llmProvider === "builtin") {
+      // Save provider as builtin (clears external config)
+      upsertMutation.mutate({ key: "LLM_PROVIDER", value: "builtin", label: "LLM 服务商" });
+      return;
+    }
+    if (!llmApiKey.trim()) { toast.error("请输入 API Key"); return; }
+    const ops = [
+      { key: "LLM_PROVIDER", value: llmProvider, label: "LLM 服务商" },
+      { key: "LLM_API_KEY", value: llmApiKey.trim(), label: "LLM API Key" },
+    ];
+    if (llmModel.trim()) ops.push({ key: "LLM_MODEL", value: llmModel.trim(), label: "LLM 模型" });
+    if (llmBaseUrl.trim()) ops.push({ key: "LLM_BASE_URL", value: llmBaseUrl.trim(), label: "LLM 自定义端点" });
+    if (llmApiVersion.trim()) ops.push({ key: "LLM_API_VERSION", value: llmApiVersion.trim(), label: "Azure API 版本" });
+    ops.forEach((op) => upsertMutation.mutate(op));
+    toast.success("LLM 配置已保存");
+  };
+  // Load existing LLM config from settings
+  const existingProvider = settings?.find((s) => s.key === "LLM_PROVIDER")?.value ?? "";
+  const existingModel = settings?.find((s) => s.key === "LLM_MODEL")?.value ?? "";
+  const existingBaseUrl = settings?.find((s) => s.key === "LLM_BASE_URL")?.value ?? "";
+  const LLM_PROVIDERS = [
+    { value: "builtin", label: "Manus 内置 LLM（默认）", hint: "使用平台内置 LLM，无需配置，开箱即用" },
+    { value: "openai", label: "OpenAI", hint: "GPT-4o、GPT-4o-mini、GPT-4-turbo 等" },
+    { value: "deepseek", label: "DeepSeek", hint: "deepseek-chat（V3）、deepseek-reasoner（R1）" },
+    { value: "anthropic", label: "Anthropic Claude", hint: "Claude 3.5 Sonnet、Claude 3 Haiku 等" },
+    { value: "azure", label: "Azure OpenAI", hint: "需要额外配置 Endpoint URL 和 API 版本" },
+    { value: "openai_compat", label: "OpenAI 兼容端点", hint: "Ollama、Together.ai、Groq 等兼容 OpenAI 格式的服务" },
+  ];
+  const DEFAULT_MODEL_HINTS: Record<string, string> = {
+    openai: "gpt-4o",
+    deepseek: "deepseek-chat",
+    anthropic: "claude-3-5-sonnet-20241022",
+    azure: "gpt-4o（部署名称）",
+    openai_compat: "视服务商而定",
+  };
 
   const PRESET_KEYS = [
     { key: "FIRECRAWL_API_KEY", label: "Firecrawl API Key", hint: "主力抓取服务，用于平台规则文件、内容页面抓取（优先使用）" },
@@ -633,6 +687,163 @@ function SettingsTab() {
             </div>
           );
         })}
+      </div>
+
+      {/* External LLM Configuration */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-medium">AI 大模型配置</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            配置外部 LLM 服务商，用于摘要生成、法律分析、平台信息填写、专题/辖区预填写等 AI 功能。
+            未配置时自动使用 Manus 内置 LLM。外部 LLM 调用失败时自动降级到内置 LLM。
+          </p>
+        </div>
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          {/* Provider selector */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">服务商</Label>
+            <Select
+              value={llmProvider || existingProvider || "builtin"}
+              onValueChange={(v) => { setLlmProvider(v); setLlmTestResult(null); setLlmModel(""); setLlmBaseUrl(""); setLlmApiVersion(""); }}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="选择 LLM 服务商" />
+              </SelectTrigger>
+              <SelectContent>
+                {LLM_PROVIDERS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    <div className="flex flex-col">
+                      <span>{p.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(() => {
+              const p = LLM_PROVIDERS.find((p) => p.value === (llmProvider || existingProvider || "builtin"));
+              return p ? <p className="text-xs text-muted-foreground">{p.hint}</p> : null;
+            })()}
+          </div>
+
+          {/* API Key (hidden for builtin) */}
+          {(llmProvider || existingProvider || "builtin") !== "builtin" && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">API Key</Label>
+                <Input
+                  type="password"
+                  className="h-8 text-sm font-mono"
+                  placeholder={settings?.find((s) => s.key === "LLM_API_KEY") ? "已配置，输入新 Key 可更新" : "输入 API Key"}
+                  value={llmApiKey}
+                  onChange={(e) => setLlmApiKey(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">
+                  模型名称
+                  <span className="text-muted-foreground font-normal ml-1">
+                    （留空使用默认：{DEFAULT_MODEL_HINTS[llmProvider || existingProvider] ?? "自动"}）
+                  </span>
+                </Label>
+                <Input
+                  className="h-8 text-sm font-mono"
+                  placeholder={existingModel || (DEFAULT_MODEL_HINTS[llmProvider || existingProvider] ?? "默认模型")}
+                  value={llmModel}
+                  onChange={(e) => setLlmModel(e.target.value)}
+                />
+              </div>
+
+              {/* Azure / openai_compat extra fields */}
+              {["azure", "openai_compat"].includes(llmProvider || existingProvider) && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">
+                    {(llmProvider || existingProvider) === "azure" ? "Azure Endpoint URL" : "自定义 Base URL"}
+                  </Label>
+                  <Input
+                    className="h-8 text-sm font-mono"
+                    placeholder={existingBaseUrl || ((llmProvider || existingProvider) === "azure"
+                      ? "https://YOUR_RESOURCE.openai.azure.com"
+                      : "https://api.example.com/v1")}
+                    value={llmBaseUrl}
+                    onChange={(e) => setLlmBaseUrl(e.target.value)}
+                  />
+                </div>
+              )}
+              {(llmProvider || existingProvider) === "azure" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Azure API 版本</Label>
+                  <Input
+                    className="h-8 text-sm font-mono"
+                    placeholder="2024-02-01"
+                    value={llmApiVersion}
+                    onChange={(e) => setLlmApiVersion(e.target.value)}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" className="h-8" onClick={saveLlmConfig} disabled={upsertMutation.isPending}>
+              {upsertMutation.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                : <Save className="w-3.5 h-3.5 mr-1.5" />}
+              保存配置
+            </Button>
+            {(llmProvider || existingProvider || "builtin") !== "builtin" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5"
+                disabled={llmTesting}
+                onClick={() => {
+                  const provider = (llmProvider || existingProvider) as "openai" | "deepseek" | "anthropic" | "azure" | "openai_compat";
+                  const key = llmApiKey.trim() || settings?.find((s) => s.key === "LLM_API_KEY")?.value || "";
+                  if (!key) { toast.error("请先输入或保存 API Key"); return; }
+                  setLlmTesting(true);
+                  setLlmTestResult(null);
+                  testLlmMutation.mutate({
+                    provider,
+                    apiKey: key,
+                    model: llmModel.trim() || existingModel || undefined,
+                    baseUrl: llmBaseUrl.trim() || existingBaseUrl || undefined,
+                    apiVersion: llmApiVersion.trim() || undefined,
+                  });
+                }}
+              >
+                {llmTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                <span className="text-xs">连通测试</span>
+              </Button>
+            )}
+          </div>
+
+          {/* Test result */}
+          {llmTestResult && (
+            <div className={`flex items-center gap-1.5 text-xs ${llmTestResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+              {llmTestResult.ok
+                ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                : <XCircle className="w-3.5 h-3.5 shrink-0" />}
+              <span>{llmTestResult.message}</span>
+              {llmTestResult.ok && llmTestResult.model && (
+                <Badge variant="secondary" className="text-xs ml-1">{llmTestResult.provider} / {llmTestResult.model}</Badge>
+              )}
+            </div>
+          )}
+
+          {/* Current config display */}
+          {existingProvider && existingProvider !== "builtin" && (
+            <div className="flex items-center gap-2 pt-1 border-t border-border">
+              <span className="text-xs text-muted-foreground">当前配置：</span>
+              <Badge variant="outline" className="text-xs">{existingProvider}</Badge>
+              {existingModel && <Badge variant="outline" className="text-xs">{existingModel}</Badge>}
+              {settings?.find((s) => s.key === "LLM_API_KEY") && (
+                <Badge variant="secondary" className="text-xs">API Key 已配置</Badge>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Custom key-value */}

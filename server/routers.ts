@@ -7,6 +7,7 @@ import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
+import { routeLlm, parseLlmConfig, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
 import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
@@ -809,6 +810,9 @@ export const appRouter = router({
     extractPlatformByKeyword: adminProcedure
       .input(z.object({ keyword: z.string() }))
       .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rows = await db.select().from(apiSettings);
         const systemPrompt = `You are a senior research analyst specializing in internet platform governance, digital regulation, and platform economics. Given a platform name or keyword, extract comprehensive information about the platform from your knowledge. Return a JSON object with ALL of the following fields:
 
 ## Basic Info
@@ -848,7 +852,8 @@ export const appRouter = router({
   - event: string (milestone description in Chinese, 30-80 chars)
 
 Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real and verifiable.`;
-        const response = await invokeLLM({
+        const llmConfig = parseLlmConfig(rows);
+        const response = await routeLlm(llmConfig, {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `Platform keyword: ${input.keyword}` },
@@ -971,7 +976,8 @@ Return ONLY valid JSON, no markdown, no explanation.`;
           ? `URL: ${input.url}\n\nFull page content (scraped via ${scrapeSource}):\n\n${scrapedFullText.slice(0, 14000)}`
           : `Please extract and analyze information from this URL: ${input.url}`;
 
-        const response = await invokeLLM({
+        const llmConfig = parseLlmConfig(rows);
+        const response = await routeLlm(llmConfig, {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -1038,7 +1044,10 @@ Return ONLY valid JSON, no explanation.`
 - labelEn: the standard English name of the topic
 - color: a semantically appropriate HEX color code (e.g. "#1a73e8" for data, "#e8710a" for content, "#34a853" for competition)
 Return ONLY valid JSON, no explanation.`;
-        const response = await invokeLLM({
+        const dbInst = await getDb();
+        const llmRows = dbInst ? await dbInst.select().from(apiSettings) : [];
+        const llmConfig = parseLlmConfig(llmRows);
+        const response = await routeLlm(llmConfig, {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: input.label },
@@ -1074,9 +1083,27 @@ Return ONLY valid JSON, no explanation.`;
         const content = response.choices[0].message.content;
         return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
       }),
-  }),
 
-  // ── Scheduled endpoint (for future use) ─────────────────────────────
+    // ── Test external LLM connectivity ──────────────────────────────────
+    testLlm: adminProcedure
+      .input(z.object({
+        provider: z.enum(["openai", "deepseek", "anthropic", "azure", "openai_compat"]),
+        apiKey: z.string().min(1),
+        model: z.string().optional(),
+        baseUrl: z.string().optional(),
+        apiVersion: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return testLlmConfig({
+          provider: input.provider,
+          apiKey: input.apiKey,
+          model: input.model,
+          baseUrl: input.baseUrl,
+          apiVersion: input.apiVersion,
+        });
+      }),
+  }),
+  // ── Scheduled endpoint (for future use) ──────────────────────────────
   scheduled: router({
     ping: publicProcedure.query(() => ({ ok: true })),
   }),

@@ -232,3 +232,10 @@
 - [x] 前端 SimpleTagForm 加入 tagType prop 和 debounce 600ms 的 AI 预填写逻辑
 - [x] 专题和辖区两处 SimpleTagForm 调用均传入 tagType
 - [x] 颜色字段加入色块预览（专题）
+
+## 外部 LLM API 接入（当前迭代）
+- [x] 设计外部 LLM 接入方案（支持 OpenAI/DeepSeek/Anthropic/Azure OpenAI）
+- [x] 实现 server/llm-router.ts：优先外部 LLM，降级内置 Manus LLM
+- [x] 将所有 AI 功能路由（extractCaseFromUrl/extractPlatformByKeyword/suggestTagFields）改为调用 llm-router
+- [x] Admin.tsx API 配置页新增外部 LLM 配置区块（服务商/Key/模型/测试）
+- [x] 后端新增 ai.testLlm 路由，验证外部 LLM 连通性
