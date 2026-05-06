@@ -392,13 +392,13 @@ export default function PlatformDetail() {
 
             {/* Version selector */}
             {sortedVersions.length > 1 && (
-              <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-5 pb-4 border-b border-border">
                 <span className="text-xs text-muted-foreground shrink-0">版本 / 日期</span>
                 <Select
                   value={activeVersion}
                   onValueChange={(v) => setSelectedRuleVersion(v)}
                 >
-                  <SelectTrigger className="h-8 text-xs w-52">
+                  <SelectTrigger className="h-8 text-xs w-full sm:w-52">
                     <SelectValue placeholder="选择版本" />
                   </SelectTrigger>
                   <SelectContent>
@@ -418,7 +418,7 @@ export default function PlatformDetail() {
             {/* Active rule metadata */}
             {activeRule && (
               <div>
-                <div className="flex items-center justify-between py-3 border-b border-border">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-border">
                   <div className="flex items-center gap-2 flex-wrap">
                     {activeRule.type && (
                       <Badge variant="outline" className="text-xs">{activeRule.type}</Badge>
@@ -639,17 +639,17 @@ export default function PlatformDetail() {
       {/* Color bar */}
       <div className="h-1.5 w-full platform-screen-content" style={{ background: p.color ?? "var(--primary)" }} />
 
-      <div className="container py-8 platform-screen-content">
+      <div className="container py-5 md:py-8 platform-screen-content">
         {/* Platform header */}
-        <div className="flex items-start gap-5 mb-6">
+        <div className="flex items-start gap-3 md:gap-5 mb-5 md:mb-6">
           <div
-            className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm shrink-0"
+            className="w-11 h-11 md:w-14 md:h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-sm shrink-0"
             style={{ background: p.color ?? "var(--primary)" }}
           >
             {p.abbr ?? p.name[0]}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold leading-tight mb-1">{p.name}</h1>
+            <h1 className="text-xl md:text-2xl font-bold leading-tight mb-1">{p.name}</h1>
             {p.company && (
               <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-2">
                 <Building2 className="w-3.5 h-3.5 shrink-0" />
@@ -703,10 +703,10 @@ export default function PlatformDetail() {
         )}
 
         {/* Two-column layout: left nav + right content */}
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-start">
           {/* ── Left: Section nav ── */}
-          <aside className="w-44 shrink-0 sticky top-4 self-start">
-            <nav className="flex flex-col">
+          <aside className="w-full md:w-44 md:shrink-0 md:sticky md:top-4 md:self-start">
+            <nav className="flex flex-row flex-wrap gap-1 md:flex-col md:gap-0 border-b border-border pb-3 mb-1 md:border-0 md:pb-0 md:mb-0">
               {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
                 if (key === "cases" && relatedCases.length === 0) return null;
                 const isActive = activeTab === key;
@@ -715,7 +715,7 @@ export default function PlatformDetail() {
                     key={key}
                     onClick={() => setActiveTab(key)}
                     className={cn(
-                      "flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors text-left w-full",
+                      "flex items-center gap-2 px-3 py-2 md:py-2.5 rounded-md text-xs md:text-sm transition-colors text-left md:w-full",
                       isActive
                         ? "bg-primary/8 text-primary font-medium"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -734,8 +734,8 @@ export default function PlatformDetail() {
               })}
             </nav>
 
-            {/* Export button in sidebar too */}
-            <div className="mt-6 pt-4 border-t border-border">
+            {/* Export button in sidebar too — desktop only */}
+            <div className="hidden md:block mt-6 pt-4 border-t border-border">
               <Button
                 variant="outline"
                 size="sm"
@@ -760,7 +760,7 @@ export default function PlatformDetail() {
         </div>
 
         {/* Bottom nav */}
-        <div className="mt-12 pt-6 border-t border-border">
+        <div className="mt-8 md:mt-12 pt-6 border-t border-border">
           <Button variant="outline" asChild>
             <Link href="/platforms">
               <ArrowLeft className="w-4 h-4 mr-2" />
