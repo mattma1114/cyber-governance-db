@@ -205,16 +205,44 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-white py-8">
-        <div className="container flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Database className="w-4 h-4" />
-            <span>互联网平台治理数据库</span>
-            <span className="text-border">|</span>
-            <span>浙江传媒学院</span>
+      <footer className="border-t border-border bg-muted/30 py-10">
+        <div className="container">
+          {/* Top row: brand + nav links */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-border">
+            {/* Brand */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-primary" />
+                <span className="font-semibold text-foreground text-sm">互联网平台治理数据库</span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                系统收录全球互联网平台治理领域的司法内容、监管执法与立法政策，
+                覆盖中国、欧盟、美国、东南亚四大司法辖区。
+              </p>
+            </div>
+            {/* Quick links */}
+            <div className="flex flex-col gap-3">
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">快速导航</h4>
+              <div className="flex flex-col gap-2">
+                <Link href="/cases" className="text-xs text-muted-foreground hover:text-foreground transition-colors">内容数据库</Link>
+                <Link href="/platforms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">平台画像库</Link>
+                <Link href="/about" className="text-xs text-muted-foreground hover:text-foreground transition-colors">关于我们</Link>
+                <Link href="/legal" className="text-xs text-muted-foreground hover:text-foreground transition-colors">法律声明</Link>
+              </div>
+            </div>
+            {/* Institution */}
+            <div className="flex flex-col gap-3">
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">主办机构</h4>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-muted-foreground">浙江传媒学院</span>
+                <span className="text-xs text-muted-foreground">数字媒体与网络传播学院</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/legal" className="hover:text-foreground transition-colors text-xs">法律声明</Link>
+          {/* Bottom row: copyright */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-6 text-xs text-muted-foreground">
+            <span>© 2026 互联网平台治理数据库。保留所有权利。</span>
+            <span className="text-muted-foreground/60">本数据库仅供学术研究与教育目的使用</span>
           </div>
         </div>
       </footer>
