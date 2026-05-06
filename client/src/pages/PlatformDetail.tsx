@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Streamdown } from "streamdown";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,40 @@ function PortraitItem({ label, value }: { label: string; value: string | string[
         </div>
       ) : (
         <span className="text-sm text-foreground leading-relaxed">{value}</span>
+      )}
+    </div>
+  );
+}
+
+// ── FullTextSection: renders rule full text with expand/collapse ──
+function FullTextSection({ fullText }: { fullText: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = fullText.length > 3000;
+  return (
+    <div className="pt-5">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">规则全文</p>
+        <span className="text-xs text-muted-foreground">{fullText.length.toLocaleString()} 字符</span>
+      </div>
+      <div
+        className={`relative overflow-hidden transition-all duration-300 ${
+          isLong && !expanded ? "max-h-[600px]" : ""
+        }`}
+      >
+        <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:prose-invert">
+          <Streamdown>{fullText}</Streamdown>
+        </div>
+        {isLong && !expanded && (
+          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+        )}
+      </div>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 text-xs text-primary hover:underline focus:outline-none"
+        >
+          {expanded ? "收起" : "展开全文"}
+        </button>
       )}
     </div>
   );
@@ -270,12 +305,7 @@ export default function PlatformDetail() {
 
                 {/* Full text */}
                 {activeRule.fullText ? (
-                  <div className="pt-5">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">规则全文</p>
-                    <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                      {activeRule.fullText}
-                    </div>
-                  </div>
+                  <FullTextSection fullText={activeRule.fullText} />
                 ) : (
                   <div className="pt-5 text-sm text-muted-foreground">
                     <p>暂无全文内容。</p>
