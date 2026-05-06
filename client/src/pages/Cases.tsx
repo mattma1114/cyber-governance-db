@@ -206,7 +206,7 @@ export default function Cases() {
             <div className="pb-1">
               <h1 className="text-xl font-bold mb-0.5">{getSetting("cases.page_title", "内容数据库")}</h1>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                司法内容、监管执法与立法政策
+                {getSetting("cases.page_description", "司法内容、监管执法与立法政策")}
               </p>
             </div>
             <Separator />

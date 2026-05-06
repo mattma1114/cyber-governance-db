@@ -261,7 +261,7 @@
 - [x] 优化 PlatformDetail.tsx 移动端布局（Tab 导航、侧边栏、规则文件表格）
 
 ## 管理员后台「网站信息」管理模块（当前迭代）
-- [ ] 数据库新增 site_settings 表（key/value/updatedAt），执行迁移
-- [ ] 新增 siteSettings tRPC 路由（getAll/update），前台页面动态读取配置
-- [ ] Admin.tsx 新增「网站信息」Tab，分模块编辑（首页/关于我们/法律声明/主办机构/底部栏/内容数据库说明/平台画像库说明）
-- [ ] 前台 Home.tsx/About.tsx/Legal.tsx/Cases.tsx/Platforms.tsx 动态读取 site_settings
+- [x] 数据库新增 site_settings 表（key/value/updatedAt），执行迁移
+- [x] 新增 siteSettings tRPC 路由（getAll/update），前台页面动态读取配置
+- [x] Admin.tsx 新增「网站信息」Tab，分模块编辑（首页/关于我们/法律声明/主办机构/底部栏/内容数据库说明/平台画像库说明）
+- [x] 前台 Home.tsx/About.tsx/Legal.tsx/Cases.tsx/Platforms.tsx 动态读取 site_settings

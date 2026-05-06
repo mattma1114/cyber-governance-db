@@ -186,7 +186,7 @@ export default function Platforms() {
         <div className="flex md:hidden items-center justify-between mb-4">
           <div>
             <h1 className="text-lg font-bold leading-tight">{getSetting("platforms.page_title", "平台画像库")}</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">全球典型互联网平台结构画像</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{getSetting("platforms.page_description", "全球典型互联网平台结构画像")}</p>
           </div>
           <div className="flex items-center gap-2">
             {/* View toggle (mobile) */}
@@ -264,7 +264,7 @@ export default function Platforms() {
                 <div className="pb-1">
                   <h1 className="text-xl font-bold mb-0.5">{getSetting("platforms.page_title", "平台画像库")}</h1>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    全球典型互联网平台结构画像，涵盖商业模式、治理规则与监管动态
+                    {getSetting("platforms.page_description", "全球典型互联网平台结构画像，涵盖商业模式、治理规则与监管动态")}
                   </p>
                 </div>
                 <Separator />
