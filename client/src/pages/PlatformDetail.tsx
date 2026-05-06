@@ -1,21 +1,28 @@
+import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft, Building2, MapPin, Calendar, Globe, ExternalLink,
-  LayoutGrid, Clock, FileText, Scale, Network
+  LayoutGrid, Clock, FileText, Scale, Network, ChevronRight
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
+// ── Portrait item: label + value, separated by bottom border ──
 function PortraitItem({ label, value }: { label: string; value: string | string[] }) {
   return (
-    <div className="flex flex-col gap-1 py-3 border-b border-border last:border-0">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <div className="flex flex-col gap-1.5 py-4 border-b border-border last:border-0">
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
       {Array.isArray(value) ? (
         <div className="flex flex-wrap gap-1.5">
           {value.map((v) => (
@@ -23,14 +30,29 @@ function PortraitItem({ label, value }: { label: string; value: string | string[
           ))}
         </div>
       ) : (
-        <span className="text-sm text-foreground">{value}</span>
+        <span className="text-sm text-foreground leading-relaxed">{value}</span>
       )}
     </div>
   );
 }
 
+// ── Nav items config ──
+const NAV_ITEMS = [
+  { key: "portrait", label: "平台画像", icon: LayoutGrid },
+  { key: "timeline", label: "发展时间线", icon: Clock },
+  { key: "rules", label: "规则文件", icon: FileText },
+  { key: "cases", label: "关联内容", icon: Scale },
+] as const;
+
+type NavKey = typeof NAV_ITEMS[number]["key"];
+
 export default function PlatformDetail() {
   const { id } = useParams<{ id: string }>();
+  const [activeTab, setActiveTab] = useState<NavKey>("portrait");
+  // Rules: selected protocol name and version
+  const [selectedRuleTitle, setSelectedRuleTitle] = useState<string>("");
+  const [selectedRuleVersion, setSelectedRuleVersion] = useState<string>("");
+
   const { data: p, isLoading } = trpc.platforms.getById.useQuery({ id: id ?? "" }, { enabled: !!id });
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: topics } = trpc.topics.list.useQuery();
@@ -43,7 +65,6 @@ export default function PlatformDetail() {
       : (p.relatedCaseIds as string[]);
   })();
 
-  // Must call useQuery unconditionally before any early returns
   const { data: relatedCasesData } = trpc.cases.list.useQuery(
     { page: 1, pageSize: 20 },
     { enabled: relatedCaseIds.length > 0 }
@@ -51,7 +72,7 @@ export default function PlatformDetail() {
 
   if (isLoading) {
     return (
-      <div className="container py-8 max-w-4xl">
+      <div className="container py-8 max-w-5xl">
         <Skeleton className="h-8 w-32 mb-6" />
         <Skeleton className="h-24 w-full mb-4" />
         <Skeleton className="h-64 w-full" />
@@ -73,7 +94,7 @@ export default function PlatformDetail() {
   const jurisArr: string[] = Array.isArray(p.jurisdiction)
     ? p.jurisdiction
     : (p.jurisdiction ? JSON.parse(p.jurisdiction as string) : []);
-  const jurisLabels = jurisArr.map((id) => jurisdictions?.find((j) => j.id === id)).filter(Boolean);
+  const jurisLabels = jurisArr.map((jid) => jurisdictions?.find((j) => j.id === jid)).filter(Boolean);
 
   const portrait: any = p.portrait
     ? (typeof p.portrait === "string" ? JSON.parse(p.portrait) : p.portrait)
@@ -101,6 +122,226 @@ export default function PlatformDetail() {
     crossBorder: "跨境运营",
   };
 
+  // ── Rules: group by title, then by version ──
+  // Each rule may have: { title, type, date, version, url, fullText }
+  // Group: title → versions[]
+  const ruleGroups: Map<string, any[]> = new Map();
+  rules.forEach((r) => {
+    const key = r.title ?? r.type ?? "未命名协议";
+    if (!ruleGroups.has(key)) ruleGroups.set(key, []);
+    ruleGroups.get(key)!.push(r);
+  });
+  const ruleTitles = Array.from(ruleGroups.keys());
+
+  // Determine active rule title (default to first)
+  const activeRuleTitle = selectedRuleTitle || ruleTitles[0] || "";
+  const versionsForTitle = ruleGroups.get(activeRuleTitle) ?? [];
+  // Sort versions by date desc
+  const sortedVersions = [...versionsForTitle].sort((a, b) =>
+    (b.date ?? "").localeCompare(a.date ?? "")
+  );
+  const activeVersion = selectedRuleVersion || sortedVersions[0]?.date || sortedVersions[0]?.version || "";
+  const activeRule = sortedVersions.find(
+    (r) => (r.date ?? r.version ?? "") === activeVersion
+  ) ?? sortedVersions[0];
+
+  // ── Render content panel ──
+  function renderContent() {
+    switch (activeTab) {
+      case "portrait":
+        return portrait ? (
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <Network className="w-4 h-4 text-primary" />
+              <h2 className="text-base font-semibold">平台结构七维画像</h2>
+            </div>
+            {Object.entries(PORTRAIT_LABELS).map(([key, label]) => {
+              const val = portrait[key];
+              if (!val) return null;
+              return <PortraitItem key={key} label={label} value={val} />;
+            })}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm py-8">暂无画像数据</p>
+        );
+
+      case "timeline":
+        return timeline.length > 0 ? (
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <Clock className="w-4 h-4 text-primary" />
+              <h2 className="text-base font-semibold">发展时间线</h2>
+            </div>
+            <div className="relative">
+              <div className="absolute left-3 top-0 bottom-0 w-px bg-border" />
+              <div className="space-y-0 pl-10">
+                {timeline.map((item: any, i: number) => (
+                  <div key={i} className="relative py-4 border-b border-border last:border-0">
+                    <div className="absolute -left-7 top-5 w-2.5 h-2.5 rounded-full border-2 border-primary bg-background" />
+                    <span className="text-xs font-mono text-muted-foreground block mb-1">{item.date}</span>
+                    <p className="text-sm leading-relaxed">{item.event}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm py-8">暂无时间线数据</p>
+        );
+
+      case "rules":
+        return rules.length > 0 ? (
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <FileText className="w-4 h-4 text-primary" />
+              <h2 className="text-base font-semibold">规则文件</h2>
+            </div>
+
+            {/* Protocol selector row */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {ruleTitles.map((title) => (
+                <button
+                  key={title}
+                  onClick={() => {
+                    setSelectedRuleTitle(title);
+                    setSelectedRuleVersion("");
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                    activeRuleTitle === title
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted text-foreground"
+                  )}
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
+
+            {/* Version selector */}
+            {sortedVersions.length > 1 && (
+              <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
+                <span className="text-xs text-muted-foreground shrink-0">版本 / 日期</span>
+                <Select
+                  value={activeVersion}
+                  onValueChange={(v) => setSelectedRuleVersion(v)}
+                >
+                  <SelectTrigger className="h-8 text-xs w-52">
+                    <SelectValue placeholder="选择版本" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedVersions.map((r, i) => {
+                      const vLabel = r.date ?? r.version ?? `版本 ${i + 1}`;
+                      return (
+                        <SelectItem key={i} value={vLabel} className="text-xs">
+                          {vLabel}{r.version && r.date ? ` (${r.version})` : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Active rule metadata */}
+            {activeRule && (
+              <div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {activeRule.type && (
+                      <Badge variant="outline" className="text-xs">{activeRule.type}</Badge>
+                    )}
+                    {activeRule.date && (
+                      <span className="text-xs text-muted-foreground">{activeRule.date}</span>
+                    )}
+                    {activeRule.version && (
+                      <span className="text-xs text-muted-foreground">版本：{activeRule.version}</span>
+                    )}
+                  </div>
+                  {activeRule.url && (
+                    <Button size="sm" variant="ghost" asChild className="gap-1.5 text-xs h-7">
+                      <a href={activeRule.url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="w-3 h-3" />
+                        查看原文
+                      </a>
+                    </Button>
+                  )}
+                </div>
+
+                {/* Full text */}
+                {activeRule.fullText ? (
+                  <div className="pt-5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">规则全文</p>
+                    <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                      {activeRule.fullText}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-5 text-sm text-muted-foreground">
+                    <p>暂无全文内容。</p>
+                    {activeRule.url && (
+                      <a
+                        href={activeRule.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-xs mt-1 inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        前往原始链接查看
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm py-8">暂无规则文件</p>
+        );
+
+      case "cases":
+        return (
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <Scale className="w-4 h-4 text-primary" />
+              <h2 className="text-base font-semibold">关联内容</h2>
+              {relatedCases.length > 0 && (
+                <span className="text-xs text-muted-foreground">共 {relatedCases.length} 条</span>
+              )}
+            </div>
+            {relatedCases.length > 0 ? (
+              <div>
+                {relatedCases.map((c) => {
+                  const topic = topics?.find((t) => t.id === c.topicId);
+                  const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
+                  return (
+                    <Link key={c.id} href={`/cases/${c.id}`}>
+                      <div className="flex items-start gap-3 py-4 border-b border-border last:border-0 hover:bg-muted/40 -mx-2 px-2 rounded transition-colors cursor-pointer">
+                        <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[c.type])}>
+                          {TYPE_LABELS[c.type]?.label}
+                        </Badge>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium line-clamp-2 mb-1">{c.title}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{c.date}</span>
+                            {juris && <span>{juris.flag} {juris.label}</span>}
+                            {topic && <span>{topic.label}</span>}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm py-8">暂无关联内容</p>
+            )}
+          </div>
+        );
+    }
+  }
+
   return (
     <div className="min-h-screen">
       {/* Breadcrumb */}
@@ -118,40 +359,51 @@ export default function PlatformDetail() {
       {/* Color bar */}
       <div className="h-1.5 w-full" style={{ background: p.color ?? "var(--primary)" }} />
 
-      <div className="container py-8 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-start gap-5 mb-8">
+      <div className="container py-8">
+        {/* Platform header */}
+        <div className="flex items-start gap-5 mb-6">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-md shrink-0"
+            className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm shrink-0"
             style={{ background: p.color ?? "var(--primary)" }}
           >
             {p.abbr ?? p.name[0]}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold leading-tight mb-1">{p.name}</h1>
+            <h1 className="text-2xl font-bold leading-tight mb-1">{p.name}</h1>
             {p.company && (
-              <p className="text-base text-muted-foreground flex items-center gap-1.5 mb-3">
-                <Building2 className="w-4 h-4 shrink-0" />
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-2">
+                <Building2 className="w-3.5 h-3.5 shrink-0" />
                 {p.company}
               </p>
             )}
-            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mb-2">
               {p.hq && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
                   {p.hq}
                 </span>
               )}
               {p.founded && (
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
                   创立于 {p.founded} 年
                 </span>
               )}
+              {p.website && (
+                <a
+                  href={p.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                >
+                  <Globe className="w-3 h-3" />
+                  官网
+                </a>
+              )}
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-1.5">
               {jurisLabels.map((j) => j && (
-                <Badge key={j.id} variant="outline" className="gap-1">
+                <Badge key={j.id} variant="outline" className="gap-1 text-xs">
                   <span>{j.flag}</span>
                   {j.label}
                 </Badge>
@@ -165,142 +417,50 @@ export default function PlatformDetail() {
 
         {/* Description */}
         {p.description && (
-          <p className="text-sm leading-relaxed text-foreground/90 mb-8 p-4 rounded-xl bg-muted/50 border border-border">
+          <p className="text-sm leading-relaxed text-foreground/80 mb-6 pb-6 border-b border-border">
             {p.description}
           </p>
         )}
 
-        <Separator className="mb-8" />
-
-        {/* Tabs */}
-        <Tabs defaultValue="portrait">
-          <TabsList className="mb-6">
-            <TabsTrigger value="portrait" className="gap-1.5">
-              <LayoutGrid className="w-3.5 h-3.5" />
-              平台画像
-            </TabsTrigger>
-            <TabsTrigger value="timeline" className="gap-1.5">
-              <Clock className="w-3.5 h-3.5" />
-              发展时间线
-            </TabsTrigger>
-            <TabsTrigger value="rules" className="gap-1.5">
-              <FileText className="w-3.5 h-3.5" />
-              规则文件
-            </TabsTrigger>
-            {relatedCases.length > 0 && (
-              <TabsTrigger value="cases" className="gap-1.5">
-                <Scale className="w-3.5 h-3.5" />
-                关联内容
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          {/* Portrait */}
-          <TabsContent value="portrait">
-            {portrait ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Network className="w-4 h-4 text-primary" />
-                    平台结构七维画像
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {Object.entries(PORTRAIT_LABELS).map(([key, label]) => {
-                    const val = portrait[key];
-                    if (!val) return null;
-                    return <PortraitItem key={key} label={label} value={val} />;
-                  })}
-                </CardContent>
-              </Card>
-            ) : (
-              <p className="text-muted-foreground text-sm">暂无画像数据</p>
-            )}
-          </TabsContent>
-
-          {/* Timeline */}
-          <TabsContent value="timeline">
-            {timeline.length > 0 ? (
-              <div className="relative">
-                <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
-                <div className="space-y-4 pl-10">
-                  {timeline.map((item: any, i: number) => (
-                    <div key={i} className="relative">
-                      <div
-                        className="absolute -left-6 top-1.5 w-3 h-3 rounded-full border-2 border-primary bg-background"
-                      />
-                      <div className="p-4 rounded-xl border border-border bg-card hover:shadow-sm transition-shadow">
-                        <span className="text-xs font-mono text-muted-foreground">{item.date}</span>
-                        <p className="text-sm mt-1">{item.event}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">暂无时间线数据</p>
-            )}
-          </TabsContent>
-
-          {/* Rules */}
-          <TabsContent value="rules">
-            {rules.length > 0 ? (
-              <div className="space-y-3">
-                {rules.map((rule: any, i: number) => (
-                  <Card key={i}>
-                    <CardContent className="p-4 flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs">{rule.type}</Badge>
-                          <span className="text-xs text-muted-foreground">{rule.date}</span>
-                        </div>
-                        <p className="text-sm font-medium">{rule.title}</p>
-                      </div>
-                      {rule.url && (
-                        <Button size="sm" variant="ghost" asChild className="shrink-0">
-                          <a href={rule.url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">暂无规则文件</p>
-            )}
-          </TabsContent>
-
-          {/* Related Cases */}
-          <TabsContent value="cases">
-            <div className="space-y-3">
-              {relatedCases.map((c) => {
-                const topic = topics?.find((t) => t.id === c.topicId);
-                const juris = jurisdictions?.find((j) => j.id === c.jurisdictionId);
+        {/* Two-column layout: left nav + right content */}
+        <div className="flex gap-8 items-start">
+          {/* ── Left: Section nav ── */}
+          <aside className="w-44 shrink-0 sticky top-4 self-start">
+            <nav className="flex flex-col">
+              {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+                // Hide "关联内容" if none
+                if (key === "cases" && relatedCases.length === 0) return null;
+                const isActive = activeTab === key;
                 return (
-                  <Link key={c.id} href={`/cases/${c.id}`}>
-                    <Card className="hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer">
-                      <CardContent className="p-4 flex items-start gap-3">
-                        <Badge variant="secondary" className={cn("text-xs shrink-0 mt-0.5", TYPE_BADGE_CLASS[c.type])}>
-                          {TYPE_LABELS[c.type]?.label}
-                        </Badge>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium line-clamp-1">{c.title}</p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span>{c.date}</span>
-                            {juris && <span>{juris.flag} {juris.label}</span>}
-                            {topic && <span>{topic.label}</span>}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors text-left w-full",
+                      isActive
+                        ? "bg-primary/8 text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Icon className={cn("w-3.5 h-3.5 shrink-0", isActive ? "text-primary" : "")} />
+                    {label}
+                    {key === "rules" && rules.length > 0 && (
+                      <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ruleTitles.length}</span>
+                    )}
+                    {key === "cases" && relatedCases.length > 0 && (
+                      <span className="ml-auto text-xs text-muted-foreground tabular-nums">{relatedCases.length}</span>
+                    )}
+                  </button>
                 );
               })}
-            </div>
-          </TabsContent>
-        </Tabs>
+            </nav>
+          </aside>
+
+          {/* ── Right: Content ── */}
+          <div className="flex-1 min-w-0">
+            {renderContent()}
+          </div>
+        </div>
 
         {/* Bottom nav */}
         <div className="mt-12 pt-6 border-t border-border">
