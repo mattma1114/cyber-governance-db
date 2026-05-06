@@ -20,8 +20,7 @@ import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
-  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare
-} from "lucide-react";
+  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -572,6 +571,46 @@ function SettingsTab() {
     { value: "azure", label: "Azure OpenAI", hint: "需要额外配置 Endpoint URL 和 API 版本" },
     { value: "openai_compat", label: "OpenAI 兼容端点", hint: "Ollama、Together.ai、Groq 等兼容 OpenAI 格式的服务" },
   ];
+
+  // ── Per-task LLM config ──────────────────────────────────────────────────
+  const { data: llmTasks } = trpc.ai.getLlmTasks.useQuery();
+  const [taskConfigs, setTaskConfigs] = useState<Record<string, { provider: string; model: string }>>({});
+  const [taskConfigExpanded, setTaskConfigExpanded] = useState(false);
+
+  // Initialize task configs from existing settings
+  const initTaskConfigs = () => {
+    if (!settings || !llmTasks) return;
+    const init: Record<string, { provider: string; model: string }> = {};
+    llmTasks.forEach((t) => {
+      init[t.key] = {
+        provider: settings.find((s) => s.key === `LLM_TASK_${t.key}_PROVIDER`)?.value ?? "",
+        model: settings.find((s) => s.key === `LLM_TASK_${t.key}_MODEL`)?.value ?? "",
+      };
+    });
+    setTaskConfigs(init);
+  };
+
+  const saveTaskConfigs = () => {
+    if (!llmTasks) return;
+    llmTasks.forEach((t) => {
+      const cfg = taskConfigs[t.key];
+      if (!cfg) return;
+      if (cfg.provider) {
+        // Save provider (including "builtin" which explicitly overrides global)
+        upsertMutation.mutate({ key: `LLM_TASK_${t.key}_PROVIDER`, value: cfg.provider, label: `${t.label} - 服务商` });
+      } else {
+        // Empty = "follow global" → delete the task-level provider key
+        deleteMutation.mutate({ key: `LLM_TASK_${t.key}_PROVIDER` });
+      }
+      if (cfg.model) {
+        upsertMutation.mutate({ key: `LLM_TASK_${t.key}_MODEL`, value: cfg.model, label: `${t.label} - 模型` });
+      } else {
+        // Empty model → delete so it falls back to provider default
+        deleteMutation.mutate({ key: `LLM_TASK_${t.key}_MODEL` });
+      }
+    });
+    toast.success("按功能 LLM 配置已保存");
+  };
   const DEFAULT_MODEL_HINTS: Record<string, string> = {
     openai: "gpt-4o",
     deepseek: "deepseek-chat",
@@ -844,6 +883,116 @@ function SettingsTab() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Per-task LLM Configuration */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium flex items-center gap-1.5">
+              <Bot className="w-4 h-4 text-primary" />
+              按功能指定模型
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              为每个 AI 功能单独指定服务商和模型。未配置时使用上方全局设置，全局未配置则使用内置 LLM。
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={() => {
+              if (!taskConfigExpanded) initTaskConfigs();
+              setTaskConfigExpanded((v) => !v);
+            }}
+          >
+            {taskConfigExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {taskConfigExpanded ? "收起" : "展开配置"}
+          </Button>
+        </div>
+
+        {taskConfigExpanded && (
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {(llmTasks ?? []).map((task) => {
+              const cfg = taskConfigs[task.key] ?? { provider: "", model: "" };
+              const effectiveProvider = cfg.provider || existingProvider || "builtin";
+              return (
+                <div key={task.key} className="px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium">{task.label}</p>
+                      <p className="text-xs text-muted-foreground">{task.desc}</p>
+                    </div>
+                    <Badge
+                      variant={cfg.provider && cfg.provider !== "builtin" ? "default" : "secondary"}
+                      className="text-xs shrink-0"
+                    >
+                      {cfg.provider && cfg.provider !== "builtin"
+                        ? cfg.provider
+                        : existingProvider && existingProvider !== "builtin"
+                          ? `全局: ${existingProvider}`
+                          : "内置 LLM"}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">服务商（留空使用全局）</label>
+                      <Select
+                        value={cfg.provider || "__global__"}
+                        onValueChange={(v) =>
+                          setTaskConfigs((prev) => ({
+                            ...prev,
+                            [task.key]: { ...prev[task.key], provider: v === "__global__" ? "" : v },
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__global__">
+                            <span className="text-muted-foreground">跟随全局配置</span>
+                          </SelectItem>
+                          <SelectItem value="builtin">Manus 内置 LLM</SelectItem>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="deepseek">DeepSeek</SelectItem>
+                          <SelectItem value="anthropic">Anthropic Claude</SelectItem>
+                          <SelectItem value="azure">Azure OpenAI</SelectItem>
+                          <SelectItem value="openai_compat">OpenAI 兼容端点</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">
+                        模型（留空使用{" "}
+                        {DEFAULT_MODEL_HINTS[effectiveProvider] ?? "默认"}）
+                      </label>
+                      <Input
+                        className="h-7 text-xs font-mono"
+                        placeholder={DEFAULT_MODEL_HINTS[effectiveProvider] ?? "默认模型"}
+                        value={cfg.model}
+                        onChange={(e) =>
+                          setTaskConfigs((prev) => ({
+                            ...prev,
+                            [task.key]: { ...prev[task.key], model: e.target.value },
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="px-4 py-3">
+              <Button size="sm" className="h-7 text-xs" onClick={saveTaskConfigs} disabled={upsertMutation.isPending}>
+                {upsertMutation.isPending
+                  ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  : <Save className="w-3 h-3 mr-1" />}
+                保存按功能配置
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Custom key-value */}

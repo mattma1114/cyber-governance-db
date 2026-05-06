@@ -274,6 +274,73 @@ export function parseLlmConfig(
   };
 }
 
+// ── Task-level LLM config ──────────────────────────────────────────────────
+
+/**
+ * 支持按功能分配 LLM 的任务键定义。
+ * 数据库 key 约定：
+ *   LLM_TASK_{TASK_KEY}_PROVIDER  – 该任务使用的服务商
+ *   LLM_TASK_{TASK_KEY}_MODEL     – 该任务使用的模型
+ * API Key 共用全局配置（LLM_API_KEY）。
+ */
+export const LLM_TASKS = [
+  { key: "CASE_EXTRACT",    label: "内容提取 + 法律分析",   desc: "从 URL 自动提取司法内容、摘要、分类、当事方，并生成深度法律分析（同一次调用）" },
+  { key: "PLATFORM_FILL",   label: "平台信息填写", desc: "根据关键词自动填写平台基本信息、画像、发展历程" },
+  { key: "TAG_SUGGEST",     label: "专题/辖区预填写", desc: "根据中文名称自动生成 slug、英文名称、颜色" },
+] as const;
+
+export type LlmTaskKey = typeof LLM_TASKS[number]["key"];
+
+/**
+ * 解析指定任务的 LLM 配置。
+ * 回退链：任务级配置 → 全局配置 → null（使用内置 LLM）
+ */
+export function parseLlmConfigForTask(
+  rows: Array<{ key: string; value: string }>,
+  taskKey: LlmTaskKey
+): LlmConfig | null {
+  const get = (k: string) => rows.find((r) => r.key === k)?.value ?? "";
+
+  // 1. 尝试任务级配置
+  const taskProvider = get(`LLM_TASK_${taskKey}_PROVIDER`) as LlmProvider;
+  if (taskProvider) {
+    // 任务级明确指定了服务商
+    if (taskProvider === "builtin") {
+      // 明确选择内置 LLM，不继续回退到全局外部配置
+      return null;
+    }
+    // 任务级可独立配置服务商和模型，但共用全局 API Key 和连接信息
+    const taskModel = get(`LLM_TASK_${taskKey}_MODEL`);
+    const globalApiKey = get("LLM_API_KEY");
+    // 如果任务级服务商与全局相同，共用全局 key；否则尝试任务级独立 key
+    const taskApiKey = get(`LLM_TASK_${taskKey}_API_KEY`) || globalApiKey;
+    if (taskApiKey) {
+      return {
+        provider: taskProvider,
+        apiKey: taskApiKey,
+        model: taskModel || undefined,
+        baseUrl: get("LLM_BASE_URL") || undefined,
+        apiVersion: get("LLM_API_VERSION") || undefined,
+      };
+    }
+  }
+
+  // 2. 回退到全局配置
+  return parseLlmConfig(rows);
+}
+
+/**
+ * 按任务级路由 LLM 调用的便捷封装函数。
+ */
+export async function routeLlmForTask(
+  rows: Array<{ key: string; value: string }>,
+  taskKey: LlmTaskKey,
+  options: LlmCallOptions
+): Promise<LlmResponse> {
+  const config = parseLlmConfigForTask(rows, taskKey);
+  return routeLlm(config, options);
+}
+
 /**
  * 测试外部 LLM 连通性（直接调用外部 API，不走降级逻辑）。
  * 外部 API 失败时明确返回失败，不会回落到内置 LLM。

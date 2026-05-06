@@ -239,3 +239,9 @@
 - [x] 将所有 AI 功能路由（extractCaseFromUrl/extractPlatformByKeyword/suggestTagFields）改为调用 llm-router
 - [x] Admin.tsx API 配置页新增外部 LLM 配置区块（服务商/Key/模型/测试）
 - [x] 后端新增 ai.testLlm 路由，验证外部 LLM 连通性
+
+## 按功能分配 LLM 模型（当前迭代）
+- [x] 设计数据库 key 约定（LLM_TASK_{TASK}_PROVIDER / MODEL）
+- [x] 扩展 llm-router.ts：返回链：任务级 → 全局 → 内置
+- [x] 更新 routers.ts 各 AI 路由传入 taskKey
+- [x] Admin.tsx 新增「按功能配置」区块，每个功能独立选择服务商和模型

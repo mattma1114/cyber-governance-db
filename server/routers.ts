@@ -7,7 +7,7 @@ import { getDb } from "./db";
 import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
-import { routeLlm, parseLlmConfig, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
+import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
 import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
@@ -852,8 +852,7 @@ export const appRouter = router({
   - event: string (milestone description in Chinese, 30-80 chars)
 
 Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real and verifiable.`;
-        const llmConfig = parseLlmConfig(rows);
-        const response = await routeLlm(llmConfig, {
+        const response = await routeLlmForTask(rows, "PLATFORM_FILL", {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `Platform keyword: ${input.keyword}` },
@@ -976,8 +975,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
           ? `URL: ${input.url}\n\nFull page content (scraped via ${scrapeSource}):\n\n${scrapedFullText.slice(0, 14000)}`
           : `Please extract and analyze information from this URL: ${input.url}`;
 
-        const llmConfig = parseLlmConfig(rows);
-        const response = await routeLlm(llmConfig, {
+        const response = await routeLlmForTask(rows, "CASE_EXTRACT", {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -1046,8 +1044,7 @@ Return ONLY valid JSON, no explanation.`
 Return ONLY valid JSON, no explanation.`;
         const dbInst = await getDb();
         const llmRows = dbInst ? await dbInst.select().from(apiSettings) : [];
-        const llmConfig = parseLlmConfig(llmRows);
-        const response = await routeLlm(llmConfig, {
+        const response = await routeLlmForTask(llmRows, "TAG_SUGGEST", {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: input.label },
@@ -1083,6 +1080,10 @@ Return ONLY valid JSON, no explanation.`;
         const content = response.choices[0].message.content;
         return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
       }),
+
+    // ── Get task definitions ──────────────────────────────────────────
+    getLlmTasks: adminProcedure
+      .query(() => LLM_TASKS.map((t) => ({ key: t.key, label: t.label, desc: t.desc }))),
 
     // ── Test external LLM connectivity ──────────────────────────────────
     testLlm: adminProcedure
