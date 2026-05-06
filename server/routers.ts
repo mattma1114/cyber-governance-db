@@ -3,8 +3,9 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { getDb, listUsers, updateUserRole } from "./db";
-import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users } from "../drizzle/schema";
+import { getDb, listUsers, updateUserRole, updateUserStatus, deleteUser, createAdminInvite, listAdminInvites, getAdminInviteByToken, consumeAdminInvite, revokeAdminInvite } from "./db";
+import { randomBytes } from "crypto";
+import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users, adminInvites } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
@@ -1193,6 +1194,108 @@ Return ONLY valid JSON, no explanation.`;
           throw new TRPCError({ code: "BAD_REQUEST", message: "不能降级自己的管理员权限" });
         }
         await updateUserRole(input.id, input.role);
+        return { success: true };
+      }),
+
+    updateStatus: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .input(z.object({
+        id: z.number().int(),
+        status: z.enum(["active", "frozen"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.id === input.id) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "不能冒结自己的账号" });
+        }
+        await updateUserStatus(input.id, input.status);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.id === input.id) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "不能删除自己的账号" });
+        }
+        await deleteUser(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ── Admin Invites ──────────────────────────────────────────────────────────────
+  invites: router({
+    list: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .query(async () => {
+        return listAdminInvites();
+      }),
+
+    generate: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .input(z.object({
+        note: z.string().max(200).optional(),
+        expiresInDays: z.number().int().min(1).max(365).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const token = randomBytes(24).toString("hex");
+        const expiresAt = input.expiresInDays
+          ? new Date(Date.now() + input.expiresInDays * 86400_000)
+          : undefined;
+        await createAdminInvite({
+          token,
+          note: input.note,
+          createdBy: ctx.user.id,
+          expiresAt,
+        });
+        return { token };
+      }),
+
+    revoke: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ input }) => {
+        await revokeAdminInvite(input.id);
+        return { success: true };
+      }),
+
+    // Public: validate invite token (used on invite landing page)
+    validate: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const invite = await getAdminInviteByToken(input.token);
+        if (!invite) return { valid: false, reason: "邀请码不存在" };
+        if (invite.usedBy) return { valid: false, reason: "邀请码已被使用" };
+        if (invite.expiresAt && invite.expiresAt < new Date()) return { valid: false, reason: "邀请码已过期" };
+        return { valid: true, note: invite.note };
+      }),
+
+    // Protected: consume invite (called after OAuth login)
+    consume: protectedProcedure
+      .input(z.object({ token: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const invite = await getAdminInviteByToken(input.token);
+        if (!invite) throw new TRPCError({ code: "NOT_FOUND", message: "邀请码不存在" });
+        if (invite.usedBy) throw new TRPCError({ code: "BAD_REQUEST", message: "邀请码已被使用" });
+        if (invite.expiresAt && invite.expiresAt < new Date()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "邀请码已过期" });
+        }
+        await consumeAdminInvite(input.token, ctx.user.id);
         return { success: true };
       }),
   }),

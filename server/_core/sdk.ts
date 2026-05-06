@@ -292,6 +292,11 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
+    // Reject frozen accounts
+    if ((user as any).status === 'frozen') {
+      throw ForbiddenError("账号已被冒结，请联系管理员。");
+    }
+
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,

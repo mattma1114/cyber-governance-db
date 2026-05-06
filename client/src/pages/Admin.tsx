@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -21,7 +21,7 @@ import {
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
   RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info,
-  Users, ShieldOff, Crown} from "lucide-react";
+  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -1067,29 +1067,52 @@ function UsersTab() {
   const utils = trpc.useUtils();
   const [page, setPage] = useState(1);
   const PAGE_SIZE_USERS = 20;
+  const [inviteNote, setInviteNote] = useState("");
+  const [inviteExpireDays, setInviteExpireDays] = useState<string>("7");
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"users" | "invites">("users");
 
   const { data, isLoading, error, refetch } = trpc.users.list.useQuery(
     { page, pageSize: PAGE_SIZE_USERS },
     { refetchOnWindowFocus: false }
   );
+  const { data: invites, refetch: refetchInvites } = trpc.invites.list.useQuery(undefined, { refetchOnWindowFocus: false });
 
   const updateRoleMutation = trpc.users.updateRole.useMutation({
-    onSuccess: () => {
-      toast.success("用户角色已更新");
-      utils.users.list.invalidate();
+    onSuccess: () => { toast.success("用户角色已更新"); utils.users.list.invalidate(); },
+    onError: (err) => toast.error(err.message || "操作失败"),
+  });
+  const updateStatusMutation = trpc.users.updateStatus.useMutation({
+    onSuccess: () => { toast.success("账号状态已更新"); utils.users.list.invalidate(); },
+    onError: (err) => toast.error(err.message || "操作失败"),
+  });
+  const deleteMutation = trpc.users.delete.useMutation({
+    onSuccess: () => { toast.success("用户已删除"); utils.users.list.invalidate(); setDeleteConfirmId(null); },
+    onError: (err) => toast.error(err.message || "删除失败"),
+  });
+  const generateInviteMutation = trpc.invites.generate.useMutation({
+    onSuccess: (data) => {
+      setGeneratedToken(data.token);
+      utils.invites.list.invalidate();
     },
-    onError: (err) => {
-      toast.error(err.message || "操作失败");
-    },
+    onError: (err) => toast.error(err.message || "生成失败"),
+  });
+  const revokeInviteMutation = trpc.invites.revoke.useMutation({
+    onSuccess: () => { toast.success("邀请码已撤销"); utils.invites.list.invalidate(); },
+    onError: (err) => toast.error(err.message || "撤销失败"),
   });
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE_USERS);
 
-  const handleRoleToggle = (userId: number, currentRole: string) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
-    updateRoleMutation.mutate({ id: userId, role: newRole as "user" | "admin" });
+  const getInviteUrl = (token: string) => `${window.location.origin}/invite/${token}`;
+
+  const handleCopyInvite = (token: string) => {
+    navigator.clipboard.writeText(getInviteUrl(token));
+    toast.success("邀请链接已复制到剪贴板");
   };
 
   return (
@@ -1097,140 +1120,279 @@ function UsersTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">用户管理</h2>
+          <h2 className="text-base font-semibold">账号管理</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            共 {total} 位注册用户，通过 Manus OAuth 登录后自动创建账号
+            共 {total} 位注册用户 · 通过邀请码可直接创建管理员账号
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
-          <RefreshCw className="w-3.5 h-3.5" />
-          刷新
-        </Button>
-      </div>
-
-      {/* Table */}
-      {error ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3 text-sm">
-          <AlertTriangle className="w-8 h-8 text-destructive opacity-70" />
-          <p className="text-muted-foreground">加载用户列表失败：{error.message}</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { refetch(); refetchInvites(); }} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" />
-            重试
+            刷新
+          </Button>
+          <Button size="sm" onClick={() => { setGeneratedToken(null); setInviteNote(""); setInviteExpireDays("7"); setShowInviteDialog(true); }} className="gap-1.5">
+            <Plus className="w-3.5 h-3.5" />
+            生成邀请码
           </Button>
         </div>
-      ) : isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">
-          <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          暂无用户
-        </div>
-      ) : (
-        <div className="rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50 border-b">
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-8">#</th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">姓名</th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">邮箱</th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">登录方式</th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">注册时间</th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden xl:table-cell">最后登录</th>
-                <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">角色</th>
-                <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((u, idx) => {
-                const isMe = currentUser?.id === u.id;
-                const isAdmin = u.role === "admin";
-                return (
-                  <tr key={u.id} className={cn("border-b last:border-0 hover:bg-muted/30 transition-colors", isMe && "bg-primary/5")}>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{(page - 1) * PAGE_SIZE_USERS + idx + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-                          {(u.name ?? "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="font-medium leading-tight">
-                            {u.name ?? <span className="text-muted-foreground italic">未设置</span>}
-                            {isMe && <span className="ml-1.5 text-xs text-primary font-normal">（我）</span>}
-                          </div>
-                          <div className="text-xs text-muted-foreground font-mono">{u.openId.slice(0, 12)}…</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                      {u.email ?? <span className="italic text-xs">未绑定</span>}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
-                      {u.loginMethod ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
-                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString("zh-CN") : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell">
-                      {u.lastSignedIn ? new Date(u.lastSignedIn).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {isAdmin ? (
-                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 gap-1 dark:bg-amber-900/30 dark:text-amber-300">
-                          <Crown className="w-3 h-3" />
-                          管理员
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="gap-1">
-                          <Users className="w-3 h-3" />
-                          普通用户
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={isMe || updateRoleMutation.isPending}
-                        onClick={() => handleRoleToggle(u.id, u.role)}
-                        className={cn(
-                          "text-xs h-7 px-2.5 gap-1",
-                          isAdmin ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        )}
-                        title={isMe ? "不能修改自己的角色" : isAdmin ? "降级为普通用户" : "提升为管理员"}
-                      >
-                        {isAdmin ? (
-                          <><ShieldOff className="w-3 h-3" />降级</>
-                        ) : (
-                          <><ShieldCheck className="w-3 h-3" />提升</>
-                        )}
-                      </Button>
-                    </td>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex border-b">
+        <button
+          onClick={() => setActiveTab("users")}
+          className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors", activeTab === "users" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+        >
+          <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />用户列表</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("invites")}
+          className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors", activeTab === "invites" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+        >
+          <span className="flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" />邀请码管理 {invites && invites.filter(i => !i.usedBy).length > 0 && <span className="bg-primary text-primary-foreground text-xs rounded-full px-1.5">{invites.filter(i => !i.usedBy).length}</span>}</span>
+        </button>
+      </div>
+
+      {/* Users List */}
+      {activeTab === "users" && (
+        <>
+          {error ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-sm">
+              <AlertTriangle className="w-8 h-8 text-destructive opacity-70" />
+              <p className="text-muted-foreground">加载用户列表失败：{error.message}</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5" />重试
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />暂无用户
+            </div>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-8">#</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">姓名</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">邮箱</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">注册时间</th>
+                    <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">角色</th>
+                    <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">状态</th>
+                    <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">操作</th>
                   </tr>
+                </thead>
+                <tbody>
+                  {items.map((u, idx) => {
+                    const isMe = currentUser?.id === u.id;
+                    const isAdmin = u.role === "admin";
+                    const isFrozen = (u as any).status === "frozen";
+                    return (
+                      <tr key={u.id} className={cn("border-b last:border-0 hover:bg-muted/30 transition-colors", isMe && "bg-primary/5", isFrozen && "opacity-60")}>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{(page - 1) * PAGE_SIZE_USERS + idx + 1}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className={cn("w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0", isFrozen ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary")}>
+                              {(u.name ?? "?").charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-medium leading-tight">
+                                {u.name ?? <span className="text-muted-foreground italic">未设置</span>}
+                                {isMe && <span className="ml-1.5 text-xs text-primary font-normal">（我）</span>}
+                              </div>
+                              <div className="text-xs text-muted-foreground font-mono">{u.openId.slice(0, 12)}…</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                          {u.email ?? <span className="italic text-xs">未绑定</span>}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+                          {u.createdAt ? new Date(u.createdAt).toLocaleDateString("zh-CN") : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {isAdmin ? (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-200 gap-1 dark:bg-amber-900/30 dark:text-amber-300">
+                              <Crown className="w-3 h-3" />管理员
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="gap-1">
+                              <Users className="w-3 h-3" />普通用户
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {isFrozen ? (
+                            <Badge variant="outline" className="gap-1 text-red-600 border-red-200">
+                              <Lock className="w-3 h-3" />已冻结
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="gap-1 text-green-600 border-green-200">
+                              <Unlock className="w-3 h-3" />正常
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* Role toggle */}
+                            <Button variant="ghost" size="sm" disabled={isMe || updateRoleMutation.isPending}
+                              onClick={() => updateRoleMutation.mutate({ id: u.id, role: isAdmin ? "user" : "admin" })}
+                              className={cn("text-xs h-7 px-2 gap-1", isAdmin ? "text-orange-600 hover:bg-orange-50" : "text-blue-600 hover:bg-blue-50")}
+                              title={isMe ? "不能修改自己" : isAdmin ? "降级为普通用户" : "提升为管理员"}>
+                              {isAdmin ? <><ShieldOff className="w-3 h-3" />降级</> : <><ShieldCheck className="w-3 h-3" />提升</>}
+                            </Button>
+                            {/* Freeze toggle */}
+                            <Button variant="ghost" size="sm" disabled={isMe || updateStatusMutation.isPending}
+                              onClick={() => updateStatusMutation.mutate({ id: u.id, status: isFrozen ? "active" : "frozen" })}
+                              className={cn("text-xs h-7 px-2 gap-1", isFrozen ? "text-green-600 hover:bg-green-50" : "text-yellow-600 hover:bg-yellow-50")}
+                              title={isMe ? "不能冻结自己" : isFrozen ? "解冻账号" : "冻结账号"}>
+                              {isFrozen ? <><Unlock className="w-3 h-3" />解冻</> : <><Lock className="w-3 h-3" />冻结</>}
+                            </Button>
+                            {/* Delete */}
+                            <Button variant="ghost" size="sm" disabled={isMe || deleteMutation.isPending}
+                              onClick={() => setDeleteConfirmId(u.id)}
+                              className="text-xs h-7 px-2 gap-1 text-red-600 hover:bg-red-50"
+                              title={isMe ? "不能删除自己" : "删除用户"}>
+                              <Trash2 className="w-3 h-3" />删除
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>第 {page} / {totalPages} 页，共 {total} 条</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Invites List */}
+      {activeTab === "invites" && (
+        <div className="space-y-3">
+          {!invites || invites.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              <Link2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              暂无邀请码，点击「生成邀请码」创建
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {invites.map((inv) => {
+                const isUsed = !!inv.usedBy;
+                const isExpired = inv.expiresAt ? new Date(inv.expiresAt) < new Date() : false;
+                const isActive = !isUsed && !isExpired;
+                return (
+                  <div key={inv.id} className={cn("flex items-center gap-3 p-3 rounded-lg border text-sm", isActive ? "bg-card" : "bg-muted/30 opacity-60")}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <code className="font-mono text-xs bg-muted px-2 py-0.5 rounded truncate max-w-[200px]">{inv.token.slice(0, 16)}…</code>
+                        {isUsed && <Badge variant="secondary" className="text-xs">已使用</Badge>}
+                        {isExpired && !isUsed && <Badge variant="outline" className="text-xs text-red-600">已过期</Badge>}
+                        {isActive && <Badge variant="outline" className="text-xs text-green-600 border-green-200">有效</Badge>}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1 flex gap-3 flex-wrap">
+                        {inv.note && <span>备注：{inv.note}</span>}
+                        {inv.expiresAt && <span>过期：{new Date(inv.expiresAt).toLocaleDateString("zh-CN")}</span>}
+                        <span>创建：{new Date(inv.createdAt).toLocaleDateString("zh-CN")}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {isActive && (
+                        <Button variant="outline" size="sm" onClick={() => handleCopyInvite(inv.token)} className="gap-1 text-xs h-7">
+                          <Copy className="w-3 h-3" />复制链接
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => revokeInviteMutation.mutate({ id: inv.id })} disabled={revokeInviteMutation.isPending} className="text-xs h-7 text-red-600 hover:bg-red-50 gap-1">
+                        <Trash2 className="w-3 h-3" />删除
+                      </Button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>第 {page} / {totalPages} 页，共 {total} 条</span>
-          <div className="flex gap-1">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-              <ChevronLeft className="w-4 h-4" />
+      {/* Generate Invite Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>生成管理员邀请码</DialogTitle>
+            <DialogDescription>
+              生成邀请链接后，将链接发送给对方。对方通过 Manus OAuth 登录后，账号将自动获得管理员权限。
+            </DialogDescription>
+          </DialogHeader>
+          {generatedToken ? (
+            <div className="space-y-4">
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-2">邀请链接已生成</p>
+                <div className="flex gap-2">
+                  <input readOnly value={getInviteUrl(generatedToken)} className="flex-1 text-xs font-mono bg-background border rounded px-2 py-1.5 text-foreground" />
+                  <Button size="sm" onClick={() => handleCopyInvite(generatedToken)} className="gap-1 shrink-0">
+                    <Copy className="w-3.5 h-3.5" />复制
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">链接有效期：{inviteExpireDays ? `${inviteExpireDays} 天` : "永久"}。请妥善保管，勿泄露给无关人员。</p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setShowInviteDialog(false); setGeneratedToken(null); }}>关闭</Button>
+                <Button onClick={() => { setGeneratedToken(null); setInviteNote(""); }}>再生成一个</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">备注（可选）</label>
+                <Input placeholder="如：张三，研究助理" value={inviteNote} onChange={e => setInviteNote(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">有效期</label>
+                <select value={inviteExpireDays} onChange={e => setInviteExpireDays(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+                  <option value="1">1 天</option>
+                  <option value="7">7 天</option>
+                  <option value="30">30 天</option>
+                  <option value="90">90 天</option>
+                  <option value="">永久有效</option>
+                </select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowInviteDialog(false)}>取消</Button>
+                <Button onClick={() => generateInviteMutation.mutate({ note: inviteNote || undefined, expiresInDays: inviteExpireDays ? parseInt(inviteExpireDays) : undefined })} disabled={generateInviteMutation.isPending}>
+                  {generateInviteMutation.isPending ? "生成中…" : "生成邀请码"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>确认删除用户</DialogTitle>
+            <DialogDescription>此操作不可撤销，用户的所有数据将被永久删除。是否继续？</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
+            <Button variant="destructive" onClick={() => deleteConfirmId && deleteMutation.mutate({ id: deleteConfirmId })} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "删除中…" : "确认删除"}
             </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

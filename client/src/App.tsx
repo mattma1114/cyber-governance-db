@@ -22,6 +22,7 @@ const Legal = lazy(() => import("./pages/Legal"));
 const Admin = lazy(() => import("./pages/Admin"));
 const CaseEditor = lazy(() => import("./pages/CaseEditor"));
 const PlatformEditor = lazy(() => import("./pages/PlatformEditor"));
+const Invite = lazy(() => import("./pages/Invite"));
 
 // Loading fallback: minimal spinner that matches the dark theme
 function PageLoader() {
@@ -46,6 +47,7 @@ function Router() {
         <Route path="/platforms/:id" component={PlatformDetail} />
         <Route path="/about" component={About} />
         <Route path="/legal" component={Legal} />
+        <Route path="/invite/:token" component={Invite} />
         <Route path="/admin">
           <ProtectedRoute requireAdmin>
             <Admin />

@@ -1,7 +1,7 @@
 import { eq, sql, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, adminInvites } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -118,6 +118,57 @@ export async function updateUserRole(id: number, role: 'user' | 'admin') {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
   await db.update(users).set({ role }).where(eq(users.id, id));
+}
+
+// ── Admin Invites ──────────────────────────────────────────────────────────────
+export async function createAdminInvite(opts: { token: string; note?: string; createdBy: number; expiresAt?: Date }) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.insert(adminInvites).values({
+    token: opts.token,
+    note: opts.note ?? null,
+    createdBy: opts.createdBy,
+    expiresAt: opts.expiresAt ?? null,
+  });
+}
+
+export async function listAdminInvites() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(adminInvites).orderBy(desc(adminInvites.createdAt));
+}
+
+export async function getAdminInviteByToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(adminInvites).where(eq(adminInvites.token, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function consumeAdminInvite(token: string, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.update(adminInvites).set({ usedBy: userId, usedAt: new Date() }).where(eq(adminInvites.token, token));
+  await db.update(users).set({ role: 'admin' }).where(eq(users.id, userId));
+}
+
+export async function revokeAdminInvite(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.delete(adminInvites).where(eq(adminInvites.id, id));
+}
+
+// ── User Status / Delete ───────────────────────────────────────────────────────
+export async function updateUserStatus(id: number, status: 'active' | 'frozen') {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.update(users).set({ status }).where(eq(users.id, id));
+}
+
+export async function deleteUser(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.delete(users).where(eq(users.id, id));
 }
 
 // TODO: add feature queries here as your schema grows.

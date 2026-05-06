@@ -270,3 +270,10 @@
 - [x] 后端新增 users tRPC 路由：listUsers（管理员）、updateUserRole（管理员）
 - [x] Admin.tsx 新增「用户管理」Tab：用户列表表格（姓名/邮箱/角色/注册时间/最后登录），支持修改角色（提升/降级管理员）
 - [x] 防止管理员降级自身账号（保护机制）
+
+## 管理员账号管理功能
+- [x] 数据库：users 表新增 status 字段（active/frozen），新增 admin_invites 邀请码表
+- [x] 后端：generateInvite（生成邀请码）、listInvites（列出邀请码）、revokeInvite（撤销邀请码）、freezeUser（冻结/解冻）、deleteUser（删除用户）tRPC 路由
+- [x] 后端：OAuth 登录时检查用户 status，冻结用户拒绝登录
+- [x] 前端：Admin.tsx 用户管理 Tab 新增邀请码管理区（生成/复制/撤销）、冻结/解冻按钮、删除用户按钮
+- [x] 前端：新增 /invite/:token 邀请码注册页，完成 Manus OAuth 后自动提升为管理员
