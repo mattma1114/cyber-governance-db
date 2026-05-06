@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type ColorTheme = "navy" | "ember" | "teal";
+export type ColorTheme = "ember";
 export type DarkMode = "light" | "dark" | "system";
 export type FontStyle = "serif" | "sans";
 export type Density = "default" | "airy" | "compact";
@@ -20,9 +20,10 @@ interface AppThemeState {
 const AppThemeContext = createContext<AppThemeState | null>(null);
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
-  const [colorTheme, setColorThemeState] = useState<ColorTheme>(
-    () => (localStorage.getItem("color-theme") as ColorTheme) ?? "navy"
-  );
+  // Color theme is fixed to "ember" (暗焰金)
+  const colorTheme: ColorTheme = "ember";
+  const setColorTheme = (_t: ColorTheme) => {};
+
   const [darkMode, setDarkModeState] = useState<DarkMode>(
     () => (localStorage.getItem("dark-mode") as DarkMode) ?? "light"
   );
@@ -48,9 +49,9 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     // Apply dark class
     root.classList.toggle("dark", dark);
 
-    // Apply color theme
-    root.classList.remove("theme-ember", "theme-teal");
-    if (colorTheme !== "navy") root.classList.add(`theme-${colorTheme}`);
+    // Apply color theme — always ember
+    root.classList.remove("theme-teal");
+    root.classList.add("theme-ember");
 
     // Apply font
     body.classList.toggle("font-sans", fontStyle === "sans");
@@ -58,7 +59,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     // Apply density
     body.classList.remove("density-airy", "density-compact");
     if (density !== "default") body.classList.add(`density-${density}`);
-  }, [colorTheme, darkMode, fontStyle, density]);
+  }, [darkMode, fontStyle, density]);
 
   // Listen to system preference changes
   useEffect(() => {
@@ -72,10 +73,6 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", handler);
   }, [darkMode]);
 
-  const setColorTheme = (t: ColorTheme) => {
-    localStorage.setItem("color-theme", t);
-    setColorThemeState(t);
-  };
   const setDarkMode = (m: DarkMode) => {
     localStorage.setItem("dark-mode", m);
     setDarkModeState(m);

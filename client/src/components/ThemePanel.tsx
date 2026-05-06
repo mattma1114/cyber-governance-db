@@ -1,15 +1,9 @@
-import { useAppTheme, ColorTheme, DarkMode, FontStyle, Density } from "@/contexts/AppThemeContext";
+import { useAppTheme, DarkMode, FontStyle, Density } from "@/contexts/AppThemeContext";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { SunMedium, Moon, Monitor, Palette, Type, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const COLOR_THEMES: { id: ColorTheme; label: string; desc: string; swatch: string }[] = [
-  { id: "navy", label: "深海蓝", desc: "默认主题", swatch: "oklch(46% 0.22 245)" },
-  { id: "ember", label: "暗焰金", desc: "温暖金色", swatch: "oklch(52% 0.18 48)" },
-  { id: "teal", label: "墨青碧", desc: "清雅青绿", swatch: "oklch(46% 0.18 192)" },
-];
 
 const DARK_MODES: { id: DarkMode; label: string; icon: React.ReactNode }[] = [
   { id: "light", label: "浅色", icon: <SunMedium className="w-4 h-4" /> },
@@ -29,47 +23,17 @@ const DENSITIES: { id: Density; label: string }[] = [
 ];
 
 export function ThemePanel() {
-  const { colorTheme, darkMode, fontStyle, density, setColorTheme, setDarkMode, setFontStyle, setDensity } = useAppTheme();
+  const { darkMode, fontStyle, density, setDarkMode, setFontStyle, setDensity } = useAppTheme();
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full" title="主题设置">
+        <Button variant="ghost" size="icon" className="rounded-full" title="显示设置">
           <Palette className="w-4 h-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-4" align="end">
+      <PopoverContent className="w-64 p-4" align="end">
         <div className="space-y-4">
-          {/* Color Theme */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Palette className="w-3.5 h-3.5" /> 配色主题
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {COLOR_THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setColorTheme(t.id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all text-xs",
-                    colorTheme === t.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40"
-                  )}
-                >
-                  <span
-                    className="w-6 h-6 rounded-full shadow-sm"
-                    style={{ background: t.swatch }}
-                  />
-                  <span className="font-medium">{t.label}</span>
-                  <span className="text-muted-foreground text-[10px]">{t.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
           {/* Dark Mode */}
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
