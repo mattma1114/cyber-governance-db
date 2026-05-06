@@ -10,12 +10,12 @@ import { cn } from "@/lib/utils";
 
 function StatCard({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 py-4 px-2">
-      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+    <div className="flex flex-col gap-0.5 py-2 px-2">
+      <div className="flex items-center gap-1 text-muted-foreground">
         {icon}
-        <span className="text-xs">{label}</span>
+        <span className="text-[11px] leading-none">{label}</span>
       </div>
-      <div className="text-3xl font-bold text-foreground" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>{value}</div>
+      <div className="text-2xl font-bold text-foreground leading-tight" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>{value}</div>
     </div>
   );
 }
@@ -91,7 +91,7 @@ export default function Home() {
             </p>
           </div>
           {/* Stats: horizontal, evenly distributed */}
-          <div className="flex flex-row items-start justify-between gap-4 border-t border-border pt-6 mb-2">
+          <div className="flex flex-row items-start justify-between gap-4 border-t border-border pt-3 mb-1">
             {stats ? (
               <>
                 <StatCard label="收录内容总数" value={stats.total} icon={<BookOpen className="w-3.5 h-3.5" />} />
@@ -119,7 +119,7 @@ export default function Home() {
       </section>
 
       {/* Recent Cases */}
-      <section className="container pb-10">
+      <section className="container pb-10 density-section">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">最新收录</h2>
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground">
@@ -143,7 +143,7 @@ export default function Home() {
       </section>
 
       {/* Coverage */}
-      <section className="container pb-16">
+      <section className="container pb-16 density-section">
         <div className="grid md:grid-cols-2 gap-6">
           {/* Jurisdictions */}
           <div className="rounded-xl border border-border bg-card p-6">

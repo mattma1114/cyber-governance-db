@@ -319,3 +319,106 @@
     }
   }
 }
+
+/* ── Font Style ─────────────────────────────────────────────────────────── */
+/*
+  body.font-sans  → DM Sans / Noto Sans SC (default sans-serif)
+  body (no class) → Noto Serif SC (serif)
+  Strategy: use CSS custom property --app-font-family on :root,
+  override it per body class, then apply to all text elements.
+*/
+:root {
+  --app-font-body: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif;
+  --app-font-heading: 'Noto Serif SC', 'Georgia', serif;
+}
+
+/* Serif mode (default when no .font-sans class) */
+body:not(.font-sans) {
+  font-family: 'Noto Serif SC', 'Georgia', serif;
+}
+body:not(.font-sans) h1,
+body:not(.font-sans) h2,
+body:not(.font-sans) h3,
+body:not(.font-sans) h4,
+body:not(.font-sans) h5,
+body:not(.font-sans) h6,
+body:not(.font-sans) p,
+body:not(.font-sans) span,
+body:not(.font-sans) li,
+body:not(.font-sans) td,
+body:not(.font-sans) th,
+body:not(.font-sans) label,
+body:not(.font-sans) input,
+body:not(.font-sans) textarea,
+body:not(.font-sans) select,
+body:not(.font-sans) button,
+body:not(.font-sans) a {
+  font-family: 'Noto Serif SC', 'Georgia', serif;
+}
+
+/* Sans-serif mode */
+body.font-sans {
+  font-family: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif;
+}
+body.font-sans h1,
+body.font-sans h2,
+body.font-sans h3,
+body.font-sans h4,
+body.font-sans h5,
+body.font-sans h6,
+body.font-sans p,
+body.font-sans span,
+body.font-sans li,
+body.font-sans td,
+body.font-sans th,
+body.font-sans label,
+body.font-sans input,
+body.font-sans textarea,
+body.font-sans select,
+body.font-sans button,
+body.font-sans a {
+  font-family: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+/* ── Information Density ─────────────────────────────────────────────────── */
+/*
+  Strategy: use CSS variables for spacing scale, applied via explicit
+  semantic class names (not Tailwind utility overrides).
+  Components use .density-section, .density-card, .density-row to opt-in.
+  Also scale font-size and line-height on body.
+*/
+
+/* Compact */
+body.density-compact {
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+body.density-compact h1 { font-size: 1.5rem; }
+body.density-compact h2 { font-size: 1.25rem; }
+body.density-compact h3 { font-size: 1.1rem; }
+body.density-compact .density-section { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+body.density-compact .density-card { padding: 0.75rem; }
+body.density-compact .density-row { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+body.density-compact .density-gap { gap: 0.5rem; }
+body.density-compact .density-stack > * + * { margin-top: 0.5rem; }
+
+/* Standard (default — no class needed, but explicit for clarity) */
+body.density-standard {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Airy */
+body.density-airy {
+  font-size: 1.0625rem;
+  line-height: 1.85;
+}
+body.density-airy h1 { font-size: 2.5rem; }
+body.density-airy h2 { font-size: 1.875rem; }
+body.density-airy h3 { font-size: 1.375rem; }
+body.density-airy .density-section { padding-top: 4rem; padding-bottom: 4rem; }
+body.density-airy .density-card { padding: 2rem; }
+body.density-airy .density-row { padding-top: 1rem; padding-bottom: 1rem; }
+body.density-airy .density-gap { gap: 1.5rem; }
+body.density-airy .density-stack > * + * { margin-top: 1.5rem; }
+body.density-airy p { margin-bottom: 0.75rem; }
