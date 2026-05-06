@@ -3,8 +3,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { getDb } from "./db";
-import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings } from "../drizzle/schema";
+import { getDb, listUsers, updateUserRole } from "./db";
+import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
@@ -1161,7 +1161,40 @@ Return ONLY valid JSON, no explanation.`;
         }
         return { success: true };
       }),
+   }),
+
+  // ── Users Router ──────────────────────────────────────────────
+  users: router({
+    list: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .input(z.object({
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      }).optional())
+      .query(async ({ input }) => {
+        return listUsers({ page: input?.page, pageSize: input?.pageSize });
+      }),
+
+    updateRole: protectedProcedure
+      .use(({ ctx, next }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return next({ ctx });
+      })
+      .input(z.object({
+        id: z.number().int(),
+        role: z.enum(["user", "admin"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Prevent admin from demoting themselves
+        if (ctx.user.id === input.id && input.role === "user") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "不能降级自己的管理员权限" });
+        }
+        await updateUserRole(input.id, input.role);
+        return { success: true };
+      }),
   }),
 });
-
 export type AppRouter = typeof appRouter;

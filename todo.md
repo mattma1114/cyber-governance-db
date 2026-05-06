@@ -265,3 +265,8 @@
 - [x] 新增 siteSettings tRPC 路由（getAll/update），前台页面动态读取配置
 - [x] Admin.tsx 新增「网站信息」Tab，分模块编辑（首页/关于我们/法律声明/主办机构/底部栏/内容数据库说明/平台画像库说明）
 - [x] 前台 Home.tsx/About.tsx/Legal.tsx/Cases.tsx/Platforms.tsx 动态读取 site_settings
+
+## 管理员后台「用户管理」模块
+- [x] 后端新增 users tRPC 路由：listUsers（管理员）、updateUserRole（管理员）
+- [x] Admin.tsx 新增「用户管理」Tab：用户列表表格（姓名/邮箱/角色/注册时间/最后登录），支持修改角色（提升/降级管理员）
+- [x] 防止管理员降级自身账号（保护机制）

@@ -20,7 +20,8 @@ import {
   ShieldCheck, Plus, Pencil, Trash2, Eye, EyeOff, Search,
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
-  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info} from "lucide-react";
+  RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info,
+  Users, ShieldOff, Crown} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -1060,6 +1061,180 @@ function SettingsTab() {
   );
 }
 
+// ── Users Tab ─────────────────────────────────────────────────────────────────
+function UsersTab() {
+  const { user: currentUser } = useAuth();
+  const utils = trpc.useUtils();
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE_USERS = 20;
+
+  const { data, isLoading, error, refetch } = trpc.users.list.useQuery(
+    { page, pageSize: PAGE_SIZE_USERS },
+    { refetchOnWindowFocus: false }
+  );
+
+  const updateRoleMutation = trpc.users.updateRole.useMutation({
+    onSuccess: () => {
+      toast.success("用户角色已更新");
+      utils.users.list.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "操作失败");
+    },
+  });
+
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE_USERS);
+
+  const handleRoleToggle = (userId: number, currentRole: string) => {
+    const newRole = currentRole === "admin" ? "user" : "admin";
+    updateRoleMutation.mutate({ id: userId, role: newRole as "user" | "admin" });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold">用户管理</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            共 {total} 位注册用户，通过 Manus OAuth 登录后自动创建账号
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" />
+          刷新
+        </Button>
+      </div>
+
+      {/* Table */}
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-sm">
+          <AlertTriangle className="w-8 h-8 text-destructive opacity-70" />
+          <p className="text-muted-foreground">加载用户列表失败：{error.message}</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" />
+            重试
+          </Button>
+        </div>
+      ) : isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          暂无用户
+        </div>
+      ) : (
+        <div className="rounded-lg border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50 border-b">
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-8">#</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">姓名</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">邮箱</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">登录方式</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">注册时间</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden xl:table-cell">最后登录</th>
+                <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">角色</th>
+                <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((u, idx) => {
+                const isMe = currentUser?.id === u.id;
+                const isAdmin = u.role === "admin";
+                return (
+                  <tr key={u.id} className={cn("border-b last:border-0 hover:bg-muted/30 transition-colors", isMe && "bg-primary/5")}>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{(page - 1) * PAGE_SIZE_USERS + idx + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                          {(u.name ?? "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium leading-tight">
+                            {u.name ?? <span className="text-muted-foreground italic">未设置</span>}
+                            {isMe && <span className="ml-1.5 text-xs text-primary font-normal">（我）</span>}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">{u.openId.slice(0, 12)}…</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                      {u.email ?? <span className="italic text-xs">未绑定</span>}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+                      {u.loginMethod ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString("zh-CN") : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell">
+                      {u.lastSignedIn ? new Date(u.lastSignedIn).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {isAdmin ? (
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 gap-1 dark:bg-amber-900/30 dark:text-amber-300">
+                          <Crown className="w-3 h-3" />
+                          管理员
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="gap-1">
+                          <Users className="w-3 h-3" />
+                          普通用户
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={isMe || updateRoleMutation.isPending}
+                        onClick={() => handleRoleToggle(u.id, u.role)}
+                        className={cn(
+                          "text-xs h-7 px-2.5 gap-1",
+                          isAdmin ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        )}
+                        title={isMe ? "不能修改自己的角色" : isAdmin ? "降级为普通用户" : "提升为管理员"}
+                      >
+                        {isAdmin ? (
+                          <><ShieldOff className="w-3 h-3" />降级</>
+                        ) : (
+                          <><ShieldCheck className="w-3 h-3" />提升</>
+                        )}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>第 {page} / {totalPages} 页，共 {total} 条</span>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Site Settings Tab ─────────────────────────────────────────────────────────
 function SiteSettingsTab() {
   const utils = trpc.useUtils();
@@ -1415,6 +1590,10 @@ export default function Admin() {
             <TabsTrigger value="siteinfo" className="gap-1.5">
               <Info className="w-3.5 h-3.5" />
               网站信息
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              用户管理
             </TabsTrigger>
           </TabsList>
 
@@ -1811,6 +1990,10 @@ export default function Admin() {
           {/* Site Info Tab */}
           <TabsContent value="siteinfo">
             <SiteSettingsTab />
+          </TabsContent>
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <UsersTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
 import { InsertUser, users } from "../drizzle/schema";
@@ -97,6 +97,27 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function listUsers(opts?: { page?: number; pageSize?: number; keyword?: string }) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0 };
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 20;
+  const offset = (page - 1) * pageSize;
+  const baseQuery = db.select().from(users);
+  const countQuery = db.select({ count: sql<number>`count(*)` }).from(users);
+  const [items, countResult] = await Promise.all([
+    baseQuery.orderBy(desc(users.createdAt)).limit(pageSize).offset(offset),
+    countQuery,
+  ]);
+  return { items, total: Number(countResult[0]?.count ?? 0) };
+}
+
+export async function updateUserRole(id: number, role: 'user' | 'admin') {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.update(users).set({ role }).where(eq(users.id, id));
 }
 
 // TODO: add feature queries here as your schema grows.
