@@ -355,9 +355,20 @@ export default function CaseDetail() {
     ? c.fullText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
     : [];
 
-  // Split aiAnalysis into paragraphs
+  // Strip Markdown symbols and split into paragraphs
+  const stripMd = (text: string) =>
+    text
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^[-*+]\s+/gm, "")
+      .replace(/`(.+?)`/g, "$1")
+      .trim();
   const analysisParagraphs = c.aiAnalysis
-    ? c.aiAnalysis.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    ? c.aiAnalysis
+        .split(/\n+/)
+        .map((p) => stripMd(p.trim()))
+        .filter(Boolean)
     : [];
 
   return (

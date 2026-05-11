@@ -277,3 +277,9 @@
 - [x] 后端：OAuth 登录时检查用户 status，冻结用户拒绝登录
 - [x] 前端：Admin.tsx 用户管理 Tab 新增邀请码管理区（生成/复制/撤销）、冻结/解冻按钮、删除用户按钮
 - [x] 前端：新增 /invite/:token 邀请码注册页，完成 Manus OAuth 后自动提升为管理员
+
+## 内容管理表单样式统一（当前迭代）
+- [x] CaseEditor.tsx 新增/编辑表单：所有分组方框（Card/rounded/border）改为横线分隔
+
+## AI 分析模块排版修复
+- [x] CaseEditor.tsx：AI 分析字段改为「编辑/预览」双模式，预览时渲染 Markdown 段落、去除 ** 符号、优化段间距

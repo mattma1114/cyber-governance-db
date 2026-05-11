@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,63 @@ const ulInput =
 const ulTextarea =
   "w-full bg-transparent border-0 border-b border-border rounded-none px-0 py-2 text-sm focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/50 transition-colors resize-none";
 const ulLabel = "block text-xs text-muted-foreground mb-1";
+
+// Strip Markdown symbols helper
+const stripMd = (text: string) =>
+  text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/`(.+?)`/g, "$1")
+    .trim();
+
+// AI Analysis Field: textarea with preview toggle
+function AiAnalysisField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [preview, setPreview] = useState(false);
+  const paragraphs = useMemo(
+    () =>
+      value
+        ? value.split(/\n+/).map((p) => stripMd(p.trim())).filter(Boolean)
+        : [],
+    [value]
+  );
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className={ulLabel}>AI 分析</label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => setPreview((v) => !v)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Eye className="w-3 h-3" />
+            {preview ? "编辑" : "预览"}
+          </button>
+        )}
+      </div>
+      {preview ? (
+        <div className="py-2 space-y-3 border-b border-border">
+          {paragraphs.length > 0 ? (
+            paragraphs.map((para, i) => (
+              <p key={i} className="text-sm leading-[1.8] text-foreground/85">{para}</p>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground/50">暂无内容</p>
+          )}
+        </div>
+      ) : (
+        <textarea
+          className={ulTextarea + " min-h-[200px]"}
+          placeholder="AI 生成的深度法律分析（含法律意义、核心争议、引用条款、合规启示等）"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}
 
 // AI loading steps definition
 const AI_STEPS = [
@@ -616,12 +673,9 @@ export default function CaseEditor() {
           </div>
 
           <div>
-            <label className={ulLabel}>AI 分析</label>
-            <textarea
-              className={ulTextarea + " min-h-[200px]"}
-              placeholder="AI 生成的深度法律分析（含法律意义、核心争议、引用条款、合规启示等）"
+            <AiAnalysisField
               value={form.aiAnalysis}
-              onChange={(e) => handleChange("aiAnalysis", e.target.value)}
+              onChange={(v) => handleChange("aiAnalysis", v)}
             />
           </div>
         </section>
