@@ -512,7 +512,6 @@ export default function CaseDetail() {
                     </div>
                   </div>
                 )}
-                </div>
                 {c.sourceUrl && (
                   <div className="flex items-start gap-2">
                     <ExternalLink className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
