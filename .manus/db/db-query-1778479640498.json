@@ -1,0 +1,142 @@
+{
+  "query": "SELECT id, title, status, createdAt FROM cases ORDER BY createdAt DESC LIMIT 25;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT id, title, status, createdAt FROM cases ORDER BY createdAt DESC LIMIT 25;",
+  "rows": [
+    {
+      "id": "270001",
+      "title": "海伦娜世界纪事报有限责任公司诉谷歌有限责任公司",
+      "status": "draft",
+      "createdAt": "2026-05-11 05:50:20"
+    },
+    {
+      "id": "240001",
+      "title": "百度AI幻觉“律师被判刑”案二审判决",
+      "status": "draft",
+      "createdAt": "2026-05-11 05:01:48"
+    },
+    {
+      "id": "210001",
+      "title": "Helena World Chronicle 诉 Google LLC 案",
+      "status": "published",
+      "createdAt": "2026-05-11 04:52:39"
+    },
+    {
+      "id": "180001",
+      "title": "欧盟委员会2026/1035号建议：建立全欧盟范围年龄验证技术的通用框架",
+      "status": "published",
+      "createdAt": "2026-05-11 04:38:56"
+    },
+    {
+      "id": "150001",
+      "title": "WhatsApp爱尔兰有限公司诉欧洲数据保护委员会案",
+      "status": "published",
+      "createdAt": "2026-05-06 05:47:44"
+    },
+    {
+      "id": "120001",
+      "title": "罗马尼亚ANSPDCP对布加勒斯特第一区市政当局的罚款",
+      "status": "published",
+      "createdAt": "2026-05-05 13:18:27"
+    },
+    {
+      "id": "90001",
+      "title": "中国自动驾驶出租车竞赛因安全问题暂停",
+      "status": "published",
+      "createdAt": "2026-05-05 07:59:12"
+    },
+    {
+      "id": "14",
+      "title": "中国国家互联网信息办公室对滴滴出行数据安全处罚案",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:58"
+    },
+    {
+      "id": "13",
+      "title": "欧盟《数字市场法》(DMA)",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:58"
+    },
+    {
+      "id": "15",
+      "title": "越南《网络安全法》",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:58"
+    },
+    {
+      "id": "10",
+      "title": "欧盟委员会对TikTok发起DSA正式调查",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:57"
+    },
+    {
+      "id": "8",
+      "title": "美国诉谷歌搜索垄断案",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:57"
+    },
+    {
+      "id": "12",
+      "title": "新加坡竞争与消费者委员会对Grab-Uber并购案审查",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:57"
+    },
+    {
+      "id": "11",
+      "title": "生成式人工智能服务管理暂行办法",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:57"
+    },
+    {
+      "id": "9",
+      "title": "中华人民共和国数据安全法",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:57"
+    },
+    {
+      "id": "6",
+      "title": "欧盟《数字服务法》(DSA)",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:56"
+    },
+    {
+      "id": "5",
+      "title": "FTC诉Meta垄断案（Instagram & WhatsApp并购审查）",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:56"
+    },
+    {
+      "id": "7",
+      "title": "印度尼西亚《个人数据保护法》(UU PDP)",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:56"
+    },
+    {
+      "id": "4",
+      "title": "中华人民共和国个人信息保护法",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:56"
+    },
+    {
+      "id": "2",
+      "title": "Meta因违反GDPR被爱尔兰DPC罚款12亿欧元",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:55"
+    },
+    {
+      "id": "1",
+      "title": "欧盟《人工智能法》",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:55"
+    },
+    {
+      "id": "3",
+      "title": "腾讯音乐娱乐集团独家版权垄断案",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:55"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tstatus\tcreatedAt\n270001\t海伦娜世界纪事报有限责任公司诉谷歌有限责任公司\tdraft\t2026-05-11 05:50:20\n240001\t百度AI幻觉“律师被判刑”案二审判决\tdraft\t2026-05-11 05:01:48\n210001\tHelena World Chronicle 诉 Google LLC 案\tpublished\t2026-05-11 04:52:39\n180001\t欧盟委员会2026/1035号建议：建立全欧盟范围年龄验证技术的通用框架\tpublished\t2026-05-11 04:38:56\n150001\tWhatsApp爱尔兰有限公司诉欧洲数据保护委员会案\tpublished\t2026-05-06 05:47:44\n120001\t罗马尼亚ANSPDCP对布加勒斯特第一区市政当局的罚款\tpublished\t2026-05-05 13:18:27\n90001\t中国自动驾驶出租车竞赛因安全问题暂停\tpublished\t2026-05-05 07:59:12\n14\t中国国家互联网信息办公室对滴滴出行数据安全处罚案\tpublished\t2026-05-01 17:00:58\n13\t欧盟《数字市场法》(DMA)\tpublished\t2026-05-01 17:00:58\n15\t越南《网络安全法》\tpublished\t2026-05-01 17:00:58\n10\t欧盟委员会对TikTok发起DSA正式调查\tpublished\t2026-05-01 17:00:57\n8\t美国诉谷歌搜索垄断案\tpublished\t2026-05-01 17:00:57\n12\t新加坡竞争与消费者委员会对Grab-Uber并购案审查\tpublished\t2026-05-01 17:00:57\n11\t生成式人工智能服务管理暂行办法\tpublished\t2026-05-01 17:00:57\n9\t中华人民共和国数据安全法\tpublished\t2026-05-01 17:00:57\n6\t欧盟《数字服务法》(DSA)\tpublished\t2026-05-01 17:00:56\n5\tFTC诉Meta垄断案（Instagram & WhatsApp并购审查）\tpublished\t2026-05-01 17:00:56\n7\t印度尼西亚《个人数据保护法》(UU PDP)\tpublished\t2026-05-01 17:00:56\n4\t中华人民共和国个人信息保护法\tpublished\t2026-05-01 17:00:56\n2\tMeta因违反GDPR被爱尔兰DPC罚款12亿欧元\tpublished\t2026-05-01 17:00:55\n1\t欧盟《人工智能法》\tpublished\t2026-05-01 17:00:55\n3\t腾讯音乐娱乐集团独家版权垄断案\tpublished\t2026-05-01 17:00:55\n",
+  "stderr": "",
+  "execution_time_ms": 1797
+}

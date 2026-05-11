@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, title, status, createdAt FROM cases ORDER BY createdAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT id, title, status, createdAt FROM cases ORDER BY createdAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "240001",
+      "title": "百度AI幻觉“律师被判刑”案二审判决",
+      "status": "draft",
+      "createdAt": "2026-05-11 05:01:48"
+    },
+    {
+      "id": "210001",
+      "title": "Helena World Chronicle 诉 Google LLC 案",
+      "status": "published",
+      "createdAt": "2026-05-11 04:52:39"
+    },
+    {
+      "id": "180001",
+      "title": "欧盟委员会2026/1035号建议：建立全欧盟范围年龄验证技术的通用框架",
+      "status": "published",
+      "createdAt": "2026-05-11 04:38:56"
+    },
+    {
+      "id": "150001",
+      "title": "WhatsApp爱尔兰有限公司诉欧洲数据保护委员会案",
+      "status": "published",
+      "createdAt": "2026-05-06 05:47:44"
+    },
+    {
+      "id": "120001",
+      "title": "罗马尼亚ANSPDCP对布加勒斯特第一区市政当局的罚款",
+      "status": "published",
+      "createdAt": "2026-05-05 13:18:27"
+    },
+    {
+      "id": "90001",
+      "title": "中国自动驾驶出租车竞赛因安全问题暂停",
+      "status": "published",
+      "createdAt": "2026-05-05 07:59:12"
+    },
+    {
+      "id": "13",
+      "title": "欧盟《数字市场法》(DMA)",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:58"
+    },
+    {
+      "id": "15",
+      "title": "越南《网络安全法》",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:58"
+    },
+    {
+      "id": "14",
+      "title": "中国国家互联网信息办公室对滴滴出行数据安全处罚案",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:58"
+    },
+    {
+      "id": "8",
+      "title": "美国诉谷歌搜索垄断案",
+      "status": "published",
+      "createdAt": "2026-05-01 17:00:57"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tstatus\tcreatedAt\n240001\t百度AI幻觉“律师被判刑”案二审判决\tdraft\t2026-05-11 05:01:48\n210001\tHelena World Chronicle 诉 Google LLC 案\tpublished\t2026-05-11 04:52:39\n180001\t欧盟委员会2026/1035号建议：建立全欧盟范围年龄验证技术的通用框架\tpublished\t2026-05-11 04:38:56\n150001\tWhatsApp爱尔兰有限公司诉欧洲数据保护委员会案\tpublished\t2026-05-06 05:47:44\n120001\t罗马尼亚ANSPDCP对布加勒斯特第一区市政当局的罚款\tpublished\t2026-05-05 13:18:27\n90001\t中国自动驾驶出租车竞赛因安全问题暂停\tpublished\t2026-05-05 07:59:12\n13\t欧盟《数字市场法》(DMA)\tpublished\t2026-05-01 17:00:58\n15\t越南《网络安全法》\tpublished\t2026-05-01 17:00:58\n14\t中国国家互联网信息办公室对滴滴出行数据安全处罚案\tpublished\t2026-05-01 17:00:58\n8\t美国诉谷歌搜索垄断案\tpublished\t2026-05-01 17:00:57\n",
+  "stderr": "",
+  "execution_time_ms": 1703
+}
