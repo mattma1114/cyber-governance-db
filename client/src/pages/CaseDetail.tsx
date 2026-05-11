@@ -8,8 +8,11 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, ExternalLink, Eye, Calendar, Building2, Tag, BookOpen,
   Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
-  Download, Loader2, MapPin, Layers, Paperclip
+  Download, Loader2, MapPin, Layers, Paperclip, FileDown
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
 import { FilePreviewModal, canPreview, type PreviewFile } from "@/components/FilePreviewModal";
 import { toast } from "sonner";
@@ -291,23 +294,31 @@ export default function CaseDetail() {
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const incrementView = trpc.cases.incrementView.useMutation();
+  const downloadBlob = (base64: string, filename: string, mime: string) => {
+    const bytes = Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
+    const blob = new Blob([bytes], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   const exportPdf = trpc.cases.exportPdf.useMutation({
     onSuccess: (data) => {
-      const bytes = Uint8Array.from(atob(data.base64), (ch) => ch.charCodeAt(0));
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = data.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(data.base64, data.filename, "application/pdf");
       toast.success("PDF 已生成，正在下载");
     },
-    onError: (err) => {
-      toast.error(`PDF 生成失败：${err.message}`);
+    onError: (err) => { toast.error(`PDF 生成失败：${err.message}`); },
+  });
+  const exportDocx = trpc.cases.exportDocx.useMutation({
+    onSuccess: (data) => {
+      downloadBlob(data.base64, data.filename, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      toast.success("Word 文档已生成，正在下载");
     },
+    onError: (err) => { toast.error(`Word 生成失败：${err.message}`); },
   });
 
   useEffect(() => {
@@ -401,17 +412,28 @@ export default function CaseDetail() {
             </Link>
           </Button>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => exportPdf.mutate({ id: c.id })}
-              disabled={exportPdf.isPending}
-            >
-              {exportPdf.isPending
-                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />生成中…</>
-                : <><Download className="w-3.5 h-3.5" />导出 PDF</>}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={exportPdf.isPending || exportDocx.isPending}
+                >
+                  {(exportPdf.isPending || exportDocx.isPending)
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />生成中…</>
+                    : <><FileDown className="w-3.5 h-3.5" />导出档案<ChevronDown className="w-3 h-3 ml-0.5" /></>}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPdf.mutate({ id: c.id })}>
+                  <Download className="w-3.5 h-3.5 mr-2" />导出为 PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportDocx.mutate({ id: c.id })}>
+                  <FileText className="w-3.5 h-3.5 mr-2" />导出为 Word
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {c.sourceUrl && (
               <Button asChild size="sm" className="gap-1.5">
                 <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer">
@@ -543,9 +565,6 @@ export default function CaseDetail() {
               </>
             )}
 
-            {/* Related Files */}
-            <AttachmentsSection caseId={c.id} />
-            <Separator />
             {/* Citation */}
             <CitationBox
               c={c}
@@ -557,6 +576,9 @@ export default function CaseDetail() {
 
             {/* Related */}
             <RelatedCases caseId={c.id} topicId={c.topicId ?? ""} />
+            {/* Related Files — at the bottom of sidebar */}
+            <Separator />
+            <AttachmentsSection caseId={c.id} />
 
           </aside>
 

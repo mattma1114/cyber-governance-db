@@ -200,9 +200,10 @@ export default function CaseEditor() {
 
   const createMutation = trpc.cases.create.useMutation({
     onSuccess: (data) => {
-      toast.success("内容已创建");
+      toast.success("内容已创建，可继续上传附件");
       utils.cases.list.invalidate();
-      navigate(`/cases/${data.id}`);
+      // 跳转到编辑页，方便立即上传附件
+      navigate(`/admin/cases/${data.id}/edit`);
     },
     onError: (e) => toast.error(`创建失败：${e.message}`),
   });
@@ -687,35 +688,41 @@ export default function CaseEditor() {
           />
         </section>
 
-        {/* Section: 相关文件 — 仅编辑模式显示 */}
-        {isEdit && (
-          <section className="space-y-4">
+        {/* Section: 相关文件 */}
+        <section className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                 <Paperclip className="w-3.5 h-3.5" />
                 相关文件
               </h2>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">支持 PDF、Word、图片等，单文件最大 20MB</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 h-7 text-xs"
-                  disabled={isUploadingFile}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {isUploadingFile
-                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                    : <Plus className="w-3 h-3" />}
-                  上传文件
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip"
-                  onChange={handleFileSelect}
-                />
+                {!isEdit && (
+                  <span className="text-xs text-amber-600/80">请先保存内容后再上传附件</span>
+                )}
+                {isEdit && (
+                  <>
+                    <span className="text-xs text-muted-foreground">支持 PDF、Word、图片等，单文件最大 20MB</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 h-7 text-xs"
+                      disabled={isUploadingFile}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {isUploadingFile
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Plus className="w-3 h-3" />}
+                      上传文件
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip"
+                      onChange={handleFileSelect}
+                    />
+                  </>
+                )}
               </div>
             </div>
 
@@ -803,7 +810,6 @@ export default function CaseEditor() {
               </p>
             )}
           </section>
-        )}
 
         {/* Bottom save */}
         <div className="flex justify-end pt-4 border-t border-border">

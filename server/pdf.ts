@@ -33,8 +33,45 @@ function escapeHtml(str: string | null | undefined): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
-    .replace(/\n/g, "<br>");
+    .replace(/'/g, "&#039;");
+}
+
+/** Strip Markdown markers and split numbered sections into separate paragraphs */
+function renderAnalysis(text: string | null | undefined): string {
+  if (!text) return "";
+  // Merge all lines into one string
+  const merged = text.replace(/\r?\n/g, " ").replace(/\s{2,}/g, " ").trim();
+  // Split on numbered section markers like "1. " "2. " "3. " etc.
+  const rawParts = merged.split(/(?=\d+\.\s)/).map((s) => s.trim()).filter(Boolean);
+  const parts = rawParts.length > 1 ? rawParts : [merged];
+  return parts
+    .map((p) =>
+      p
+        .replace(/\*\*([^*]*)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]*)\*/g, "$1")
+        .replace(/__([^_]*)__/g, "<strong>$1</strong>")
+        .replace(/_([^_]*)_/g, "$1")
+        .replace(/^#+\s*/gm, "")
+        .replace(/`([^`]*)`/g, "$1")
+        .trim()
+    )
+    .map((p) => `<p style="margin-bottom:10px;text-indent:2em">${escapeHtml(p)}</p>`)
+    .join("");
+}
+
+/** Simple strip for non-analysis text (summary, abstract) */
+function stripMd(text: string | null | undefined): string {
+  if (!text) return "";
+  return escapeHtml(
+    text
+      .replace(/\*\*([^*]*)\*\*/g, "$1")
+      .replace(/\*([^*]*)\*/g, "$1")
+      .replace(/__([^_]*)__/g, "$1")
+      .replace(/_([^_]*)_/g, "$1")
+      .replace(/^#+\s*/gm, "")
+      .replace(/`([^`]*)`/g, "$1")
+      .trim()
+  ).replace(/\n/g, "<br>");
 }
 
 function buildHtml(data: PdfCaseData): string {
@@ -54,7 +91,7 @@ function buildHtml(data: PdfCaseData): string {
     sections.push(`
       <section class="section">
         <h2 class="section-title">内容摘要</h2>
-        <div class="section-body">${escapeHtml(data.abstract)}</div>
+        <div class="section-body">${stripMd(data.abstract)}</div>
       </section>`);
   }
 
@@ -63,7 +100,7 @@ function buildHtml(data: PdfCaseData): string {
     sections.push(`
       <section class="section ai-section">
         <h2 class="section-title ai-title">✦ AI 摘要解读</h2>
-        <div class="section-body">${escapeHtml(data.aiSummary)}</div>
+        <div class="section-body">${stripMd(data.aiSummary)}</div>
       </section>`);
   }
 
@@ -72,7 +109,7 @@ function buildHtml(data: PdfCaseData): string {
     sections.push(`
       <section class="section analysis-section">
         <h2 class="section-title analysis-title">⚖ 深度法律分析</h2>
-        <div class="section-body">${escapeHtml(data.aiAnalysis)}</div>
+        <div class="section-body">${renderAnalysis(data.aiAnalysis)}</div>
       </section>`);
   }
 

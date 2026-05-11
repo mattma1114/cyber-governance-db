@@ -10,6 +10,8 @@ import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
 import { generateCasePdf, generateBatchPdfZip } from "./pdf";
+import { generateCaseDocx } from "./case-docx";
+import { generatePlatformPdf, generatePlatformDocx } from "./platform-pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
 import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -517,6 +519,44 @@ export const appRouter = router({
         };
        }),
 
+    // ── Export single case as Word docx ──────────────────────────────────────────────────────────────────
+    exportDocx: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const result = await db.select().from(cases).where(eq(cases.id, input.id)).limit(1);
+        const c = result[0];
+        if (!c) throw new TRPCError({ code: "NOT_FOUND", message: "内容不存在" });
+        const [topicsData, jurisdictionsData] = await Promise.all([
+          db.select().from(topics),
+          db.select().from(jurisdictions),
+        ]);
+        const topic = topicsData.find((t) => t.id === c.topicId);
+        const juris = jurisdictionsData.find((j) => j.id === c.jurisdictionId);
+        const tags: string[] = Array.isArray(c.tags) ? (c.tags as string[]) : c.tags ? JSON.parse(c.tags as string) : [];
+        const docxBuffer = await generateCaseDocx({
+          title: c.title,
+          titleEn: c.titleEn,
+          type: c.type,
+          date: c.date,
+          source: c.source,
+          sourceUrl: c.sourceUrl,
+          abstract: c.abstract,
+          aiSummary: c.aiSummary,
+          aiAnalysis: c.aiAnalysis,
+          fullText: c.fullText,
+          topicLabel: topic?.label ?? null,
+          jurisdictionLabel: juris?.label ?? null,
+          jurisdictionFlag: juris?.flag ?? null,
+          tags,
+        });
+        return {
+          base64: docxBuffer.toString("base64"),
+          filename: `${c.title.slice(0, 50).replace(/[\/\\?%*:|"<>]/g, "-")}.docx`,
+        };
+      }),
+
     // ── Refetch fullText for existing cases ───────────────────────────────
     refetchFullText: adminProcedure
       .input(z.object({
@@ -725,9 +765,53 @@ export const appRouter = router({
         await db.delete(platforms).where(eq(platforms.id, input.id));
         return { success: true };
       }),
+    // ── Export platform profile as PDF or Word ─────────────────────────
+    exportProfile: publicProcedure
+      .input(z.object({
+        id: z.string(),
+        format: z.enum(["pdf", "docx"]),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rows = await db.select().from(platforms).where(eq(platforms.id, input.id)).limit(1);
+        if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "平台不存在" });
+        const p = rows[0];
+        const jurisData = await db.select().from(jurisdictions);
+        const jurisIds: string[] = Array.isArray(p.jurisdiction)
+          ? (p.jurisdiction as string[])
+          : p.jurisdiction ? JSON.parse(p.jurisdiction as string) : [];
+        const jurisLabels = jurisIds
+          .map((jid) => jurisData.find((j) => j.id === jid)?.label ?? jid)
+          .filter(Boolean);
+        const exportData = {
+          id: p.id,
+          name: p.name,
+          abbr: p.abbr,
+          company: p.company,
+          hq: p.hq,
+          founded: p.founded,
+          website: p.website,
+          description: p.description,
+          portrait: p.portrait,
+          timeline: p.timeline,
+          rules: p.rules,
+          jurisdictionLabels: jurisLabels,
+          profileFeatures: p.profileFeatures,
+          developmentHistory: p.developmentHistory,
+        };
+        if (input.format === "pdf") {
+          const buf = await generatePlatformPdf(exportData);
+          const safeTitle = p.name.replace(/[/\\?%*:|"<>]/g, "-");
+          return { base64: buf.toString("base64"), filename: `${safeTitle}_平台档案.pdf`, mimeType: "application/pdf" };
+        } else {
+          const buf = await generatePlatformDocx(exportData);
+          const safeTitle = p.name.replace(/[/\\?%*:|"<>]/g, "-");
+          return { base64: buf.toString("base64"), filename: `${safeTitle}_平台档案.docx`, mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+        }
+      }),
   }),
-
-  // ── Settings (API keys) ──────────────────────────────────────────────
+  // ── Settings (API keys) ───────────────────────────────────────────────
   settings: router({
     getAll: adminProcedure.query(async () => {
       const db = await getDb();

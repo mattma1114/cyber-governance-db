@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Streamdown } from "streamdown";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -14,8 +14,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft, Building2, MapPin, Calendar, Globe, ExternalLink,
-  LayoutGrid, Clock, FileText, Scale, Network, ChevronRight, Download, Loader2
+  LayoutGrid, Clock, FileText, Scale, Network, ChevronRight, Download, Loader2, ChevronDown
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
@@ -96,7 +102,33 @@ export default function PlatformDetail() {
   const [activeTab, setActiveTab] = useState<NavKey>("portrait");
   const [selectedRuleTitle, setSelectedRuleTitle] = useState<string>("");
   const [selectedRuleVersion, setSelectedRuleVersion] = useState<string>("");
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportProfile = trpc.platforms.exportProfile.useMutation({
+    onSuccess: (data) => {
+      const bytes = Uint8Array.from(atob(data.base64), (ch) => ch.charCodeAt(0));
+      const blob = new Blob([bytes], { type: data.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setIsExporting(false);
+    },
+    onError: (err) => {
+      import("sonner").then(({ toast }) => toast.error(`导出失败：${err.message}`));
+      setIsExporting(false);
+    },
+  });
+
+  const handleExport = (format: "pdf" | "docx") => {
+    if (!p || isExporting) return;
+    setIsExporting(true);
+    exportProfile.mutate({ id: p.id, format });
+  };
 
   const { data: p, isLoading } = trpc.platforms.getById.useQuery({ id: id ?? "" }, { enabled: !!id });
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -114,147 +146,6 @@ export default function PlatformDetail() {
     { enabled: relatedCaseIds.length > 0 }
   );
 
-  const handleExportPdf = useCallback(() => {
-    if (!p) return;
-    setIsPrinting(true);
-
-    // 构建打印内容 HTML
-    const jurisArrLocal: string[] = Array.isArray(p.jurisdiction)
-      ? p.jurisdiction
-      : (p.jurisdiction ? JSON.parse(p.jurisdiction as string) : []);
-    const jurisLabelsLocal = jurisArrLocal
-      .map((jid) => jurisdictions?.find((j) => j.id === jid))
-      .filter(Boolean);
-    const jurisLabelStrLocal = jurisLabelsLocal
-      .map((j: any) => `${j?.flag ?? ""} ${j?.label ?? ""}`)
-      .join("  ·  ");
-
-    const portraitLocal: any = p.portrait
-      ? (typeof p.portrait === "string" ? JSON.parse(p.portrait) : p.portrait)
-      : null;
-
-    const timelineLocal: any[] = p.timeline
-      ? (typeof p.timeline === "string" ? JSON.parse(p.timeline) : p.timeline)
-      : [];
-
-    const portraitLabels: Record<string, string> = {
-      types: "平台类型",
-      structure: "市场结构",
-      contentSource: "内容来源",
-      networkEffect: "网络效应",
-      businessModel: "商业模式",
-      openness: "开放程度",
-      crossBorder: "跨境运营",
-    };
-
-    const portraitRows = portraitLocal
-      ? Object.entries(portraitLabels)
-          .map(([key, label]) => {
-            const val = portraitLocal[key];
-            if (!val) return "";
-            const display = Array.isArray(val) ? val.join("、") : val;
-            return `<tr>
-              <td style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.06em;width:90px;padding:8px 12px 8px 0;vertical-align:top;border-bottom:1px solid #f3f4f6">${label}</td>
-              <td style="font-size:13px;color:#333;line-height:1.6;padding:8px 0;border-bottom:1px solid #f3f4f6">${display}</td>
-            </tr>`;
-          })
-          .join("")
-      : "";
-
-    const timelineRows = timelineLocal
-      .map(
-        (item: any) =>
-          `<tr>
-            <td style="font-size:11px;font-family:monospace;color:#888;width:80px;padding:8px 12px 8px 0;vertical-align:top;border-bottom:1px solid #f3f4f6">${item.date ?? ""}</td>
-            <td style="font-size:13px;color:#333;line-height:1.7;padding:8px 0;border-bottom:1px solid #f3f4f6">${item.event ?? ""}</td>
-          </tr>`
-      )
-      .join("");
-
-    // 规则文件模块：按名称分组，每组列出所有版本（名称、日期、链接）
-    const rulesLocal: any[] = p.rules
-      ? (typeof p.rules === "string" ? JSON.parse(p.rules) : p.rules)
-      : [];
-    // 按 title 分组
-    const ruleGroupsLocal = new Map<string, any[]>();
-    rulesLocal.forEach((r: any) => {
-      const key = r.title ?? r.type ?? "未命名协议";
-      if (!ruleGroupsLocal.has(key)) ruleGroupsLocal.set(key, []);
-      ruleGroupsLocal.get(key)!.push(r);
-    });
-    const rulesHtml = Array.from(ruleGroupsLocal.entries())
-      .map(([groupTitle, versions]) => {
-        const sortedV = [...versions].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-        const versionRows = sortedV
-          .map((r: any) => {
-            const vLabel = [r.date, r.version].filter(Boolean).join("  ·  ");
-            const linkCell = r.url
-              ? `<a href="${r.url}" style="font-size:12px;color:#1e3a5f;word-break:break-all">${r.url}</a>`
-              : `<span style="font-size:12px;color:#bbb">无链接</span>`;
-            return `<tr>
-              <td style="font-size:12px;color:#555;width:100px;padding:6px 12px 6px 0;vertical-align:top;border-bottom:1px solid #f3f4f6">${vLabel || "—"}</td>
-              <td style="padding:6px 0;border-bottom:1px solid #f3f4f6">${linkCell}</td>
-            </tr>`;
-          })
-          .join("");
-        return `<div style="margin-bottom:16px">
-          <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px">${groupTitle}</div>
-          <table style="width:100%;border-collapse:collapse">${versionRows}</table>
-        </div>`;
-      })
-      .join("");
-
-    const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <title>${p.name} — 平台档案</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif; color: #222; background: #fff; padding: 0; }
-    @page { margin: 20mm 18mm; size: A4; }
-    @media print { body { padding: 0; } }
-    .page { max-width: 170mm; margin: 0 auto; padding: 20mm 0; }
-    h1 { font-size: 22px; font-weight: bold; color: #1e3a5f; margin-bottom: 4px; }
-    .meta { font-size: 12px; color: #888; display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
-    .section-title { font-size: 14px; font-weight: 700; color: #1e3a5f; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; margin-top: 24px; }
-    .desc { font-size: 13px; line-height: 1.8; color: #333; margin-top: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #aaa; display: flex; justify-content: space-between; }
-  </style>
-</head>
-<body>
-<div class="page">
-  <div style="border-bottom:3px solid #1e3a5f;padding-bottom:16px;margin-bottom:8px">
-    <h1>${p.name}${p.abbr && p.abbr !== p.name ? ` (${p.abbr})` : ""}</h1>
-    ${p.company ? `<div style="font-size:13px;color:#555;margin-top:4px">${p.company}</div>` : ""}
-    <div class="meta">
-      ${p.hq ? `<span>总部：${p.hq}</span>` : ""}
-      ${p.founded ? `<span>创立：${p.founded} 年</span>` : ""}
-      ${jurisLabelStrLocal ? `<span>司法辖区：${jurisLabelStrLocal}</span>` : ""}
-      ${p.website ? `<span>官网：${p.website}</span>` : ""}
-    </div>
-  </div>
-  ${p.description ? `<p class="desc">${p.description}</p>` : ""}
-  ${portraitRows ? `<div class="section-title">平台结构画像</div><table>${portraitRows}</table>` : ""}
-  ${timelineRows ? `<div class="section-title">发展历程</div><table>${timelineRows}</table>` : ""}
-  ${rulesHtml ? `<div class="section-title">规则文件</div>${rulesHtml}` : ""}
-  <div class="footer">
-    <span>互联网平台治理数据库</span>
-    <span>导出日期：${new Date().toLocaleDateString("zh-CN")}</span>
-  </div>
-</div>
-<script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };<\/script>
-</body>
-</html>`;
-
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-    }
-    setTimeout(() => setIsPrinting(false), 1500);
-  }, [p, jurisdictions]);
 
   if (isLoading) {
     return (
@@ -514,104 +405,8 @@ export default function PlatformDetail() {
 
   return (
     <div className="min-h-screen">
-      {/* ── Print-only archive ── */}
-      <style>{`
-        @media print {
-          /* 隐藏页面上所有屏幕内容 */
-          .platform-screen-content { display: none !important; }
-          /* 显示打印内容 */
-          #platform-print-root {
-            position: static !important;
-            left: auto !important;
-            visibility: visible !important;
-            display: block !important;
-            width: 100% !important;
-          }
-          @page { margin: 20mm 18mm; size: A4; }
-        }
-        @media screen {
-          /* 屏幕上不可见但保持布局（避免 Chrome 打印空白） */
-          #platform-print-root {
-            position: fixed;
-            left: -9999px;
-            top: 0;
-            width: 210mm;
-            visibility: hidden;
-            pointer-events: none;
-          }
-        }
-      `}</style>
-
-      <div id="platform-print-root">
-        {/* Cover */}
-        <div style={{ borderBottom: "3px solid #1e3a5f", paddingBottom: "16px", marginBottom: "24px" }}>
-          <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1e3a5f", marginBottom: "4px" }}>
-            {p.name}
-          </div>
-          {p.company && (
-            <div style={{ fontSize: "13px", color: "#555", marginBottom: "4px" }}>{p.company}</div>
-          )}
-          <div style={{ fontSize: "12px", color: "#888", display: "flex", gap: "16px", flexWrap: "wrap" }}>
-            {p.hq && <span>总部：{p.hq}</span>}
-            {p.founded && <span>创立：{p.founded} 年</span>}
-            {jurisLabelStr && <span>司法辖区：{jurisLabelStr}</span>}
-            {p.website && <span>官网：{p.website}</span>}
-          </div>
-        </div>
-
-        {/* Description */}
-        {p.description && (
-          <div style={{ marginBottom: "24px" }}>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>平台简介</div>
-            <p style={{ fontSize: "13px", lineHeight: "1.8", color: "#333" }}>{p.description}</p>
-          </div>
-        )}
-
-        {/* Portrait */}
-        {portrait && (
-          <div style={{ marginBottom: "24px" }}>
-            <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", borderBottom: "1px solid #e5e7eb", paddingBottom: "6px", marginBottom: "12px" }}>
-              平台结构画像
-            </div>
-            {Object.entries(PORTRAIT_LABELS).map(([key, label]) => {
-              const val = (portrait as any)[key];
-              if (!val) return null;
-              const display = Array.isArray(val) ? val.join("、") : val;
-              return (
-                <div key={key} style={{ display: "flex", gap: "12px", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
-                  <span style={{ fontSize: "11px", fontWeight: "600", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", width: "80px", flexShrink: 0, paddingTop: "2px" }}>{label}</span>
-                  <span style={{ fontSize: "13px", color: "#333", lineHeight: "1.6" }}>{display}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Timeline */}
-        {timeline.length > 0 && (
-          <div style={{ marginBottom: "24px" }}>
-            <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", borderBottom: "1px solid #e5e7eb", paddingBottom: "6px", marginBottom: "12px" }}>
-              发展历程
-            </div>
-            {timeline.map((item: any, i: number) => (
-              <div key={i} style={{ display: "flex", gap: "16px", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
-                <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#888", width: "72px", flexShrink: 0, paddingTop: "2px" }}>{item.date}</span>
-                <p style={{ fontSize: "13px", color: "#333", lineHeight: "1.7", margin: 0 }}>{item.event}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div style={{ marginTop: "32px", paddingTop: "12px", borderTop: "1px solid #e5e7eb", fontSize: "11px", color: "#aaa", display: "flex", justifyContent: "space-between" }}>
-          <span>互联网平台治理数据库</span>
-          <span>导出日期：{new Date().toLocaleDateString("zh-CN")}</span>
-        </div>
-      </div>
-
-      {/* ── Screen view ── */}
       {/* Breadcrumb */}
-      <div className="border-b border-border bg-white platform-screen-content">
+      <div className="border-b border-border bg-white">
         <div className="container py-3 flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link href="/platforms">
@@ -619,27 +414,32 @@ export default function PlatformDetail() {
               返回平台列表
             </Link>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={handleExportPdf}
-            disabled={isPrinting}
-          >
-            {isPrinting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-            导出档案 PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={isExporting}>
+                {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                导出档案
+                <ChevronDown className="w-3 h-3 ml-0.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                <FileText className="w-3.5 h-3.5 mr-2" />
+                导出为 PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("docx")}>
+                <FileText className="w-3.5 h-3.5 mr-2" />
+                导出为 Word (.docx)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Color bar */}
-      <div className="h-1.5 w-full platform-screen-content" style={{ background: p.color ?? "var(--primary)" }} />
+      <div className="h-1.5 w-full" style={{ background: p.color ?? "var(--primary)" }} />
 
-      <div className="container py-5 md:py-8 platform-screen-content">
+      <div className="container py-5 md:py-8">
         {/* Platform header */}
         <div className="flex items-start gap-3 md:gap-5 mb-5 md:mb-6">
           <div
@@ -734,21 +534,27 @@ export default function PlatformDetail() {
               })}
             </nav>
 
-            {/* Export button in sidebar too — desktop only */}
-            <div className="hidden md:block mt-6 pt-4 border-t border-border">
+            {/* Export buttons in sidebar — desktop only */}
+            <div className="hidden md:flex md:flex-col gap-2 mt-6 pt-4 border-t border-border">
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full gap-1.5 text-xs"
-                onClick={handleExportPdf}
-                disabled={isPrinting}
+                onClick={() => handleExport("pdf")}
+                disabled={isExporting}
               >
-                {isPrinting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Download className="w-3.5 h-3.5" />
-                )}
-                导出档案 PDF
+                {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                导出 PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5 text-xs"
+                onClick={() => handleExport("docx")}
+                disabled={isExporting}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                导出 Word
               </Button>
             </div>
           </aside>
