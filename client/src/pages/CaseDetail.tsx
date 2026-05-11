@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, ExternalLink, Eye, Calendar, Building2, Tag, BookOpen,
+  ArrowLeft, ExternalLink, Calendar, Building2, Tag, BookOpen,
   Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
   Download, Loader2, MapPin, Layers, Paperclip, FileDown
 } from "lucide-react";
@@ -293,7 +293,6 @@ export default function CaseDetail() {
   const { data: c, isLoading } = trpc.cases.getById.useQuery({ id: caseId }, { enabled: !!caseId });
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
-  const incrementView = trpc.cases.incrementView.useMutation();
   const downloadBlob = (base64: string, filename: string, mime: string) => {
     const bytes = Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
     const blob = new Blob([bytes], { type: mime });
@@ -320,10 +319,6 @@ export default function CaseDetail() {
     },
     onError: (err) => { toast.error(`Word 生成失败：${err.message}`); },
   });
-
-  useEffect(() => {
-    if (caseId) incrementView.mutate({ id: caseId });
-  }, [caseId]);
 
   if (isLoading) {
     return (
@@ -517,12 +512,6 @@ export default function CaseDetail() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-start gap-2">
-                  <Eye className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                  <div>
-                    <dt className="text-xs text-muted-foreground">浏览次数</dt>
-                    <dd className="text-sm font-medium">{(c.views ?? 0) + 1}</dd>
-                  </div>
                 </div>
                 {c.sourceUrl && (
                   <div className="flex items-start gap-2">
