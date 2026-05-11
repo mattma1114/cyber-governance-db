@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Database, LayoutGrid, Info, ShieldCheck, LogIn, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -116,6 +116,7 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-64 pt-12">
+              <SheetTitle className="sr-only">导航菜单</SheetTitle>
               <nav className="flex flex-col gap-1">
                 {NAV_LINKS.map((link) => (
                   <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
