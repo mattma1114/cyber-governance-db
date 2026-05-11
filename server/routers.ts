@@ -8,6 +8,8 @@ import { randomBytes } from "crypto";
 import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users, adminInvites } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
+import bcrypt from "bcryptjs";
+import { sdk } from "./_core/sdk";
 import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
 import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { generateCaseDocx } from "./case-docx";
@@ -33,6 +35,70 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    // Admin password login
+    adminLogin: publicProcedure
+      .input(z.object({
+        username: z.string().min(1),
+        password: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Find user by username (stored as openId with prefix 'admin:')
+        const [user] = await db.select().from(users)
+          .where(eq(users.openId, `admin:${input.username}`))
+          .limit(1);
+        if (!user || !user.passwordHash) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "用户名或密码错误" });
+        }
+        if (user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "仅管理员账号可使用此方式登录" });
+        }
+        if (user.status === 'frozen') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "账号已被冻结，请联系管理员" });
+        }
+        const valid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!valid) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "用户名或密码错误" });
+        }
+        // Create session cookie
+        const token = await sdk.createSessionToken(user.openId, { name: user.name ?? input.username });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+        return { success: true, user: { id: user.id, name: user.name, role: user.role } };
+      }),
+    // Set/change admin password (admin only, or self)
+    setAdminPassword: protectedProcedure
+      .input(z.object({
+        username: z.string().min(1).optional(),
+        newPassword: z.string().min(8, "密码至少8位"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const targetUsername = input.username ?? ctx.user.openId.replace('admin:', '');
+        const openId = `admin:${targetUsername}`;
+        const hash = await bcrypt.hash(input.newPassword, 12);
+        // Upsert admin user
+        const [existing] = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+        if (existing) {
+          await db.update(users).set({ passwordHash: hash }).where(eq(users.openId, openId));
+        } else {
+          await db.insert(users).values({
+            openId,
+            name: targetUsername,
+            role: 'admin',
+            status: 'active',
+            loginMethod: 'password',
+            passwordHash: hash,
+            lastSignedIn: new Date(),
+          });
+        }
+        return { success: true };
+      }),
   }),
 
   // ── Topics ──────────────────────────────────────────────────────────

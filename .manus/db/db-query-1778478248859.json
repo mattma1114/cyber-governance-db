@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO `users` (`openId`, `name`, `role`, `status`, `loginMethod`, `passwordHash`, `lastSignedIn`, `createdAt`, `updatedAt`)\nVALUES ('admin:cybergovadmin', 'cybergovadmin', 'admin', 'active', 'password', '$2b$12$aZ4OEwniMZL1kBawOklvSuXN5XhTFKRDnL/xH4szcAIauAxjKrtyC', NOW(), NOW(), NOW())\nON DUPLICATE KEY UPDATE\n  `passwordHash` = '$2b$12$aZ4OEwniMZL1kBawOklvSuXN5XhTFKRDnL/xH4szcAIauAxjKrtyC',\n  `role` = 'admin',\n  `status` = 'active',\n  `updatedAt` = NOW();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute INSERT INTO `users` (`openId`, `name`, `role`, `status`, `loginMethod`, `passwordHash`, `lastSignedIn`, `createdAt`, `updatedAt`)\nVALUES ('admin:cybergovadmin', 'cybergovadmin', 'admin', 'active', 'password', '$2b$12$aZ4OEwniMZL1kBawOklvSuXN5XhTFKRDnL/xH4szcAIauAxjKrtyC', NOW(), NOW(), NOW())\nON DUPLICATE KEY UPDATE\n  `passwordHash` = '$2b$12$aZ4OEwniMZL1kBawOklvSuXN5XhTFKRDnL/xH4szcAIauAxjKrtyC',\n  `role` = 'admin',\n  `status` = 'active',\n  `updatedAt` = NOW();",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1805
+}

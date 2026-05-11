@@ -36,6 +36,13 @@
       "when": 1778066592655,
       "tag": "0004_sturdy_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1778477873360,
+      "tag": "0005_glossy_wallow",
+      "breakpoints": true
     }
   ]
 }
