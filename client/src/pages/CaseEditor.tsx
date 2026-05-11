@@ -122,7 +122,6 @@ function AiAnalysisField({ value, onChange }: { value: string; onChange: (v: str
 const AI_STEPS = [
   { id: "scrape", icon: Globe, label: "正在抓取原文内容", desc: "通过多通道爬虫获取页面全文…" },
   { id: "analyze", icon: Sparkles, label: "AI 深度分析中", desc: "提取关键字段、生成法律分析…" },
-  { id: "fill", icon: FileText, label: "自动填充表单", desc: "将分析结果写入各字段…" },
 ];
 
 function AiLoadingOverlay({ step }: { step: number }) {
@@ -168,13 +167,7 @@ function AiLoadingOverlay({ step }: { step: number }) {
           })}
         </div>
 
-        {/* Animated progress bar */}
-        <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-700 ease-in-out"
-            style={{ width: `${((step + 0.5) / AI_STEPS.length) * 100}%` }}
-          />
-        </div>
+
       </div>
     </div>
   );
@@ -226,9 +219,8 @@ export default function CaseEditor() {
 
   const extractFromUrlMutation = trpc.ai.extractCaseFromUrl.useMutation({
     onSuccess: (data) => {
-      // Step 3: filling form
-      setAiStep(2);
-      setTimeout(() => {
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+      // 立即填充表单并关闭弹窗
         // Map type value: backend may return 'enforcement' or 'policy', normalize to our enum
         const typeMap: Record<string, CaseForm["type"]> = {
           judicial: "judicial",
@@ -256,9 +248,8 @@ export default function CaseEditor() {
           sourceUrl: urlInput.trim() || prev.sourceUrl,
         }));
 
-        setIsAiLoading(false);
-        toast.success("AI 已自动提取并填充所有字段，请核对后保存");
-      }, 600);
+      setIsAiLoading(false);
+      toast.success("AI 已自动提取并填充所有字段，请核对后保存");
     },
     onError: (e) => {
       setIsAiLoading(false);
@@ -318,10 +309,10 @@ export default function CaseEditor() {
     setAiStep(0);
     setIsAiLoading(true);
 
-    // Advance step 0 → 1 after ~2s (simulating scrape phase)
+    // 约 3s 后切换到 AI 分析步骤（抓取预计完成）
     stepTimerRef.current = setTimeout(() => {
       setAiStep(1);
-    }, 2200);
+    }, 3000);
 
     try {
       await extractFromUrlMutation.mutateAsync({ url: urlInput.trim() });

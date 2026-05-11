@@ -32,9 +32,9 @@ async function scrapeWithFirecrawl(url: string, apiKey: string): Promise<string>
       url,
       formats: ["markdown"],
       onlyMainContent: true,
-      timeout: 30000,
+      timeout: 15000,
     }),
-    signal: AbortSignal.timeout(35000),
+    signal: AbortSignal.timeout(18000),
   });
 
   if (!res.ok) {
@@ -64,7 +64,7 @@ async function scrapeWithJina(url: string, apiKey?: string): Promise<string> {
   const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
   const res = await fetch(jinaUrl, {
     headers,
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(12000),
   });
 
   if (!res.ok) {
@@ -89,7 +89,7 @@ async function scrapeWithScrapingBee(url: string, apiKey: string): Promise<strin
   });
 
   const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
-    signal: AbortSignal.timeout(35000),
+    signal: AbortSignal.timeout(18000),
   });
 
   if (!res.ok) {
@@ -117,10 +117,24 @@ export interface ScrapeOptions {
   scrapingbeeKey?: string;
 }
 
+// 辅助：将 Promise 包装为带来源标识的结果
+async function tryWithSource(
+  fn: () => Promise<string>,
+  source: ScrapeResult["source"],
+  url: string
+): Promise<ScrapeResult | null> {
+  try {
+    const markdown = await fn();
+    return { markdown, source, url };
+  } catch {
+    return null;
+  }
+}
+
 export async function scrapeUrl(url: string, opts: ScrapeOptions): Promise<ScrapeResult> {
   const errors: string[] = [];
 
-  // 1. Firecrawl (primary)
+  // 1. Firecrawl 优先（有 Key 时），超时 18s
   if (opts.firecrawlKey) {
     try {
       const markdown = await scrapeWithFirecrawl(url, opts.firecrawlKey);
@@ -128,21 +142,46 @@ export async function scrapeUrl(url: string, opts: ScrapeOptions): Promise<Scrap
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`Firecrawl: ${msg}`);
-      console.warn("[scraper] Firecrawl failed, trying Jina:", msg);
+      console.warn("[scraper] Firecrawl failed, falling back:", msg);
     }
   }
 
-  // 2. Jina Reader (secondary – works without key)
-  try {
-    const markdown = await scrapeWithJina(url, opts.jinaKey);
-    return { markdown, source: "jina", url };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    errors.push(`Jina: ${msg}`);
-    console.warn("[scraper] Jina failed, trying ScrapingBee:", msg);
+  // 2. Jina + Direct fetch 并行竞速（谁先成功用谁，取内容更多者）
+  // Jina 超时 12s，Direct fetch 超时 10s
+  const directFetchFn = async (): Promise<string> => {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; CyberGovDB/1.0; +https://cybergovdb.manus.space)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    if (!html || html.length < 200) throw new Error("Empty response");
+    const extracted = extractMainContent(html, url);
+    if (extracted.text.length < 100) throw new Error("Readability extracted insufficient content");
+    return extracted.text;
+  };
+
+  const [jinaResult, directResult] = await Promise.all([
+    tryWithSource(() => scrapeWithJina(url, opts.jinaKey), "jina", url),
+    tryWithSource(directFetchFn, "direct", url),
+  ]);
+
+  // 优先返回内容较多的结果
+  const candidates = [jinaResult, directResult].filter((r): r is ScrapeResult => r !== null);
+  if (candidates.length > 0) {
+    const best = candidates.reduce((a, b) => (a.markdown.length >= b.markdown.length ? a : b));
+    console.info(`[scraper] Fast path succeeded via ${best.source} (${best.markdown.length} chars)`);
+    return best;
   }
 
-  // 3. ScrapingBee (tertiary)
+  errors.push("Jina: failed", "Direct fetch: failed");
+  console.warn("[scraper] Jina + Direct both failed, trying ScrapingBee");
+
+  // 3. ScrapingBee 备用
   if (opts.scrapingbeeKey) {
     try {
       const markdown = await scrapeWithScrapingBee(url, opts.scrapingbeeKey);
@@ -154,32 +193,9 @@ export async function scrapeUrl(url: string, opts: ScrapeOptions): Promise<Scrap
     }
   }
 
-   // 4. 直接 fetch（最后兑底，无需 API Key）
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; CyberGovDB/1.0; +https://cybergovdb.manus.space)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-      },
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    if (!html || html.length < 200) throw new Error("Empty response");
-    // 用 Readability + 噪音清洗提取正文
-    const extracted = extractMainContent(html, url);
-    if (extracted.text.length < 100) throw new Error("Readability extracted insufficient content");
-    console.info(`[scraper] Direct fetch succeeded for ${url} (strategy: ${extracted.strategy})`);
-    return { markdown: extracted.text, source: "direct", url };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    errors.push(`Direct fetch: ${msg}`);
-    console.warn("[scraper] Direct fetch failed:", msg);
-  }
-
   throw new Error(`所有抓取服务均失败：\n${errors.join("\n")}`);
 }
+
 // ── API Key validation ────────────────────────────────────────────────────────
 export interface TestApiKeyResult {
   ok: boolean;
