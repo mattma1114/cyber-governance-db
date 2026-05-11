@@ -355,20 +355,38 @@ export default function CaseDetail() {
     ? c.fullText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
     : [];
 
-  // Strip Markdown symbols and split into paragraphs
+  // 彻底去除所有 Markdown 符号（**bold** / *italic* / # heading / `code` 等）
   const stripMd = (text: string) =>
     text
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/^#{1,6}\s+/gm, "")
-      .replace(/^[-*+]\s+/gm, "")
-      .replace(/`(.+?)`/g, "$1")
+      .replace(/\*\*([^*]*)\*\*/g, "$1")   // **bold** → text
+      .replace(/\*([^*]*)\*/g, "$1")         // *italic* → text
+      .replace(/^#{1,6}\s+/gm, "")           // # heading
+      .replace(/^[-*+]\s+/gm, "")            // - list
+      .replace(/`([^`]*)`/g, "$1")           // `code`
+      .replace(/\*\*/g, "")                  // 残余 **
+      .replace(/\*/g, "")                    // 残余 *
+      .replace(/\s{2,}/g, " ")              // 合并多余空格
       .trim();
+
+  // 按编号（1. 2. 3. ...）拆分段落
+  // 策略：先将所有换行合并为空格（避免同一编号段被换行截断），
+  // 再按编号前缀拆分，最后去除 Markdown 符号
   const analysisParagraphs = c.aiAnalysis
-    ? c.aiAnalysis
-        .split(/\n+/)
-        .map((p) => stripMd(p.trim()))
-        .filter(Boolean)
+    ? (() => {
+        const raw = c.aiAnalysis!;
+        // 将换行替换为空格，使整段文字在同一行便于按编号拆分
+        const oneLine = raw.replace(/\n+/g, " ").replace(/\s{2,}/g, " ").trim();
+        // 按 "数字. " 前缀拆分（lookahead 保留编号）
+        const segments = oneLine
+          .split(/(?=\d+\.\s)/)
+          .map((p) => p.trim())
+          .filter(Boolean);
+        // 如果拆分失败（无编号格式），回退到按换行分段
+        const result = segments.length > 1
+          ? segments
+          : raw.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+        return result.map(stripMd).filter(Boolean);
+      })()
     : [];
 
   return (

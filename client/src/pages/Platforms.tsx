@@ -2,35 +2,29 @@ import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RotateCcw, Search, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from "lucide-react";
+import { RotateCcw, X, Filter, Building2, MapPin, Calendar, LayoutGrid, List, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from "lucide-react";
 import { truncate, cn } from "@/lib/utils";
 import { Drawer } from "vaul";
 
 export default function Platforms() {
-  const [keyword, setKeyword] = useState("");
-  const [inputVal, setInputVal] = useState("");
+
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const { data: platforms, isLoading } = trpc.platforms.list.useQuery({ keyword: keyword || undefined });
+  const { data: platforms, isLoading } = trpc.platforms.list.useQuery({});
   const { data: siteSettingsData } = trpc.siteSettings.getPublic.useQuery();
   const getSetting = (key: string, fallback = "") =>
     siteSettingsData?.find((s: { key: string; value: string }) => s.key === key)?.value ?? fallback;
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
 
-  const handleSearch = () => setKeyword(inputVal);
-
   const clearFilters = () => {
-    setKeyword("");
-    setInputVal("");
     setSelectedJurisdictions([]);
     setSelectedTypes([]);
   };
@@ -84,28 +78,12 @@ export default function Platforms() {
   const toggleType = (v: string) =>
     setSelectedTypes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
 
-  const hasFilters = keyword || selectedJurisdictions.length > 0 || selectedTypes.length > 0;
-  const activeFilterCount = selectedJurisdictions.length + selectedTypes.length + (keyword ? 1 : 0);
+  const hasFilters = selectedJurisdictions.length > 0 || selectedTypes.length > 0;
+  const activeFilterCount = selectedJurisdictions.length + selectedTypes.length;
 
   // ── Shared filter panel content (used in both sidebar and drawer) ──
   const FilterContent = ({ onApply }: { onApply?: () => void }) => (
     <div className="flex flex-col gap-4">
-      {/* Search */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Input
-            className="h-8 text-sm"
-            placeholder="搜索平台…"
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { handleSearch(); onApply?.(); } }}
-          />
-        </div>
-        <Button onClick={() => { handleSearch(); onApply?.(); }} size="sm" className="h-8 px-2.5">
-          <Search className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-
       {/* Platform Type */}
       <div>
         <div className="flex items-center gap-1.5 mb-3">
@@ -333,11 +311,7 @@ export default function Platforms() {
                     </Badge>
                   ) : null;
                 })}
-                {keyword && (
-                  <Badge variant="secondary" className="text-xs gap-1 cursor-pointer" onClick={() => { setKeyword(""); setInputVal(""); }}>
-                    "{keyword}"<X className="w-2.5 h-2.5" />
-                  </Badge>
-                )}
+
               </div>
             )}
 

@@ -200,30 +200,80 @@ function cleanText(raw: string): string {
 /**
  * 从 Markdown 文本中提取正文（用于 Jina/Firecrawl 已返回 Markdown 的情况）
  * 过滤掉常见的 Markdown 噪音模式（导航链接列表、图片行、分隔线等）
+ * 并将行内链接替换为纯文本（去掉 URL，保留链接文字）
  */
 export function cleanMarkdown(md: string): string {
+  /**
+   * 将行内 Markdown 链接替换为纯文本，并移除裸 URL
+   * [text](url) → text（若 text 本身是 URL 则整体删除）
+   * ![alt](url) → 删除
+   * https://... → 删除
+   */
+  function stripLinks(text: string): string {
+    return text
+      // 图片链接 → 删除
+      .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+      // 普通链接 [text](url) → 保留 text（若 text 是 URL 或空则删除）
+      .replace(/\[([^\]]*)\]\([^)]+\)/g, (_m, t) => {
+        const clean = t.trim();
+        if (!clean || /^https?:\/\//i.test(clean)) return "";
+        return clean;
+      })
+      // 裸 URL → 删除
+      .replace(/https?:\/\/[^\s)>"'\]]+/g, "")
+      .trim();
+  }
+
   const lines = md.split("\n");
   const cleaned: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // 跳过纯链接行（如 [Home](/) [About](/about)）
-    if (/^\[.+\]\(.+\)(\s*\|?\s*\[.+\]\(.+\))*$/.test(trimmed)) continue;
     // 跳过纯图片行
     if (/^!\[.*\]\(.+\)$/.test(trimmed)) continue;
     // 跳过分隔线
     if (/^[-*_]{3,}$/.test(trimmed)) continue;
     // 跳过只有数字/符号的行（页码、版权符号等）
     if (/^[\d©®™\s|·•–—]+$/.test(trimmed)) continue;
-    // 跳过极短行（少于 5 个字符，通常是导航项）
-    if (trimmed.length > 0 && trimmed.length < 5) continue;
-    // 跳过常见广告/导航关键词行
-    if (/^(首页|Home|导航|Navigation|登录|Login|注册|Register|搜索|Search|返回顶部|Back to top|Cookie|Privacy Policy|Terms of Service|版权所有|All rights reserved)$/i.test(trimmed)) continue;
-    // 跳过版权声明行（含 © 或 Copyright 且行长较短，不太可能是正文）
+    // 跳过版权声明行
     if (/(\u00a9|Copyright|All rights reserved|版权所有)/i.test(trimmed) && trimmed.length < 120) continue;
+    // 跳过常见 UI/导航单行关键词
+    if (/^(首页|Home|导航|Navigation|登录|Login|注册|Register|搜索|Search|返回顶部|Back to top|Cookie|Privacy Policy|Terms of Service|版权所有|All rights reserved|Share this page|Show external content|Remember my choice|Your choice will be saved)$/i.test(trimmed)) continue;
 
-    cleaned.push(line);
+    // 对行内链接进行清洗
+    const stripped = stripLinks(trimmed);
+
+    // 清洗后为空 → 跳过
+    if (!stripped) continue;
+    // 清洗后极短（< 4 字符）→ 跳过
+    if (stripped.length < 4) continue;
+
+    // 列表项：清洗后文字很短（< 25 字符）且不含中文/英文实质内容 → 可能是导航项，跳过
+    const isBullet = /^[-*+]\s/.test(trimmed);
+    if (isBullet && stripped.length < 25 && !/[\u4e00-\u9fa5]/.test(stripped)) continue;
+
+    // 保留行（用清洗后内容替换原行，保留缩进）
+    const indent = line.match(/^(\s*)/)?.[1] ?? "";
+    // 标题行：保留 # 符号
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)/);
+    if (headingMatch) {
+      const headingText = stripLinks(headingMatch[2]);
+      if (headingText.length >= 4) {
+        cleaned.push(`${indent}${headingMatch[1]} ${headingText}`);
+      }
+      continue;
+    }
+    // 列表行：保留列表符号
+    if (isBullet) {
+      const bulletContent = stripLinks(trimmed.replace(/^[-*+]\s+/, ""));
+      if (bulletContent.length >= 4) {
+        cleaned.push(`${indent}- ${bulletContent}`);
+      }
+      continue;
+    }
+
+    cleaned.push(`${indent}${stripped}`);
   }
 
   // 合并连续空行
