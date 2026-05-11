@@ -641,7 +641,7 @@ function SettingsTab() {
         {PRESET_KEYS.map((preset) => {
           const existing = settings?.find((s) => s.key === preset.key);
           return (
-            <div key={preset.key} className="rounded-lg border border-border p-4 space-y-2">
+            <div key={preset.key} className="py-4 space-y-2 border-b border-border last:border-b-0">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -738,7 +738,7 @@ function SettingsTab() {
             未配置时自动使用 Manus 内置 LLM。外部 LLM 调用失败时自动降级到内置 LLM。
           </p>
         </div>
-        <div className="rounded-lg border border-border p-4 space-y-4">
+        <div className="pt-3 border-t border-border space-y-4">
           {/* Provider selector */}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">服务商</Label>
@@ -913,7 +913,7 @@ function SettingsTab() {
         </div>
 
         {taskConfigExpanded && (
-          <div className="rounded-lg border border-border divide-y divide-border">
+          <div className="divide-y divide-border">
             {(llmTasks ?? []).map((task) => {
               const cfg = taskConfigs[task.key] ?? { provider: "", model: "" };
               const effectiveProvider = cfg.provider || existingProvider || "builtin";
@@ -999,7 +999,7 @@ function SettingsTab() {
       {/* Custom key-value */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium">自定义配置项</h3>
-        <div className="rounded-lg border border-border p-4 space-y-3">
+        <div className="space-y-3 pt-3 border-t border-border">
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Key</Label>
@@ -1032,7 +1032,7 @@ function SettingsTab() {
       {settings && settings.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium">已配置项</h3>
-          <div className="rounded-lg border border-border divide-y divide-border">
+          <div className="divide-y divide-border">
             {settings.map((s) => (
               <div key={s.key} className="flex items-center justify-between px-4 py-2.5">
                 <div>
@@ -1496,19 +1496,17 @@ function SiteSettingsTab() {
         const groupSettings = allSettings?.filter((s) => s.group === group.key) ?? [];
         if (groupSettings.length === 0) return null;
         return (
-          <Card key={group.key}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <span>{group.icon}</span>
-                {group.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div key={group.key} className="pt-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2 pb-3 border-b border-border">
+              <span>{group.icon}</span>
+              {group.label}
+            </h3>
+            <div className="divide-y divide-border">
               {groupSettings.map((setting) => {
                 const meta = FIELD_LABELS[setting.key];
                 const isMultiline = meta?.multiline ?? false;
                 return (
-                  <div key={setting.key} className="space-y-1.5">
+                  <div key={setting.key} className="py-3 space-y-1.5">
                     <Label className="text-sm font-medium">
                       {meta?.label ?? setting.label ?? setting.key}
                     </Label>
@@ -1532,8 +1530,8 @@ function SiteSettingsTab() {
                   </div>
                 );
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>
