@@ -11,6 +11,7 @@ import { invokeLLM } from "./_core/llm";
 import bcrypt from "bcryptjs";
 import { sdk } from "./_core/sdk";
 import { routeLlm, routeLlmForTask, parseLlmConfig, LLM_TASKS, testLlmConfig, DEFAULT_MODELS } from "./llm-router";
+import { extractTextFromPdf } from "./pdf-extractor";
 import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { generateCaseDocx } from "./case-docx";
 import { generatePlatformPdf, generatePlatformDocx } from "./platform-pdf";
@@ -660,7 +661,101 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // ── Check duplicate (title similarity + sourceUrl exact match) ────────
+    // ── Parse PDF full text via AI ──────────────────────────────────────────────────
+    parsePdfFullText: adminProcedure
+      .input(z.object({ caseId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
+
+        // 1. Load case to get PDF URL
+        const rows = await db.select({
+          id: cases.id,
+          fullTextPdfUrl: cases.fullTextPdfUrl,
+          fullTextPdfKey: cases.fullTextPdfKey,
+          title: cases.title,
+        }).from(cases).where(eq(cases.id, input.caseId)).limit(1);
+
+        const caseRow = rows[0];
+        if (!caseRow) throw new TRPCError({ code: "NOT_FOUND", message: "内容不存在" });
+        if (!caseRow.fullTextPdfUrl) throw new TRPCError({ code: "BAD_REQUEST", message: "该内容未上传 PDF原文" });
+
+        // 2. Download PDF from storage
+        const pdfUrl = caseRow.fullTextPdfUrl.startsWith("/")
+          ? `http://localhost:${process.env.PORT ?? 3000}${caseRow.fullTextPdfUrl}`
+          : caseRow.fullTextPdfUrl;
+
+        let pdfBuffer: Buffer;
+        try {
+          const resp = await fetch(pdfUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const arrayBuf = await resp.arrayBuffer();
+          pdfBuffer = Buffer.from(arrayBuf);
+        } catch (e: any) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `PDF 下载失败: ${e.message}` });
+        }
+
+        // 3. Extract raw text from PDF
+        let rawText: string;
+        let numPages: number;
+        try {
+          const extracted = await extractTextFromPdf(pdfBuffer);
+          rawText = extracted.text;
+          numPages = extracted.numPages;
+        } catch (e: any) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `PDF 文本提取失败: ${e.message}` });
+        }
+
+        if (!rawText || rawText.trim().length < 50) {
+          throw new TRPCError({ code: "UNPROCESSABLE_CONTENT", message: "PDF 文本内容过少，可能是扫描件或加密 PDF，无法自动提取" });
+        }
+
+        // 4. LLM clean-up: fix OCR artefacts, normalise paragraphs, keep original language
+        // Truncate to 30000 chars to stay within LLM context window
+        const truncated = rawText.length > 30000 ? rawText.slice(0, 30000) + "\n\n[文本过长，已截断至 30000 字符]" : rawText;
+
+        const llmRows = await db.select().from(apiSettings);
+
+        let cleanedText: string;
+        try {
+          const llmResp = await routeLlmForTask(llmRows, "PDF_EXTRACT", {
+            messages: [
+              {
+                role: "system",
+                content: `你是一个文本整理尓手。你的任务是清洗和整理从 PDF 提取的原始文本，输出整理后的完整正文。
+要求：
+1. 保留所有实质内容，不得删除任何正文段落
+2. 修复 OCR 识别错误（如分词、字符替换错误）
+3. 删除页眉、页脚、页码、目录等非正文内容
+4. 合并被换行断开的段落，恢复自然段落结构
+5. 保留原始语言（中文就输出中文，英文就输出英文）
+6. 不要添加任何总结、评论或额外解释
+7. 直接输出整理后的正文，不要加入任何前言或后记`,
+              },
+              {
+                role: "user",
+                content: `请整理以下从 PDF 提取的文本（共 ${numPages} 页）：\n\n${truncated}`,
+              },
+            ],
+          });
+          cleanedText = (llmResp.choices?.[0]?.message?.content as string) ?? rawText;
+        } catch {
+          // LLM failed – fall back to raw extracted text
+          cleanedText = rawText;
+        }
+
+        // 5. Save to fullText field
+        await db.update(cases).set({ fullText: cleanedText }).where(eq(cases.id, input.caseId));
+
+        return {
+          success: true,
+          numPages,
+          charCount: cleanedText.length,
+          preview: cleanedText.slice(0, 300),
+        };
+      }),
+
+    // ── Check duplicate (title similarity + sourceUrl exact match) ────────────────────
     checkDuplicate: adminProcedure
       .input(z.object({
         title: z.string().optional(),
@@ -671,17 +766,32 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) return [];
         if (!input.title && !input.sourceUrl) return [];
+
+        // ── Step 1: Keyword coarse filter ─────────────────────────────────
         const conditions: any[] = [];
         if (input.sourceUrl && input.sourceUrl.trim().length > 0) {
           conditions.push(like(cases.sourceUrl, `%${input.sourceUrl.trim()}%`));
         }
-        if (input.title && input.title.trim().length >= 4) {
-          // Use first 10 chars as keyword for fuzzy match
-          const keyword = input.title.trim().slice(0, 10);
-          conditions.push(like(cases.title, `%${keyword}%`));
+        if (input.title && input.title.trim().length >= 2) {
+          const titleTrimmed = input.title.trim();
+          // Multi-keyword strategy: use first 6 chars, middle segment, and last 6 chars
+          // to maximise recall for titles with different phrasing
+          const len = titleTrimmed.length;
+          const kw1 = titleTrimmed.slice(0, Math.min(6, len));
+          conditions.push(like(cases.title, `%${kw1}%`));
+          if (len > 12) {
+            const mid = Math.floor(len / 2);
+            const kw2 = titleTrimmed.slice(mid - 3, mid + 3);
+            if (kw2.trim().length >= 2) conditions.push(like(cases.title, `%${kw2}%`));
+          }
+          if (len > 8) {
+            const kw3 = titleTrimmed.slice(Math.max(0, len - 6));
+            if (kw3.trim().length >= 2) conditions.push(like(cases.title, `%${kw3}%`));
+          }
         }
         if (conditions.length === 0) return [];
-        const rows = await db.select({
+
+        const rawRows = await db.select({
           id: cases.id,
           title: cases.title,
           status: cases.status,
@@ -691,11 +801,106 @@ export const appRouter = router({
         }).from(cases)
           .where(or(...conditions))
           .orderBy(desc(cases.createdAt))
-          .limit(5);
+          .limit(15);
+
         // Exclude current case when editing
-        return input.excludeId
-          ? rows.filter(r => r.id !== input.excludeId)
-          : rows;
+        const candidates = input.excludeId
+          ? rawRows.filter(r => r.id !== input.excludeId)
+          : rawRows;
+
+        if (candidates.length === 0) return [];
+
+        // ── Step 2: LLM semantic similarity scoring ───────────────────────
+        // Only run LLM if we have a title to compare
+        if (!input.title || input.title.trim().length < 2) {
+          return candidates.slice(0, 5).map(r => ({
+            ...r,
+            similarityScore: null as number | null,
+            reason: null as string | null,
+          }));
+        }
+
+        try {
+          const llmRows = await db.select().from(apiSettings);
+          const candidateList = candidates.slice(0, 10).map((r, i) => `${i + 1}. [ID:${r.id}] ${r.title}`).join("\n");
+
+          const llmResp = await routeLlmForTask(llmRows, "DUP_CHECK", {
+            messages: [
+              {
+                role: "system",
+                content: `你是一个内容去重专家。给定一个查询标题，判断候选列表中每条标题与查询标题的语义相似度。
+相似度评分标准（0-100）：
+- 90-100：几乎完全相同，只有细微措辞差异
+- 70-89：高度相似，描述同一事件/文件但表述不同
+- 50-69：中度相似，主题相关但可能是不同事件
+- 0-49：低相似度，基本不重复
+
+请以 JSON 数组格式返回，每项包含：id（候选ID）、score（0-100整数）、reason（一句话判断理由，20字以内）。
+只返回 score >= 50 的结果。如果没有相似的，返回空数组 []。
+直接输出 JSON，不要加任何说明。`,
+              },
+              {
+                role: "user",
+                content: `查询标题：「${input.title.trim()}」\n\n候选列表：\n${candidateList}`,
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "dup_check_result",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    results: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "integer" },
+                          score: { type: "integer" },
+                          reason: { type: "string" },
+                        },
+                        required: ["id", "score", "reason"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["results"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = llmResp.choices?.[0]?.message?.content as string;
+          let llmResults: Array<{ id: number; score: number; reason: string }> = [];
+          try {
+            const parsed = JSON.parse(content);
+            llmResults = Array.isArray(parsed) ? parsed : (parsed.results ?? []);
+          } catch { /* fall through to raw results */ }
+
+          // Merge LLM scores back into candidate rows
+          const scoreMap = new Map(llmResults.map(r => [r.id, r]));
+          const scored = candidates
+            .map(r => ({
+              ...r,
+              similarityScore: scoreMap.get(r.id)?.score ?? null as number | null,
+              reason: scoreMap.get(r.id)?.reason ?? null as string | null,
+            }))
+            .filter(r => r.similarityScore === null || r.similarityScore >= 50)
+            .sort((a, b) => (b.similarityScore ?? 0) - (a.similarityScore ?? 0))
+            .slice(0, 5);
+
+          return scored;
+        } catch {
+          // LLM failed – return raw keyword matches without scores
+          return candidates.slice(0, 5).map(r => ({
+            ...r,
+            similarityScore: null as number | null,
+            reason: null as string | null,
+          }));
+        }
       }),
 
     // ── Refetch fullText for existing cases ───────────────────────────────

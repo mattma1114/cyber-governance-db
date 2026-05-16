@@ -402,6 +402,28 @@ export default function CaseEditor() {
     onError: (e) => toast.error(e.message),
   });
 
+  const [isParsing, setIsParsing] = useState(false);
+  const parsePdfFullText = trpc.cases.parsePdfFullText.useMutation({
+    onMutate: () => setIsParsing(true),
+    onSuccess: (data) => {
+      setIsParsing(false);
+      // Directly fill fullText from the returned preview is not enough;
+      // invalidate triggers re-fetch which updates existingCase, then the useEffect syncs form.
+      // But we also explicitly set form.fullText here for immediate feedback.
+      if (data.preview) {
+        // The backend saved the full text; we need to fetch it.
+        // We optimistically switch to text mode; the useEffect will fill in the full text after invalidation.
+        setFullTextMode("text");
+      }
+      utils.cases.getById.invalidate({ id: caseId! });
+      toast.success(`AI 解析完成！共 ${data.numPages} 页，提取 ${data.charCount.toLocaleString()} 字符，已自动填充到文本字段`);
+    },
+    onError: (e) => {
+      setIsParsing(false);
+      toast.error(`AI 解析失败：${e.message}`);
+    },
+  });
+
   const { data: attachments, refetch: refetchAttachments } = trpc.attachments.listByCaseId.useQuery(
     { caseId: caseId! },
     { enabled: !!caseId }
@@ -583,28 +605,47 @@ export default function CaseEditor() {
             <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300">注意：此内容可能已存在</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">检测到以下疑似重复内容，请确认是否为新内容：</p>
-              <ul className="mt-2 space-y-1">
-                {dupResults.map((dup) => (
-                  <li key={dup.id} className="flex items-center gap-2 text-xs">
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                      dup.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" :
-                      dup.status === "draft" ? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" :
-                      "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
-                    }`}>
-                      {dup.status === "published" ? "已发布" : dup.status === "draft" ? "草稿" : "已下架"}
-                    </span>
-                    <a
-                      href={`/cases/${dup.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-amber-800 dark:text-amber-300 hover:underline truncate"
-                    >
-                      {dup.title}
-                    </a>
-                    <span className="text-amber-600/60 dark:text-amber-500/60 shrink-0">{dup.date}</span>
-                  </li>
-                ))}
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">AI 语义检测到以下疑似重复内容，请确认是否为新内容：</p>
+              <ul className="mt-2 space-y-1.5">
+                {dupResults.map((dup) => {
+                  const score = (dup as any).similarityScore as number | null;
+                  const reason = (dup as any).reason as string | null;
+                  const riskLevel = score !== null
+                    ? score >= 90 ? { label: "极高风险", cls: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" }
+                    : score >= 70 ? { label: "高风险", cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400" }
+                    : { label: "中风险", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400" }
+                    : null;
+                  return (
+                    <li key={dup.id} className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          dup.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" :
+                          dup.status === "draft" ? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" :
+                          "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                        }`}>
+                          {dup.status === "published" ? "已发布" : dup.status === "draft" ? "草稿" : "已下架"}
+                        </span>
+                        {riskLevel && (
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${riskLevel.cls}`}>
+                            {riskLevel.label}{score !== null ? ` ${score}%` : ""}
+                          </span>
+                        )}
+                        <a
+                          href={`/cases/${dup.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-amber-800 dark:text-amber-300 hover:underline truncate"
+                        >
+                          {dup.title}
+                        </a>
+                        <span className="text-amber-600/60 dark:text-amber-500/60 shrink-0">{dup.date}</span>
+                      </div>
+                      {reason && (
+                        <p className="text-[11px] text-amber-600/70 dark:text-amber-500/70 pl-1">└ {reason}</p>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
@@ -860,7 +901,25 @@ export default function CaseEditor() {
                     <p className="text-sm font-medium truncate">{pdfFilename}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">PDF 原文已上传，前台将显示在线阅读器</p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    {isEdit && caseId && (existingCase as any)?.fullTextPdfUrl && (
+                      <button
+                        type="button"
+                        disabled={isParsing}
+                        className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary px-2 py-1 rounded hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        onClick={() => {
+                          if (confirm("AI 将自动提取 PDF 文本并填充到「原文全文」文本字段。如已有文本内容将被覆盖，确定继续？")) {
+                            parsePdfFullText.mutate({ caseId });
+                          }
+                        }}
+                      >
+                        {isParsing ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" />解析中…</>
+                        ) : (
+                          <><Sparkles className="w-3 h-3" />AI 解析全文</>
+                        )}
+                      </button>
+                    )}
                     {isEdit && (existingCase as any)?.fullTextPdfUrl && (
                       <a
                         href={(existingCase as any).fullTextPdfUrl}

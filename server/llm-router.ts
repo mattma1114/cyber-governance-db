@@ -287,6 +287,8 @@ export const LLM_TASKS = [
   { key: "CASE_EXTRACT",    label: "内容提取 + 法律分析",   desc: "从 URL 自动提取司法内容、摘要、分类、当事方，并生成深度法律分析（同一次调用）" },
   { key: "PLATFORM_FILL",   label: "平台信息填写", desc: "根据关键词自动填写平台基本信息、画像、发展历程" },
   { key: "TAG_SUGGEST",     label: "专题/辖区预填写", desc: "根据中文名称自动生成 slug、英文名称、颜色" },
+  { key: "PDF_EXTRACT",     label: "PDF 文本整理", desc: "清洗和整理从 PDF 提取的原始文本，修复 OCR 错误并恢复段落结构" },
+  { key: "DUP_CHECK",       label: "语义去重检测", desc: "对标题进行语义相似度比对，识别表述不同但内容相同的重复条目" },
 ] as const;
 
 export type LlmTaskKey = typeof LLM_TASKS[number]["key"];
