@@ -730,7 +730,7 @@ export default function CaseDetail() {
                   </h2>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                      本处仅展示原语言内容，请自行根据需要配置翻译
+                      本处配置为自动翻译，可能并不准确
                     </p>
                     {/* AI Translate button – only shown when there is text content */}
                     {fullTextParagraphs.length > 0 && (
