@@ -21,8 +21,9 @@ import {
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
   RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info,
-  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy, Sparkles} from "lucide-react";
+  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy, Sparkles, GitCommit} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
+import DevChangelog from "@/pages/DevChangelog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -1842,6 +1843,10 @@ export default function Admin() {
               <Users className="w-3.5 h-3.5" />
               用户管理
             </TabsTrigger>
+            <TabsTrigger value="changelog" className="gap-1.5">
+              <GitCommit className="w-3.5 h-3.5" />
+              开发日志
+            </TabsTrigger>
           </TabsList>
 
           {/* Cases Tab */}
@@ -2260,6 +2265,10 @@ export default function Admin() {
           {/* Users Tab */}
           <TabsContent value="users">
             <UsersTab />
+          </TabsContent>
+          {/* Changelog Tab */}
+          <TabsContent value="changelog">
+            <DevChangelog />
           </TabsContent>
         </Tabs>
       </div>
