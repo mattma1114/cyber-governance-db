@@ -5,7 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb, listUsers, updateUserRole, updateUserStatus, deleteUser, createAdminInvite, listAdminInvites, getAdminInviteByToken, consumeAdminInvite, revokeAdminInvite } from "./db";
 import { randomBytes } from "crypto";
-import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users, adminInvites } from "../drizzle/schema";
+import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users, adminInvites, platformRules, ruleAttachments } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import bcrypt from "bcryptjs";
@@ -314,6 +314,9 @@ export const appRouter = router({
           updatedAt: cases.updatedAt,
           // Lightweight flag instead of returning the full text content
           hasFullText: sql<number>`CASE WHEN ${cases.fullText} IS NOT NULL AND ${cases.fullText} != '' THEN 1 ELSE 0 END`,
+          // Flag: has PDF uploaded but no fullText yet (pending AI parse)
+          hasPdf: sql<number>`CASE WHEN ${cases.fullTextPdfUrl} IS NOT NULL AND ${cases.fullTextPdfUrl} != '' THEN 1 ELSE 0 END`,
+          pendingPdfParse: sql<number>`CASE WHEN ${cases.fullTextPdfUrl} IS NOT NULL AND ${cases.fullTextPdfUrl} != '' AND (${cases.fullText} IS NULL OR ${cases.fullText} = '') THEN 1 ELSE 0 END`,
         };
         const [items, countResult] = await Promise.all([
           db.select(selectFields).from(cases).where(where).orderBy(desc(cases.createdAt)).limit(pageSize).offset(offset),
@@ -1694,7 +1697,350 @@ Return ONLY valid JSON, no explanation.`;
       }),
    }),
 
-  // ── Users Router ──────────────────────────────────────────────
+  // ── Platform Rules Router ──────────────────────────────────────────────
+  platformRules: router({
+    // List all rules for a platform (public)
+    list: publicProcedure
+      .input(z.object({ platformId: z.string(), latestOnly: z.boolean().optional() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const conditions: any[] = [eq(platformRules.platformId, input.platformId)];
+        if (input.latestOnly) conditions.push(eq(platformRules.isLatest, true));
+        return db.select().from(platformRules)
+          .where(and(...conditions))
+          .orderBy(asc(platformRules.sortOrder), desc(platformRules.createdAt));
+      }),
+
+    // List all versions of a specific rule (by title similarity)
+    listVersions: publicProcedure
+      .input(z.object({ ruleId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const current = await db.select().from(platformRules)
+          .where(eq(platformRules.id, input.ruleId)).limit(1);
+        if (!current[0]) return [];
+        const { platformId, title } = current[0];
+        const kw = title.slice(0, Math.min(20, title.length));
+        return db.select().from(platformRules)
+          .where(and(
+            eq(platformRules.platformId, platformId),
+            like(platformRules.title, `%${kw}%`)
+          ))
+          .orderBy(desc(platformRules.createdAt));
+      }),
+
+    // Create a new rule
+    create: adminProcedure
+      .input(z.object({
+        platformId: z.string(),
+        title: z.string().min(1),
+        type: z.string().default("policy"),
+        url: z.string().optional(),
+        date: z.string().optional(),
+        fullText: z.string().optional(),
+        versionLabel: z.string().optional(),
+        versionDate: z.string().optional(),
+        sortOrder: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const result = await db.insert(platformRules).values({
+          platformId: input.platformId,
+          title: input.title,
+          type: input.type,
+          url: input.url,
+          date: input.date,
+          fullText: input.fullText,
+          versionLabel: input.versionLabel,
+          versionDate: input.versionDate,
+          isLatest: true,
+          sortOrder: input.sortOrder ?? 0,
+        });
+        return { success: true, id: Number((result as any).insertId) };
+      }),
+
+    // Update a rule
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        type: z.string().optional(),
+        url: z.string().optional(),
+        date: z.string().optional(),
+        fullText: z.string().optional(),
+        versionLabel: z.string().optional(),
+        versionDate: z.string().optional(),
+        isLatest: z.boolean().optional(),
+        sortOrder: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, ...rest } = input;
+        await db.update(platformRules).set(rest).where(eq(platformRules.id, id));
+        return { success: true };
+      }),
+
+    // Delete a rule
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(ruleAttachments).where(eq(ruleAttachments.ruleId, input.id));
+        await db.delete(platformRules).where(eq(platformRules.id, input.id));
+        return { success: true };
+      }),
+
+    // Add a new version of an existing rule
+    addVersion: adminProcedure
+      .input(z.object({
+        parentRuleId: z.number(),
+        title: z.string().min(1),
+        type: z.string().default("policy"),
+        url: z.string().optional(),
+        date: z.string().optional(),
+        fullText: z.string().optional(),
+        versionLabel: z.string().optional(),
+        versionDate: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const parent = await db.select().from(platformRules)
+          .where(eq(platformRules.id, input.parentRuleId)).limit(1);
+        if (!parent[0]) throw new TRPCError({ code: "NOT_FOUND", message: "父规则不存在" });
+        const kw = parent[0].title.slice(0, Math.min(20, parent[0].title.length));
+        await db.update(platformRules)
+          .set({ isLatest: false })
+          .where(and(
+            eq(platformRules.platformId, parent[0].platformId),
+            like(platformRules.title, `%${kw}%`)
+          ));
+        const result = await db.insert(platformRules).values({
+          platformId: parent[0].platformId,
+          title: input.title,
+          type: input.type,
+          url: input.url,
+          date: input.date,
+          fullText: input.fullText,
+          versionLabel: input.versionLabel,
+          versionDate: input.versionDate,
+          parentRuleId: input.parentRuleId,
+          isLatest: true,
+          sortOrder: parent[0].sortOrder,
+        });
+        await db.update(platformRules)
+          .set({ newVersionHint: null })
+          .where(eq(platformRules.id, input.parentRuleId));
+        return { success: true, id: Number((result as any).insertId) };
+      }),
+
+    // AI: check if a new version exists for a rule
+    checkNewVersion: adminProcedure
+      .input(z.object({ ruleId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rule = await db.select().from(platformRules)
+          .where(eq(platformRules.id, input.ruleId)).limit(1);
+        if (!rule[0]) throw new TRPCError({ code: "NOT_FOUND" });
+        const r = rule[0];
+        if (!r.url) throw new TRPCError({ code: "BAD_REQUEST", message: "该规则文件无 URL，无法检测新版本" });
+        let currentContent = "";
+        try {
+          const scrapeRows = await db.select().from(apiSettings);
+          const getScrape = (key: string) => scrapeRows.find((row) => row.key === key)?.value ?? undefined;
+          const scraped = await scrapeUrl(r.url, {
+            firecrawlKey: getScrape("FIRECRAWL_API_KEY"),
+            jinaKey: getScrape("JINA_API_KEY"),
+            scrapingbeeKey: getScrape("SCRAPINGBEE_API_KEY"),
+          });
+          currentContent = scraped.markdown;
+        } catch (e: any) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `抓取失败: ${e.message}` });
+        }
+        const llmRows = await db.select().from(apiSettings);
+        const llmResp = await routeLlmForTask(llmRows, "RULE_CHECK", {
+          messages: [
+            {
+              role: "system",
+              content: `你是平台政策监测专家。判断规则文件是否有新版本。返回 JSON: {"hasNewVersion":boolean,"newVersionDate":string|null,"newVersionLabel":string|null,"summary":string,"confidence":string}`,
+            },
+            {
+              role: "user",
+              content: `标题：${r.title}\n已知版本：${r.versionLabel ?? "未知"}\n已知日期：${r.date ?? "未知"}\n\n网页内容（前 3000 字）：\n${currentContent.slice(0, 3000)}`,
+            },
+          ],
+        });
+        const content = llmResp.choices?.[0]?.message?.content as string;
+        let result: any = { hasNewVersion: false, summary: "检测完成", confidence: "low" };
+        try { result = JSON.parse(content); } catch { /* use default */ }
+        const hint = result.hasNewVersion
+          ? `检测到新版本：${result.newVersionLabel ?? ""}（${result.newVersionDate ?? ""}）- ${result.summary}`
+          : null;
+        await db.update(platformRules)
+          .set({ newVersionHint: hint, newVersionCheckedAt: new Date() })
+          .where(eq(platformRules.id, input.ruleId));
+        return { ...result, hint };
+      }),
+
+    // AI: batch check new versions for all latest rules of a platform
+    batchCheckNewVersion: adminProcedure
+      .input(z.object({ platformId: z.string() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rules = await db.select().from(platformRules)
+          .where(and(
+            eq(platformRules.platformId, input.platformId),
+            eq(platformRules.isLatest, true),
+            isNotNull(platformRules.url)
+          ));
+        const results: Array<{ id: number; title: string; hasNewVersion: boolean; hint: string | null; error?: string }> = [];
+        for (const rule of rules) {
+          try {
+            let currentContent = "";
+            try {
+              const scrapeRows = await db.select().from(apiSettings);
+              const getScrape = (key: string) => scrapeRows.find((row) => row.key === key)?.value ?? undefined;
+              const scraped = await scrapeUrl(rule.url!, {
+                firecrawlKey: getScrape("FIRECRAWL_API_KEY"),
+                jinaKey: getScrape("JINA_API_KEY"),
+                scrapingbeeKey: getScrape("SCRAPINGBEE_API_KEY"),
+              });
+              currentContent = scraped.markdown;
+            } catch { /* skip */ }
+            if (!currentContent) { results.push({ id: rule.id, title: rule.title, hasNewVersion: false, hint: null, error: "无法抓取页面" }); continue; }
+            const llmRows = await db.select().from(apiSettings);
+            const llmResp = await routeLlmForTask(llmRows, "RULE_CHECK", {
+              messages: [
+                { role: "system", content: `判断规则文件是否有新版本。返回 JSON: {"hasNewVersion":boolean,"newVersionDate":string|null,"newVersionLabel":string|null,"summary":string,"confidence":string}` },
+                { role: "user", content: `标题：${rule.title}\n已知版本：${rule.versionLabel ?? "未知"}\n已知日期：${rule.date ?? "未知"}\n\n网页内容：\n${currentContent.slice(0, 2000)}` },
+              ],
+            });
+            const c = llmResp.choices?.[0]?.message?.content as string;
+            let rv: any = { hasNewVersion: false, summary: "" };
+            try { rv = JSON.parse(c); } catch { /* use default */ }
+            const hint = rv.hasNewVersion ? `检测到新版本：${rv.newVersionLabel ?? ""}（${rv.newVersionDate ?? ""}）- ${rv.summary}` : null;
+            await db.update(platformRules).set({ newVersionHint: hint, newVersionCheckedAt: new Date() }).where(eq(platformRules.id, rule.id));
+            results.push({ id: rule.id, title: rule.title, hasNewVersion: rv.hasNewVersion, hint });
+          } catch (e: any) {
+            results.push({ id: rule.id, title: rule.title, hasNewVersion: false, hint: null, error: e.message });
+          }
+        }
+        return { total: rules.length, results };
+      }),
+
+    // AI: extract full text for a single rule
+    extractFullText: adminProcedure
+      .input(z.object({ ruleId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const rule = await db.select().from(platformRules)
+          .where(eq(platformRules.id, input.ruleId)).limit(1);
+        if (!rule[0]) throw new TRPCError({ code: "NOT_FOUND" });
+        if (!rule[0].url) throw new TRPCError({ code: "BAD_REQUEST", message: "该规则文件无 URL" });
+        const scrapeRows = await db.select().from(apiSettings);
+        const getScrape = (key: string) => scrapeRows.find((row) => row.key === key)?.value ?? undefined;
+        const scraped = await scrapeUrl(rule[0].url, {
+          firecrawlKey: getScrape("FIRECRAWL_API_KEY"),
+          jinaKey: getScrape("JINA_API_KEY"),
+          scrapingbeeKey: getScrape("SCRAPINGBEE_API_KEY"),
+        });
+        const text = scraped.markdown;
+        if (!text || text.trim().length < 50) throw new TRPCError({ code: "UNPROCESSABLE_CONTENT", message: "抓取内容过少" });
+        await db.update(platformRules).set({ fullText: text }).where(eq(platformRules.id, input.ruleId));
+        return { success: true, charCount: text.length };
+      }),
+
+    // AI: batch extract full text for all rules without fullText
+    batchExtractFullText: adminProcedure
+      .input(z.object({ platformId: z.string() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const pending = await db.select().from(platformRules)
+          .where(and(
+            eq(platformRules.platformId, input.platformId),
+            isNotNull(platformRules.url),
+            or(isNull(platformRules.fullText), eq(platformRules.fullText, ""))
+          ));
+        const results: Array<{ id: number; title: string; success: boolean; charCount?: number; error?: string }> = [];
+        for (const rule of pending) {
+          try {
+            const scrapeRows2 = await db.select().from(apiSettings);
+            const getScrape2 = (key: string) => scrapeRows2.find((row) => row.key === key)?.value ?? undefined;
+            const scraped = await scrapeUrl(rule.url!, {
+              firecrawlKey: getScrape2("FIRECRAWL_API_KEY"),
+              jinaKey: getScrape2("JINA_API_KEY"),
+              scrapingbeeKey: getScrape2("SCRAPINGBEE_API_KEY"),
+            });
+            const text = scraped.markdown;
+            if (!text || text.trim().length < 50) { results.push({ id: rule.id, title: rule.title, success: false, error: "内容过少" }); continue; }
+            await db.update(platformRules).set({ fullText: text }).where(eq(platformRules.id, rule.id));
+            results.push({ id: rule.id, title: rule.title, success: true, charCount: text.length });
+          } catch (e: any) {
+            results.push({ id: rule.id, title: rule.title, success: false, error: e.message });
+          }
+        }
+        return { total: pending.length, successCount: results.filter(r => r.success).length, failCount: results.filter(r => !r.success).length, results };
+      }),
+
+    // Upload attachment for a rule
+    uploadAttachment: adminProcedure
+      .input(z.object({
+        ruleId: z.number(),
+        filename: z.string(),
+        fileBase64: z.string(),
+        mimeType: z.string().optional(),
+        fileSize: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const buf = Buffer.from(input.fileBase64, "base64");
+        const ext = input.filename.split(".").pop() ?? "bin";
+        const key = `rule-attachments/${input.ruleId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const { url } = await storagePut(key, buf, input.mimeType ?? "application/octet-stream");
+        await db.insert(ruleAttachments).values({
+          ruleId: input.ruleId,
+          filename: input.filename,
+          fileKey: key,
+          fileUrl: url,
+          fileSize: input.fileSize,
+          mimeType: input.mimeType,
+        });
+        return { success: true, url, key };
+      }),
+
+    // List attachments for a rule
+    listAttachments: publicProcedure
+      .input(z.object({ ruleId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(ruleAttachments)
+          .where(eq(ruleAttachments.ruleId, input.ruleId))
+          .orderBy(desc(ruleAttachments.createdAt));
+      }),
+
+    // Delete attachment
+    deleteAttachment: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(ruleAttachments).where(eq(ruleAttachments.id, input.id));
+        return { success: true };
+      }),
+  }),
+
+   // ── Admin Users ──────────────────────────────
   users: router({
     list: protectedProcedure
       .use(({ ctx, next }) => {
@@ -1708,7 +2054,6 @@ Return ONLY valid JSON, no explanation.`;
       .query(async ({ input }) => {
         return listUsers({ page: input?.page, pageSize: input?.pageSize });
       }),
-
     updateRole: protectedProcedure
       .use(({ ctx, next }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

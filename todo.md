@@ -307,11 +307,11 @@
 - [x] LLM 返回每条候选的相似度得分（0-100）和判断理由
 - [x] 前端去重警告横幅升级：显示相似度得分（高/中/低风险标识）和 LLM 判断理由
 
-## 批量 AI 解析 PDF 全文（当前迭代）
-- [ ] 后端新增 cases.batchParsePdf 路由：查询已上传 PDF 但 fullText 为空的条目，逐条调用 PDF 提取 + LLM 清洗逻辑，返回进度和结果汇总
-- [ ] 前端管理后台内容列表页顶部添加「批量 AI 解析」按钮（仅对有待解析条目时显示），展示待解析数量
-- [ ] 批量解析进度弹窗：实时显示当前处理进度（X/N）、成功/失败计数，完成后展示汇总报告
-- [ ] 39 个测试全部通过
+## 批量 AI 解析 PDF 全文（旧描述，已完成）
+- [x] 后端新增 cases.batchParsePdf 路由：查询已上传 PDF 但 fullText 为空的条目，逐条调用 PDF 提取 + LLM 清洗逻辑，返回进度和结果汇总
+- [x] 前端管理后台内容列表页顶部添加「批量 AI 解析」按钮，展示待解析数量
+- [x] 批量解析进度弹窗：完成后展示汇总报告（成功/失败计数）
+- [x] 39 个测试全部通过
 
 ## 批量 AI 解析 PDF 全文（当前迭代）
 - [x] 后端新增 cases.batchParsePdf 路由：查询已上传 PDF 但 fullText 为空的条目，逐条调用 PDF 提取 + LLM 清洗，返回进度和结果汇总
@@ -322,3 +322,9 @@
 - [x] siteSettings 新增 dupCheckThreshold 字段（默认 60），存储去重相似度阈值
 - [x] checkDuplicate 路由读取阈值，低于阈值的候选不返回给前端
 - [x] API 配置页新增阈值滑块（0-100，步长 5，默认 60），实时预览效果说明
+
+## 规则文件多版本管理 + AI 检测 + 批量提取 + 附件（当前迭代）
+- [x] Schema：新建 platform_rules 表（支持 parentRuleId 关联历史版本、versionLabel、changeNote）和 rule_attachments 表，执行数据库迁移
+- [x] 后端：platformRules 路由：list、create、update、delete、addVersion、listVersions、checkNewVersion（AI）、batchCheckNewVersion、extractFullText（AI）、batchExtract、listAttachments、uploadAttachment、deleteAttachment
+- [x] 管理后台 PlatformEditor.tsx 规则文件 Tab 升级：DB 驱动列表、版本管理弹窗、AI 检测新版本按钮（单条/批量）、批量 AI 提取全文按钮、附件上传区域
+- [x] 前台 PlatformDetail.tsx 规则文件 Tab 升级：卡片展示、点击展开版本历史时间轴 + 附件列表

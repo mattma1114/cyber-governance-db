@@ -177,3 +177,43 @@ export const siteSettings = mysqlTable("site_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type SiteSetting = typeof siteSettings.$inferSelect;
+
+// 平台规则文件（支持多版本）
+export const platformRules = mysqlTable("platform_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  platformId: varchar("platform_id", { length: 64 }).notNull(),
+  title: varchar("title", { length: 512 }).notNull(),
+  type: varchar("type", { length: 64 }).default("policy").notNull(), // policy|terms|privacy|community|transparency|other
+  url: text("url"),
+  date: varchar("date", { length: 32 }),
+  fullText: longtext("full_text"),
+  // 版本管理字段
+  versionLabel: varchar("version_label", { length: 128 }), // e.g. "v2.1", "2024-01版"
+  versionDate: varchar("version_date", { length: 32 }), // 该版本生效日期
+  parentRuleId: int("parent_rule_id"), // 指向同一规则的上一版本
+  isLatest: boolean("is_latest").default(true).notNull(), // 是否为最新版本
+  // AI 检测新版本相关
+  newVersionHint: text("new_version_hint"), // AI 检测到的新版本提示信息
+  newVersionCheckedAt: timestamp("new_version_checked_at"), // 上次检测时间
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PlatformRule = typeof platformRules.$inferSelect;
+export type InsertPlatformRule = typeof platformRules.$inferInsert;
+
+// 规则文件附件
+export const ruleAttachments = mysqlTable("rule_attachments", {
+  id: int("id").autoincrement().primaryKey(),
+  ruleId: int("rule_id").notNull(),
+  filename: varchar("filename", { length: 512 }).notNull(),
+  fileKey: varchar("file_key", { length: 512 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: int("file_size"),
+  mimeType: varchar("mime_type", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RuleAttachment = typeof ruleAttachments.$inferSelect;
+export type InsertRuleAttachment = typeof ruleAttachments.$inferInsert;

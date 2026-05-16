@@ -1243,7 +1243,7 @@ function UsersTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((u, idx) => {
+                  {items.map((u, idx: number) => {
                     const isMe = currentUser?.id === u.id;
                     const isAdmin = u.role === "admin";
                     const isFrozen = (u as any).status === "frozen";
@@ -1872,19 +1872,25 @@ export default function Admin() {
                 </SelectContent>
               </Select>
               <div className="flex-1" />
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 gap-1.5"
-                disabled={batchParsePdfMutation.isPending}
-                onClick={() => {
-                  setBatchParseDialog({ open: true, status: "running", total: 0, successCount: 0, failCount: 0, results: [] });
-                  batchParsePdfMutation.mutate();
-                }}
-              >
-                {batchParsePdfMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                批量 AI 解析
-              </Button>
+              {(() => {
+                const pendingCount = (casesData?.items ?? []).filter((c: any) => c.pendingPdfParse === 1 || c.pendingPdfParse === true).length;
+                return (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5"
+                    disabled={batchParsePdfMutation.isPending}
+                    onClick={() => {
+                      setBatchParseDialog({ open: true, status: "running", total: 0, successCount: 0, failCount: 0, results: [] });
+                      batchParsePdfMutation.mutate();
+                    }}
+                    title="对全库已上传 PDF 但尚无全文的条目进行 AI 解析"
+                  >
+                    {batchParsePdfMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    批量 AI 解析{pendingCount > 0 ? ` (${pendingCount})` : ""}
+                  </Button>
+                );
+              })()}
               <Button
                 size="sm"
                 variant="outline"
