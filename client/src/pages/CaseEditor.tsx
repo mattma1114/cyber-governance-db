@@ -189,8 +189,7 @@ export default function CaseEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  // PDF full-text upload state
-  const [fullTextMode, setFullTextMode] = useState<"text" | "pdf">("text");
+  // PDF full-text upload state (no longer mutually exclusive with text)
   const [pdfFilename, setPdfFilename] = useState<string | null>(null);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -300,13 +299,10 @@ export default function CaseEditor() {
     if (existingCase) {
       const pdfUrl = (existingCase as any).fullTextPdfUrl;
       if (pdfUrl) {
-        setFullTextMode("pdf");
-        // Extract filename from URL or key
         const key = (existingCase as any).fullTextPdfKey ?? "";
         const name = key.split("/").pop() ?? "已上传的PDF文件.pdf";
         setPdfFilename(name);
       } else {
-        setFullTextMode("text");
         setPdfFilename(null);
       }
     }
@@ -421,9 +417,6 @@ export default function CaseEditor() {
     onMutate: () => setIsParsing(true),
     onSuccess: (data) => {
       setIsParsing(false);
-      if (data.preview) {
-        setFullTextMode("text");
-      }
       utils.cases.getById.invalidate({ id: caseId! });
       // Show paragraph integrity check result
       setParagraphCheck({
@@ -860,48 +853,11 @@ export default function CaseEditor() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">原文全文</h2>
-            {/* Mode toggle */}
-            <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (fullTextMode === "pdf" && pdfFilename) {
-                    if (!confirm("切换到文本模式将清除已上传的 PDF，确定继续？")) return;
-                    if (caseId) deleteFullTextPdf.mutate({ caseId });
-                    else setPdfFilename(null);
-                  }
-                  setFullTextMode("text");
-                }}
-                className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                  fullTextMode === "text"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                文本输入
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (fullTextMode === "text" && form.fullText.trim()) {
-                    if (!confirm("切换到 PDF 模式将清除已填写的文本内容，确定继续？")) return;
-                    handleChange("fullText", "");
-                  }
-                  setFullTextMode("pdf");
-                }}
-                className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                  fullTextMode === "pdf"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                上传 PDF
-              </button>
-            </div>
+            <p className="text-[11px] text-muted-foreground/60">可同时填写文本并上传 PDF，两者独立保存</p>
           </div>
 
           {/* Paragraph integrity check banner — shown after URL import or PDF parse */}
-          {paragraphCheck?.show && fullTextMode === "text" && (
+          {paragraphCheck?.show && (
             <div className={`flex items-start gap-3 px-4 py-3 rounded-lg text-sm border ${
               paragraphCheck.hasWarning
                 ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300"
@@ -929,14 +885,20 @@ export default function CaseEditor() {
             </div>
           )}
 
-          {fullTextMode === "text" ? (
-            <textarea
-              className="w-full bg-transparent border-b border-border rounded-none px-0 py-3 text-sm font-mono focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/40 transition-colors resize-none min-h-[400px]"
-              placeholder="AI 提取后将自动填充原文内容，也可在此手动粘贴…"
-              value={form.fullText}
-              onChange={(e) => handleChange("fullText", e.target.value)}
-            />
-          ) : (
+          {/* ── Text input area (always visible) ── */}
+          <textarea
+            className="w-full bg-transparent border-b border-border rounded-none px-0 py-3 text-sm font-mono focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/40 transition-colors resize-none min-h-[400px]"
+            placeholder="AI 提取后将自动填充原文内容，也可在此手动粘贴…"
+            value={form.fullText}
+            onChange={(e) => handleChange("fullText", e.target.value)}
+          />
+
+          {/* ── PDF upload area (always visible, independent) ── */}
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">PDF 原文附件</h3>
+              <span className="text-[10px] text-muted-foreground/50">（可选，与文本内容独立保存）</span>
+            </div>
             <div className="border-b border-border pb-4">
               {pdfFilename ? (
                 /* PDF already uploaded */
@@ -953,7 +915,7 @@ export default function CaseEditor() {
                         disabled={isParsing}
                         className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary px-2 py-1 rounded hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                         onClick={() => {
-                          if (confirm("AI 将自动提取 PDF 文本并填充到「原文全文」文本字段。如已有文本内容将被覆盖，确定继续？")) {
+                          if (confirm("AI 将自动提取 PDF 文本并填充到上方「原文全文」文本区域。如已有文本内容将被覆盖，确定继续？")) {
                             parsePdfFullText.mutate({ caseId });
                           }
                         }}
@@ -961,7 +923,7 @@ export default function CaseEditor() {
                         {isParsing ? (
                           <><Loader2 className="w-3 h-3 animate-spin" />解析中…</>
                         ) : (
-                          <><Sparkles className="w-3 h-3" />AI 解析全文</>
+                          <><Sparkles className="w-3 h-3" />AI 解析至文本区域</>
                         )}
                       </button>
                     )}
@@ -1002,7 +964,7 @@ export default function CaseEditor() {
               ) : (
                 /* Upload area */
                 <div
-                  className="flex flex-col items-center justify-center gap-3 py-10 border border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
+                  className="flex flex-col items-center justify-center gap-3 py-8 border border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => {
                     if (!isEdit) {
                       toast.error("请先保存内容后再上传 PDF");
@@ -1037,7 +999,7 @@ export default function CaseEditor() {
                 onChange={handlePdfSelect}
               />
             </div>
-          )}
+          </div>
         </section>
 
         {/* Section: 相关文件 */}

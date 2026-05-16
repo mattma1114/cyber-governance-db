@@ -355,3 +355,9 @@
 - [x] 前端 CaseDetail.tsx：页面加载时从 localStorage 读取缓存，自动恢复 translationPairs 和 viewMode
 - [x] 「重新翻译」时覆盖写入 localStorage，保持缓存最新
 - [x] 缓存结构包含 fullTextLength 字段，正文更新后自动失效旧缓存
+
+## 正文「文本输入」与「上传 PDF」并存（当前迭代）
+- [x] CaseEditor.tsx：移除「文本输入/上传 PDF」互斥切换 Tab，改为两个独立区域同时显示
+- [x] 文本输入区域：始终可见，可直接编辑 fullText，支持 AI 提取/手动填写
+- [x] PDF 上传区域：始终可见，可独立上传 PDF，支持 AI 解析并填充到文本区域
+- [x] 两者共存时，保存时以文本区域内容为准（fullText），PDF 仅作为附件/来源
