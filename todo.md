@@ -341,3 +341,17 @@
 - [x] 后端新增 cases.translateFullText 路由：接收 caseId，读取 fullText，调用 LLM 分段翻译为中文，返回段落对照数组
 - [x] 前端 CaseDetail.tsx：提示语旁添加「一键 AI 翻译」按鈕，翻译中显示进度，完成后以双语对照形式（原文段 / 译文段）展示
 - [x] 双语对照支持「切换视图」（仅原文 / 仅译文 / 双语对照），翻译结果缓存在前端 state 避免重复调用
+
+## 翻译结果 localStorage 缓存（当前迭代）
+- [ ] CaseDetail.tsx：翻译完成后将结果写入 localStorage（key: `translation_cache_{caseId}`）
+- [ ] CaseDetail.tsx：页面加载时从 localStorage 读取缓存，自动恢复 translationPairs 和 viewMode
+- [ ] 「重新翻译」时覆盖写入 localStorage，保持缓存最新
+- [ ] 缓存结构包含版本标识（fullText 长度/哈希），正文更新后自动失效旧缓存
+
+## 翻译进度条 + localStorage 缓存（当前迭代）
+- [x] 后端 translateFullText 路由：返回 totalBatches 字段，支持前端计算批次进度
+- [x] 前端 CaseDetail.tsx：翻译中显示进度条（预估进度 + 「正在翻译第 X/N 批…」文字）
+- [x] 前端 CaseDetail.tsx：翻译完成后将结果写入 localStorage（key: `cgdb_translation_{caseId}`）
+- [x] 前端 CaseDetail.tsx：页面加载时从 localStorage 读取缓存，自动恢复 translationPairs 和 viewMode
+- [x] 「重新翻译」时覆盖写入 localStorage，保持缓存最新
+- [x] 缓存结构包含 fullTextLength 字段，正文更新后自动失效旧缓存

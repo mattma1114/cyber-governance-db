@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { FilePreviewModal, canPreview, type PreviewFile } from "@/components/FilePreviewModal";
 import { toast } from "sonner";
 
@@ -320,26 +321,113 @@ export default function CaseDetail() {
     onError: (err) => { toast.error(`Word 生成失败：${err.message}`); },
   });
 
-  // ── Translation state ─────────────────────────────────────────────────────────────────────────────────────
+  // ── Translation state + localStorage cache + progress ─────────────────────────────────────────────────────────────────────────────────────
   type TranslationPair = { original: string; translated: string };
   type ViewMode = "original" | "translated" | "bilingual";
+  type TranslationCache = {
+    pairs: TranslationPair[];
+    viewMode: ViewMode;
+    fullTextLength: number; // used to detect stale cache when fullText changes
+  };
+
+  const CACHE_KEY = `cgdb_translation_${caseId}`;
+
+  // Start with null; restore from localStorage once case data is loaded (see useEffect below)
   const [translationPairs, setTranslationPairs] = useState<TranslationPair[] | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("bilingual");
+  const cacheRestoredRef = useRef(false);
+
+  // Restore translation cache once case data has loaded (so fullTextLength comparison is valid)
+  useEffect(() => {
+    if (!c || cacheRestoredRef.current) return;
+    cacheRestoredRef.current = true;
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return;
+      const cached: TranslationCache = JSON.parse(raw);
+      // Invalidate if fullText has changed since last translation
+      if (cached.fullTextLength !== (c.fullText?.length ?? 0)) return;
+      setTranslationPairs(cached.pairs);
+      setViewMode(cached.viewMode);
+    } catch {
+      // ignore parse errors
+    }
+  }, [c?.id, c?.fullText?.length]);
+
+  // Progress state: 0-100 (estimated)
+  const [translateProgress, setTranslateProgress] = useState(0);
+  const [translateBatchLabel, setTranslateBatchLabel] = useState("");
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Helper: write translation result to localStorage
+  const saveTranslationCache = useCallback((pairs: TranslationPair[], mode: ViewMode) => {
+    try {
+      const cache: TranslationCache = {
+        pairs,
+        viewMode: mode,
+        fullTextLength: c?.fullText?.length ?? 0,
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // localStorage may be unavailable (private browsing, quota exceeded)
+    }
+  }, [CACHE_KEY, c?.fullText?.length]);
+
+  // Keep viewMode in cache in sync when user switches tabs
+  useEffect(() => {
+    if (!translationPairs) return;
+    saveTranslationCache(translationPairs, viewMode);
+  }, [viewMode]);
 
   const translateMutation = trpc.cases.translateFullText.useMutation({
-    onMutate: () => setIsTranslating(true),
+    onMutate: () => {
+      setIsTranslating(true);
+      setTranslateProgress(5);
+      setTranslateBatchLabel("正在准备翻译…");
+      // Simulate gradual progress while waiting for the backend
+      // We advance to ~85% over ~30s; the final jump to 100% happens onSuccess.
+      let tick = 0;
+      progressTimerRef.current = setInterval(() => {
+        tick++;
+        // Slow logarithmic growth: fast at start, plateaus near 85
+        const next = Math.min(85, 5 + Math.round(80 * (1 - Math.exp(-tick / 12))));
+        setTranslateProgress(next);
+        // Update batch label based on estimated progress
+        if (next < 30) setTranslateBatchLabel("正在翻译第 1 批…");
+        else if (next < 55) setTranslateBatchLabel("正在翻译中间段落…");
+        else if (next < 75) setTranslateBatchLabel("即将完成，正在整理结果…");
+        else setTranslateBatchLabel("翻译即将完成…");
+      }, 2500);
+    },
     onSuccess: (data) => {
-      setIsTranslating(false);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      setTranslateProgress(100);
+      const totalB = data.totalBatches ?? 1;
+      setTranslateBatchLabel(`共 ${data.totalParagraphs} 个段落，${totalB} 个批次`);
+      setTimeout(() => {
+        setIsTranslating(false);
+        setTranslateProgress(0);
+        setTranslateBatchLabel("");
+      }, 600);
       setTranslationPairs(data.pairs);
       setViewMode("bilingual");
+      saveTranslationCache(data.pairs, "bilingual");
       toast.success(`翻译完成！共 ${data.totalParagraphs} 个段落`);
     },
     onError: (err) => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
       setIsTranslating(false);
+      setTranslateProgress(0);
+      setTranslateBatchLabel("");
       toast.error(`翻译失败：${err.message}`);
     },
   });
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (progressTimerRef.current) clearInterval(progressTimerRef.current); };
+  }, []);
 
   const handleTranslate = useCallback(() => {
     if (!caseId) return;
@@ -664,7 +752,20 @@ export default function CaseDetail() {
                         )}
                       </button>
                     )}
+                    {/* Cached indicator */}
+                    {translationPairs && !isTranslating && (
+                      <span className="text-[10px] text-muted-foreground/50 shrink-0">已缓存</span>
+                    )}
                   </div>
+                  {/* Progress bar – shown while translating */}
+                  {isTranslating && (
+                    <div className="mt-2 space-y-1">
+                      <Progress value={translateProgress} className="h-1.5" />
+                      <p className="text-[10px] text-muted-foreground/60">
+                        {translateBatchLabel} {translateProgress > 0 && translateProgress < 100 ? `${translateProgress}%` : ''}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {/* View mode toggle – only shown when translation is available */}

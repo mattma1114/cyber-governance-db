@@ -954,7 +954,8 @@ export const appRouter = router({
           translated: translatedParagraphs[idx] ?? '',
         }));
 
-        return { pairs, totalParagraphs: paragraphs.length };
+        const totalBatches = Math.ceil(paragraphs.length / BATCH_SIZE);
+        return { pairs, totalParagraphs: paragraphs.length, totalBatches };
       }),
 
     // ── Check duplicate (title similarity + sourceUrl exact match) ─────────────────────────────────
