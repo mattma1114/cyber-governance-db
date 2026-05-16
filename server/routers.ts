@@ -1118,7 +1118,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return [];
-        const conditions = [eq(platforms.isActive, true)];
+        const conditions = [eq(platforms.status, "published")];
         if (input?.keyword) {
           conditions.push(or(
             like(platforms.name, `%${input.keyword}%`),
@@ -1128,11 +1128,19 @@ export const appRouter = router({
         return db.select().from(platforms).where(and(...conditions)).orderBy(asc(platforms.sortOrder));
       }),
 
-    listAdmin: adminProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) return [];
-      return db.select().from(platforms).orderBy(asc(platforms.sortOrder));
-    }),
+    listAdmin: adminProcedure
+      .input(z.object({ statusFilter: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const conditions: any[] = [];
+        if (input?.statusFilter && input.statusFilter !== "all") {
+          conditions.push(eq(platforms.status, input.statusFilter as "published" | "draft" | "unpublished"));
+        }
+        return db.select().from(platforms)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .orderBy(asc(platforms.sortOrder));
+      }),
 
     getById: publicProcedure
       .input(z.object({ id: z.string() }))
@@ -1211,6 +1219,42 @@ export const appRouter = router({
         await db.delete(platforms).where(eq(platforms.id, input.id));
         return { success: true };
       }),
+
+    updateStatus: adminProcedure
+      .input(z.object({
+        id: z.string(),
+        status: z.enum(["published", "draft", "unpublished"]),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(platforms).set({ status: input.status }).where(eq(platforms.id, input.id));
+        return { success: true };
+      }),
+
+    batchUpdateStatus: adminProcedure
+      .input(z.object({
+        ids: z.array(z.string()),
+        status: z.enum(["published", "draft", "unpublished"]),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (!input.ids.length) return { success: true, count: 0 };
+        await db.update(platforms).set({ status: input.status }).where(inArray(platforms.id, input.ids));
+        return { success: true, count: input.ids.length };
+      }),
+
+    batchDelete: adminProcedure
+      .input(z.object({ ids: z.array(z.string()) }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (!input.ids.length) return { success: true, count: 0 };
+        await db.delete(platforms).where(inArray(platforms.id, input.ids));
+        return { success: true, count: input.ids.length };
+      }),
+
     // ── Export platform profile as PDF or Word ─────────────────────────
     exportProfile: publicProcedure
       .input(z.object({

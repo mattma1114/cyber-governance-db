@@ -135,6 +135,7 @@ export const platforms = mysqlTable("platforms", {
   developmentHistory: text("developmentHistory"),
   sortOrder: int("sortOrder").default(0),
   isActive: boolean("isActive").default(true),
+  status: mysqlEnum("status", ["published", "draft", "unpublished"]).default("published").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -1611,9 +1611,13 @@ export default function Admin() {
   // Topic/Jurisdiction dialog
   const [topicDialog, setTopicDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
   const [jurisDialog, setJurisDialog] = useState<{ open: boolean; editing?: any }>({ open: false });
-  // Batch selection
+  // Batch selection (cases)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  // Platform management state
+  const [platformStatusFilter, setPlatformStatusFilter] = useState<string>("all");
+  const [selectedPlatformIds, setSelectedPlatformIds] = useState<Set<string>>(new Set());
+  const [platformDeleteDialog, setPlatformDeleteDialog] = useState<{ open: boolean; id?: string; name?: string; isBatch?: boolean }>({ open: false });
 
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
@@ -1626,7 +1630,9 @@ export default function Admin() {
     status: statusFilter !== "all" ? statusFilter : undefined,
   });
 
-  const { data: platforms, isLoading: platformsLoading } = trpc.platforms.list.useQuery({});
+  const { data: platforms, isLoading: platformsLoading } = trpc.platforms.listAdmin.useQuery(
+    platformStatusFilter !== "all" ? { statusFilter: platformStatusFilter } : {}
+  );
 
   const createTopic = trpc.topics.create.useMutation({
     onSuccess: () => { toast.success("专题已创建"); utils.topics.list.invalidate(); setTopicDialog({ open: false }); },
@@ -1691,6 +1697,37 @@ export default function Admin() {
       utils.cases.stats.invalidate();
     },
     onError: (e) => toast.error(e.message),
+  });
+
+  // Platform mutations
+  const platformUpdateStatus = trpc.platforms.updateStatus.useMutation({
+    onSuccess: () => { toast.success("平台状态已更新"); utils.platforms.listAdmin.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const platformBatchUpdateStatus = trpc.platforms.batchUpdateStatus.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(`已更新 ${data.count} 个平台状态`);
+      setSelectedPlatformIds(new Set());
+      utils.platforms.listAdmin.invalidate();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const platformDelete = trpc.platforms.delete.useMutation({
+    onSuccess: () => {
+      toast.success("平台已删除");
+      utils.platforms.listAdmin.invalidate();
+      setPlatformDeleteDialog({ open: false });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const platformBatchDelete = trpc.platforms.batchDelete.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(`已删除 ${data.count} 个平台`);
+      setSelectedPlatformIds(new Set());
+      utils.platforms.listAdmin.invalidate();
+      setPlatformDeleteDialog({ open: false });
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const [refetchingFullText, setRefetchingFullText] = useState(false);
@@ -2084,13 +2121,54 @@ export default function Admin() {
 
           {/* Platforms Tab */}
           <TabsContent value="platforms">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">共 {platforms?.length ?? 0} 个平台</p>
-              <Button size="sm" className="gap-1.5" onClick={() => navigate("/admin/platforms/new")}>
-                <Plus className="w-4 h-4" />
-                新增平台
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <div className="flex-1 flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">共 {platforms?.length ?? 0} 个平台</p>
+                <Select value={platformStatusFilter} onValueChange={(v) => { setPlatformStatusFilter(v); setSelectedPlatformIds(new Set()); }}>
+                  <SelectTrigger className="h-8 w-28 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部</SelectItem>
+                    <SelectItem value="published">已发布</SelectItem>
+                    <SelectItem value="draft">草稿</SelectItem>
+                    <SelectItem value="unpublished">已下架</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedPlatformIds.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">已选 {selectedPlatformIds.size} 个</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                        批量操作 <ChevronDown className="w-3 h-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem onClick={() => platformBatchUpdateStatus.mutate({ ids: Array.from(selectedPlatformIds), status: "published" })}>
+                        <Eye className="w-3.5 h-3.5 mr-2" />批量发布
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => platformBatchUpdateStatus.mutate({ ids: Array.from(selectedPlatformIds), status: "unpublished" })}>
+                        <EyeOff className="w-3.5 h-3.5 mr-2" />批量下架
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => platformBatchUpdateStatus.mutate({ ids: Array.from(selectedPlatformIds), status: "draft" })}>
+                        <FileText className="w-3.5 h-3.5 mr-2" />批量设为草稿
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" onClick={() => setPlatformDeleteDialog({ open: true, isBatch: true })}>
+                        <Trash2 className="w-3.5 h-3.5 mr-2" />批量删除
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+              <Button size="sm" className="gap-1.5 h-8" onClick={() => navigate("/admin/platforms/new")}>
+                <Plus className="w-4 h-4" />新增平台
               </Button>
             </div>
+
             {platformsLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
@@ -2100,54 +2178,118 @@ export default function Admin() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">平台</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">母公司</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">总部</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground w-28">操作</th>
+                      <th className="px-3 py-3 w-10">
+                        <Checkbox
+                          checked={(platforms?.length ?? 0) > 0 && (platforms ?? []).every((p: any) => selectedPlatformIds.has(p.id))}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedPlatformIds(new Set((platforms ?? []).map((p: any) => p.id)));
+                            else setSelectedPlatformIds(new Set());
+                          }}
+                          aria-label="全选"
+                        />
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground">平台</th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground hidden md:table-cell">母公司</th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground hidden md:table-cell">总部</th>
+                      <th className="text-left px-3 py-3 font-medium text-muted-foreground w-24">状态</th>
+                      <th className="text-right px-3 py-3 font-medium text-muted-foreground w-16">操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {platforms?.map((p: any, i: number) => (
-                      <tr key={p.id} className={cn("border-t border-border hover:bg-muted/30 transition-colors", i % 2 === 0 ? "" : "bg-muted/10")}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
-                              style={{ background: p.color ?? "var(--primary)" }}
-                            >
-                              {p.abbr ?? p.name[0]}
+                    {(platforms ?? []).map((p: any, i: number) => {
+                      const isSelected = selectedPlatformIds.has(p.id);
+                      const pStatusConfig = {
+                        published: { label: "已发布", icon: Eye, cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+                        draft: { label: "草稿", icon: FileText, cls: "bg-muted text-muted-foreground" },
+                        unpublished: { label: "已下架", icon: EyeOff, cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+                      }[p.status as string] ?? { label: p.status ?? "已发布", icon: Eye, cls: "bg-green-100 text-green-700" };
+                      const PStatusIcon = pStatusConfig.icon;
+                      return (
+                        <tr key={p.id} className={cn("border-t border-border hover:bg-muted/30 transition-colors", isSelected ? "bg-primary/5" : i % 2 !== 0 ? "bg-muted/10" : "")}>
+                          <td className="px-3 py-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setSelectedPlatformIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (checked) next.add(p.id); else next.delete(p.id);
+                                  return next;
+                                });
+                              }}
+                              aria-label={`选择 ${p.name}`}
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+                                style={{ background: p.color ?? "var(--primary)" }}
+                              >
+                                {p.abbr ?? p.name[0]}
+                              </div>
+                              <span className="font-medium">{p.name}</span>
                             </div>
-                            <span className="font-medium">{p.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{p.company}</td>
-                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{p.hq}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-7 h-7"
-                              onClick={() => navigate(`/admin/platforms/${p.id}/edit`)}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="w-7 h-7"
-                              asChild
-                            >
-                              <Link href={`/platforms/${p.id}`}>
-                                <Eye className="w-3.5 h-3.5" />
-                              </Link>
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground hidden md:table-cell">{p.company}</td>
+                          <td className="px-3 py-3 text-muted-foreground hidden md:table-cell">{p.hq}</td>
+                          <td className="px-3 py-3">
+                            <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full", pStatusConfig.cls)}>
+                              <PStatusIcon className="w-3 h-3" />
+                              {pStatusConfig.label}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center justify-end">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="w-7 h-7">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  <DropdownMenuItem onClick={() => navigate(`/admin/platforms/${p.id}/edit`)}>
+                                    <Pencil className="w-3.5 h-3.5 mr-2" />编辑
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/platforms/${p.id}`} className="flex items-center">
+                                      <Eye className="w-3.5 h-3.5 mr-2" />查看详情
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  {p.status !== "published" && (
+                                    <DropdownMenuItem onClick={() => platformUpdateStatus.mutate({ id: p.id, status: "published" })}>
+                                      <Eye className="w-3.5 h-3.5 mr-2" />发布
+                                    </DropdownMenuItem>
+                                  )}
+                                  {p.status !== "unpublished" && (
+                                    <DropdownMenuItem onClick={() => platformUpdateStatus.mutate({ id: p.id, status: "unpublished" })}>
+                                      <EyeOff className="w-3.5 h-3.5 mr-2" />下架
+                                    </DropdownMenuItem>
+                                  )}
+                                  {p.status !== "draft" && (
+                                    <DropdownMenuItem onClick={() => platformUpdateStatus.mutate({ id: p.id, status: "draft" })}>
+                                      <FileText className="w-3.5 h-3.5 mr-2" />设为草稿
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => setPlatformDeleteDialog({ open: true, id: p.id, name: p.name })}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" />删除
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+                {(platforms ?? []).length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">暂无平台数据</div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -2313,6 +2455,37 @@ export default function Admin() {
               }}
             >
               {(deleteCase.isPending || batchDelete.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Platform Delete Confirm Dialog */}
+      <AlertDialog open={platformDeleteDialog.open} onOpenChange={(o) => setPlatformDeleteDialog({ open: o })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{platformDeleteDialog.isBatch ? "确认批量删除" : "确认删除"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {platformDeleteDialog.isBatch
+                ? `确定要删除所选的 ${selectedPlatformIds.size} 个平台吗？此操作不可撤销。`
+                : `确定要删除平台「${platformDeleteDialog.name}」吗？此操作不可撤销。`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (platformDeleteDialog.isBatch) {
+                  platformBatchDelete.mutate({ ids: Array.from(selectedPlatformIds) });
+                } else if (platformDeleteDialog.id) {
+                  platformDelete.mutate({ id: platformDeleteDialog.id });
+                }
+              }}
+            >
+              {(platformDelete.isPending || platformBatchDelete.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               删除
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,0 +1,1 @@
+ALTER TABLE `platforms` ADD `status` enum('published','draft','unpublished') DEFAULT 'published' NOT NULL;

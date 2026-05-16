@@ -322,3 +322,12 @@
 - [x] siteSettings 新增 dupCheckThreshold 字段（默认 60），存储去重相似度阈值
 - [x] checkDuplicate 路由读取阈值，低于阈值的候选不返回给前端
 - [x] API 配置页新增阈值滑块（0-100，步长 5，默认 60），实时预览效果说明
+
+## 平台画像库管理功能（当前迭代）
+- [x] 数据库：platforms 表新增 status 字段（published/draft/unpublished），迁移并设置默认值
+- [x] 后端：新增 platforms.updateStatus（单条）、platforms.batchUpdateStatus（批量）、platforms.delete（单条）、platforms.batchDelete（批量）路由
+- [x] 前端 Admin.tsx 平台管理 Tab：每行新增操作下拉菜单（编辑/发布/下架/设为草稿/删除）
+- [x] 前端：平台列表新增状态 Badge（已发布/草稿/已下架）和状态筛选下拉
+- [x] 前端：支持全选/多选 Checkbox + 批量操作工具栏（批量发布/下架/删除）
+- [x] 前端：删除操作添加确认弹窗（单条/批量）
+- [x] 前台 Platforms.tsx：只展示 status=published 的平台
