@@ -21,7 +21,7 @@ import {
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
   RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info,
-  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy} from "lucide-react";
+  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy, Sparkles} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -499,6 +499,9 @@ function SettingsTab() {
   const [llmApiVersion, setLlmApiVersion] = useState<string>("");
   const [llmTestResult, setLlmTestResult] = useState<{ ok: boolean; message: string; provider?: string; model?: string } | null>(null);
   const [llmTesting, setLlmTesting] = useState(false);
+  // Dup check threshold state
+  const [dupThreshold, setDupThreshold] = useState<number>(60);
+  const [dupThresholdLoaded, setDupThresholdLoaded] = useState(false);
   const utils = trpc.useUtils();
 
   const testApiKeyMutation = trpc.scraper.testApiKey.useMutation({
@@ -572,8 +575,21 @@ function SettingsTab() {
     { value: "azure", label: "Azure OpenAI", hint: "需要额外配置 Endpoint URL 和 API 版本" },
     { value: "openai_compat", label: "OpenAI 兼容端点", hint: "Ollama、Together.ai、Groq 等兼容 OpenAI 格式的服务" },
   ];
+  // ── Dup check threshold (from siteSettings) ─────────────────────────────────────────────
+  const { data: siteSettingsData } = trpc.siteSettings.getAll.useQuery();
+  const updateSiteSettingMutation = trpc.siteSettings.update.useMutation({
+    onSuccess: () => toast.success("去重阈值已保存"),
+    onError: (e) => toast.error(`保存失败：${e.message}`),
+  });
+  useEffect(() => {
+    if (siteSettingsData && !dupThresholdLoaded) {
+      const val = siteSettingsData.find(s => s.key === "dupCheckThreshold")?.value;
+      if (val) { setDupThreshold(parseInt(val, 10)); }
+      setDupThresholdLoaded(true);
+    }
+  }, [siteSettingsData, dupThresholdLoaded]);
 
-  // ── Per-task LLM config ──────────────────────────────────────────────────
+  // ── Per-task LLM config ──────────────────────────────────────────────────────
   const { data: llmTasks } = trpc.ai.getLlmTasks.useQuery();
   const [taskConfigs, setTaskConfigs] = useState<Record<string, { provider: string; model: string }>>({});
   const [taskConfigExpanded, setTaskConfigExpanded] = useState(false);
@@ -1024,6 +1040,48 @@ function SettingsTab() {
           >
             {upsertMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
             添加
+          </Button>
+        </div>
+      </div>
+
+      {/* Dup check threshold slider */}
+      <div className="pt-4">
+        <h3 className="text-sm font-medium pb-3 border-t border-border pt-4">内容去重检测配置</h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">语义相似度阈值</Label>
+              <span className="text-sm font-semibold tabular-nums w-12 text-right">{dupThreshold}分</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              只有 LLM 评分≥ {dupThreshold} 分的候选条目才会展示为疑似重复。阈值越高误报越少，阈值越低召回越全。
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-6">0</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={dupThreshold}
+                onChange={(e) => setDupThreshold(parseInt(e.target.value, 10))}
+                className="flex-1 accent-primary"
+              />
+              <span className="text-xs text-muted-foreground w-8 text-right">100</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>极高风险 ≥90分</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span>高风险 70-89分</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>中风险 50-69分</span>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => updateSiteSettingMutation.mutate({ key: "dupCheckThreshold", value: String(dupThreshold) })}
+            disabled={updateSiteSettingMutation.isPending}
+          >
+            {updateSiteSettingMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+            保存阈值设置
           </Button>
         </div>
       </div>
@@ -1636,6 +1694,35 @@ export default function Admin() {
   });
 
   const [refetchingFullText, setRefetchingFullText] = useState(false);
+  const [batchParseDialog, setBatchParseDialog] = useState<{
+    open: boolean;
+    status: "idle" | "running" | "done";
+    total: number;
+    successCount: number;
+    failCount: number;
+    results: Array<{ id: number; title: string; success: boolean; charCount?: number; error?: string }>;
+  }>({
+    open: false, status: "idle", total: 0, successCount: 0, failCount: 0, results: [],
+  });
+
+  const batchParsePdfMutation = trpc.cases.batchParsePdf.useMutation({
+    onSuccess: (data) => {
+      setBatchParseDialog(prev => ({
+        ...prev,
+        status: "done",
+        total: data.total,
+        successCount: data.successCount,
+        failCount: data.failCount,
+        results: data.results,
+      }));
+      utils.cases.listAdmin.invalidate();
+    },
+    onError: (e) => {
+      setBatchParseDialog(prev => ({ ...prev, status: "done" }));
+      toast.error(`批量解析失败: ${e.message}`);
+    },
+  });
+
   const refetchFullTextMutation = trpc.cases.refetchFullText.useMutation({
     onSuccess: (data) => {
       setRefetchingFullText(false);
@@ -1785,6 +1872,19 @@ export default function Admin() {
                 </SelectContent>
               </Select>
               <div className="flex-1" />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5"
+                disabled={batchParsePdfMutation.isPending}
+                onClick={() => {
+                  setBatchParseDialog({ open: true, status: "running", total: 0, successCount: 0, failCount: 0, results: [] });
+                  batchParsePdfMutation.mutate();
+                }}
+              >
+                {batchParsePdfMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                批量 AI 解析
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -2218,6 +2318,69 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Batch PDF Parse Progress Dialog */}
+      <Dialog open={batchParseDialog.open} onOpenChange={(o) => {
+        if (!batchParsePdfMutation.isPending) setBatchParseDialog(prev => ({ ...prev, open: o }));
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              批量 AI 解析 PDF 全文
+            </DialogTitle>
+            <DialogDescription>
+              {batchParseDialog.status === "running"
+                ? "正在查找并解析已上传 PDF 但尚无全文的条目，请稍候…"
+                : batchParseDialog.total === 0
+                  ? "没有需要解析的条目（所有已上传 PDF 的条目均已有全文）"
+                  : `解析完成：共 ${batchParseDialog.total} 条，成功 ${batchParseDialog.successCount} 条，失败 ${batchParseDialog.failCount} 条`
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {batchParseDialog.status === "running" && (
+            <div className="flex items-center justify-center py-8 gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">正在解析中，这可能需要几分钟…</span>
+            </div>
+          )}
+
+          {batchParseDialog.status === "done" && batchParseDialog.results.length > 0 && (
+            <div className="max-h-64 overflow-y-auto space-y-1.5 mt-2">
+              {batchParseDialog.results.map((r) => (
+                <div key={r.id} className={`flex items-start gap-2 text-sm px-3 py-2 rounded-lg ${
+                  r.success ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
+                }`}>
+                  {r.success
+                    ? <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                    : <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{r.title}</p>
+                    {r.success && r.charCount && (
+                      <p className="text-xs text-muted-foreground">提取 {r.charCount.toLocaleString()} 字符</p>
+                    )}
+                    {!r.success && r.error && (
+                      <p className="text-xs text-red-500">{r.error}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchParseDialog(prev => ({ ...prev, open: false }))}
+              disabled={batchParsePdfMutation.isPending}
+            >
+              {batchParseDialog.status === "done" ? "关闭" : "取消"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

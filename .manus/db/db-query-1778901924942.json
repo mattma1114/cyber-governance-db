@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO site_settings (`key`, `value`, `label`, `group`, `updatedAt`)\nVALUES ('dupCheckThreshold', '60', '去重检测相似度阈值', 'ai', NOW())\nON DUPLICATE KEY UPDATE `label` = '去重检测相似度阈值', `group` = 'ai';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute INSERT INTO site_settings (`key`, `value`, `label`, `group`, `updatedAt`)\nVALUES ('dupCheckThreshold', '60', '去重检测相似度阈值', 'ai', NOW())\nON DUPLICATE KEY UPDATE `label` = '去重检测相似度阈值', `group` = 'ai';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1836
+}

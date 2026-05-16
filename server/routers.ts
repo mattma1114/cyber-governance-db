@@ -16,7 +16,7 @@ import { generateCasePdf, generateBatchPdfZip } from "./pdf";
 import { generateCaseDocx } from "./case-docx";
 import { generatePlatformPdf, generatePlatformDocx } from "./platform-pdf";
 import { scrapeUrl, testFirecrawlKey, testJinaKey, testScrapingBeeKey } from "./scraper";
-import { eq, like, and, desc, asc, sql, or, inArray } from "drizzle-orm";
+import { eq, like, and, desc, asc, sql, or, inArray, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 // Admin guard middleware
@@ -755,7 +755,102 @@ export const appRouter = router({
         };
       }),
 
-    // ── Check duplicate (title similarity + sourceUrl exact match) ────────────────────
+    // ── Batch parse PDF full text ───────────────────────────────────────────────
+    batchParsePdf: adminProcedure
+      .mutation(async ({ ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
+
+        // Find all cases with PDF uploaded but fullText empty/null
+        const pending = await db.select({
+          id: cases.id,
+          title: cases.title,
+          fullTextPdfUrl: cases.fullTextPdfUrl,
+          fullTextPdfKey: cases.fullTextPdfKey,
+        }).from(cases)
+          .where(
+            and(
+              isNotNull(cases.fullTextPdfUrl),
+              or(
+                isNull(cases.fullText),
+                eq(cases.fullText, "")
+              )
+            )
+          )
+          .orderBy(asc(cases.id));
+
+        const llmRows = await db.select().from(apiSettings);
+        const results: Array<{ id: number; title: string; success: boolean; charCount?: number; error?: string }> = [];
+
+        for (const row of pending) {
+          try {
+            if (!row.fullTextPdfUrl) {
+              results.push({ id: row.id, title: row.title, success: false, error: "无 PDF URL" });
+              continue;
+            }
+
+            // Download PDF
+            const pdfUrl = row.fullTextPdfUrl.startsWith("/")
+              ? `http://localhost:${process.env.PORT ?? 3000}${row.fullTextPdfUrl}`
+              : row.fullTextPdfUrl;
+
+            const resp = await fetch(pdfUrl);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const arrayBuf = await resp.arrayBuffer();
+            const pdfBuffer = Buffer.from(arrayBuf);
+
+            // Extract text
+            const extracted = await extractTextFromPdf(pdfBuffer);
+            if (!extracted.text || extracted.text.trim().length < 50) {
+              results.push({ id: row.id, title: row.title, success: false, error: "文本内容过少（可能是扫描件或加密 PDF）" });
+              continue;
+            }
+
+            // LLM clean-up
+            const truncated = extracted.text.length > 30000
+              ? extracted.text.slice(0, 30000) + "\n\n[文本过长，已截断至 30000 字符]"
+              : extracted.text;
+
+            let cleanedText: string;
+            try {
+              const llmResp = await routeLlmForTask(llmRows, "PDF_EXTRACT", {
+                messages: [
+                  {
+                    role: "system",
+                    content: `你是一个文本整理小手。你的任务是清洗和整理从 PDF 提取的原始文本，输出整理后的完整正文。
+要求：
+1. 保留所有实质内容，不得删除任何正文段落
+2. 修复 OCR 识别错误（如分词、字符替换错误）
+3. 删除页眉、页脚、页码、目录等非正文内容
+4. 合并被换行断开的段落，恢复自然段落结构
+5. 保留原始语言（中文就输出中文，英文就输出英文）
+6. 不要添加任何总结、评论或额外解释
+7. 直接输出整理后的正文，不要加入任何前言或后记`,
+                  },
+                  {
+                    role: "user",
+                    content: `请整理以下从 PDF 提取的文本（共 ${extracted.numPages} 页）：\n\n${truncated}`,
+                  },
+                ],
+              });
+              cleanedText = (llmResp.choices?.[0]?.message?.content as string) ?? extracted.text;
+            } catch {
+              cleanedText = extracted.text;
+            }
+
+            await db.update(cases).set({ fullText: cleanedText }).where(eq(cases.id, row.id));
+            results.push({ id: row.id, title: row.title, success: true, charCount: cleanedText.length });
+          } catch (e: any) {
+            results.push({ id: row.id, title: row.title, success: false, error: e.message ?? "未知错误" });
+          }
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+        return { total: pending.length, successCount, failCount, results };
+      }),
+
+    // ── Check duplicate (title similarity + sourceUrl exact match) ─────────────────────────────────
     checkDuplicate: adminProcedure
       .input(z.object({
         title: z.string().optional(),
@@ -880,6 +975,11 @@ export const appRouter = router({
             llmResults = Array.isArray(parsed) ? parsed : (parsed.results ?? []);
           } catch { /* fall through to raw results */ }
 
+          // Read threshold from siteSettings (default 60)
+          const settingsRows = await db.select().from(siteSettings);
+          const thresholdStr = settingsRows.find(r => r.key === "dupCheckThreshold")?.value;
+          const threshold = thresholdStr ? parseInt(thresholdStr, 10) : 60;
+
           // Merge LLM scores back into candidate rows
           const scoreMap = new Map(llmResults.map(r => [r.id, r]));
           const scored = candidates
@@ -888,7 +988,7 @@ export const appRouter = router({
               similarityScore: scoreMap.get(r.id)?.score ?? null as number | null,
               reason: scoreMap.get(r.id)?.reason ?? null as string | null,
             }))
-            .filter(r => r.similarityScore === null || r.similarityScore >= 50)
+            .filter(r => r.similarityScore === null || r.similarityScore >= threshold)
             .sort((a, b) => (b.similarityScore ?? 0) - (a.similarityScore ?? 0))
             .slice(0, 5);
 
