@@ -336,3 +336,8 @@
 - [x] 前端 CaseDetail.tsx：修复正文渲染（保留换行/段落，使用 whitespace-pre-wrap 或逐段渲染）
 - [x] 前端 CaseDetail.tsx：原文正文区域右方添加语言提示小字「本处仅展示原语言内容，请自行根据需要配置翻译」
 - [x] 管理后台 CaseEditor.tsx：导入/AI 提取后展示段落预检结果（段落数、字符数、是否通过校验）
+
+## 原文正文一键 AI 翻译（当前迭代）
+- [x] 后端新增 cases.translateFullText 路由：接收 caseId，读取 fullText，调用 LLM 分段翻译为中文，返回段落对照数组
+- [x] 前端 CaseDetail.tsx：提示语旁添加「一键 AI 翻译」按鈕，翻译中显示进度，完成后以双语对照形式（原文段 / 译文段）展示
+- [x] 双语对照支持「切换视图」（仅原文 / 仅译文 / 双语对照），翻译结果缓存在前端 state 避免重复调用

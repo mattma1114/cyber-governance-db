@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, ExternalLink, Calendar, Building2, Tag, BookOpen,
   Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
-  Download, Loader2, MapPin, Layers, Paperclip, FileDown
+  Download, Loader2, MapPin, Layers, Paperclip, FileDown, Languages, AlignLeft, AlignJustify, Columns2
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -320,6 +320,32 @@ export default function CaseDetail() {
     onError: (err) => { toast.error(`Word 生成失败：${err.message}`); },
   });
 
+  // ── Translation state ─────────────────────────────────────────────────────────────────────────────────────
+  type TranslationPair = { original: string; translated: string };
+  type ViewMode = "original" | "translated" | "bilingual";
+  const [translationPairs, setTranslationPairs] = useState<TranslationPair[] | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("bilingual");
+
+  const translateMutation = trpc.cases.translateFullText.useMutation({
+    onMutate: () => setIsTranslating(true),
+    onSuccess: (data) => {
+      setIsTranslating(false);
+      setTranslationPairs(data.pairs);
+      setViewMode("bilingual");
+      toast.success(`翻译完成！共 ${data.totalParagraphs} 个段落`);
+    },
+    onError: (err) => {
+      setIsTranslating(false);
+      toast.error(`翻译失败：${err.message}`);
+    },
+  });
+
+  const handleTranslate = useCallback(() => {
+    if (!caseId) return;
+    translateMutation.mutate({ caseId });
+  }, [caseId]);
+
   if (isLoading) {
     return (
       <div className="container py-8 max-w-6xl">
@@ -608,93 +634,203 @@ export default function CaseDetail() {
 
             {/* Full Text – always visible, most important */}
             <div className="pt-4">
-              <div className="flex items-start justify-between mb-5 gap-4">
+              <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                     <FileText className="w-3.5 h-3.5" />
                     原文正文
                   </h2>
-                  <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">
-                    本处仅展示原语言内容，请自行根据需要配置翻译
-                  </p>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                      本处仅展示原语言内容，请自行根据需要配置翻译
+                    </p>
+                    {/* AI Translate button – only shown when there is text content */}
+                    {fullTextParagraphs.length > 0 && (
+                      <button
+                        onClick={handleTranslate}
+                        disabled={isTranslating}
+                        className="inline-flex items-center gap-1 text-[11px] text-primary/70 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 font-medium"
+                      >
+                        {isTranslating ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            AI 翻译中…
+                          </>
+                        ) : (
+                          <>
+                            <Languages className="w-3 h-3" />
+                            {translationPairs ? '重新翻译' : '一键 AI 翻译'}
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {/* Show PDF download link if PDF is available */}
-                {(c as any).fullTextPdfUrl && (
-                  <a
-                    href={(c as any).fullTextPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  >
-                    <Download className="w-3 h-3" />
-                    下载 PDF
-                  </a>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* View mode toggle – only shown when translation is available */}
+                  {translationPairs && (
+                    <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                      <button
+                        onClick={() => setViewMode('original')}
+                        title="仅原文"
+                        className={cn(
+                          "p-1 rounded transition-colors",
+                          viewMode === 'original' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <AlignLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('bilingual')}
+                        title="双语对照"
+                        className={cn(
+                          "p-1 rounded transition-colors",
+                          viewMode === 'bilingual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <Columns2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('translated')}
+                        title="仅译文"
+                        className={cn(
+                          "p-1 rounded transition-colors",
+                          viewMode === 'translated' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <AlignJustify className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  {/* PDF download link */}
+                  {(c as any).fullTextPdfUrl && (
+                    <a
+                      href={(c as any).fullTextPdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      下载 PDF
+                    </a>
+                  )}
+                </div>
               </div>
 
               {/* PDF Reader: shown when fullTextPdfUrl exists */}
-              {(c as any).fullTextPdfUrl ? (
-                <div className="space-y-3">
-                  <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/20">
-                    <iframe
-                      src={`${(c as any).fullTextPdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-                      className="w-full"
-                      style={{ height: "800px", border: "none" }}
-                      title="原文 PDF 阅读器"
-                    />
-                  </div>
-                  {/* Fallback text if also has text content */}
-                  {fullTextParagraphs.length > 0 && (
-                    <details className="mt-4">
-                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-2">
-                        查看文本版原文
-                      </summary>
-                      <div className="space-y-4 mt-3 pt-3 border-t border-border">
+{/* Helper: render text paragraphs according to viewMode */}
+              {(() => {
+                // Render a single text-only block (original / translated / bilingual)
+                const renderTextBlock = () => {
+                  if (!translationPairs) {
+                    // No translation yet – show original paragraphs
+                    return (
+                      <div className="space-y-4">
                         {fullTextParagraphs.map((para, i) => (
-                          <p
-                            key={i}
-                            className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line"
-                          >
+                          <p key={i} className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line">
                             {para}
                           </p>
                         ))}
                       </div>
-                    </details>
-                  )}
-                </div>
-              ) : fullTextParagraphs.length > 0 ? (
-                <div className="space-y-4">
-                  {fullTextParagraphs.map((para, i) => (
-                    <p
-                      key={i}
-                      className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line"
-                    >
-                      {para}
+                    );
+                  }
+                  if (viewMode === 'original') {
+                    return (
+                      <div className="space-y-4">
+                        {translationPairs.map((pair, i) => (
+                          <p key={i} className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line">
+                            {pair.original}
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  }
+                  if (viewMode === 'translated') {
+                    return (
+                      <div className="space-y-4">
+                        {translationPairs.map((pair, i) => (
+                          <p key={i} className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line">
+                            {pair.translated}
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  }
+                  // bilingual mode
+                  return (
+                    <div className="space-y-0">
+                      {translationPairs.map((pair, i) => (
+                        <div key={i} className="py-3 border-b border-border/40 last:border-b-0 space-y-1.5">
+                          <p className="text-[13px] leading-[1.75] text-muted-foreground whitespace-pre-line">
+                            {pair.original}
+                          </p>
+                          <p className="text-[15px] leading-[1.85] text-foreground whitespace-pre-line">
+                            {pair.translated}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                };
+
+                // PDF mode
+                if ((c as any).fullTextPdfUrl) {
+                  return (
+                    <div className="space-y-3">
+                      <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/20">
+                        <iframe
+                          src={`${(c as any).fullTextPdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                          className="w-full"
+                          style={{ height: "800px", border: "none" }}
+                          title="原文 PDF 阅读器"
+                        />
+                      </div>
+                      {/* Text version (collapsible) – supports translation view */}
+                      {fullTextParagraphs.length > 0 && (
+                        <details className="mt-4">
+                          <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-2">
+                            {translationPairs
+                              ? '译文视图已启用，展开文本区域查看对照'
+                              : '查看文本版原文'}
+                          </summary>
+                          <div className="mt-3 pt-3 border-t border-border">
+                            {renderTextBlock()}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Text-only mode
+                if (fullTextParagraphs.length > 0) {
+                  return renderTextBlock();
+                }
+
+                // Empty state
+                return (
+                  <div className="py-10 border border-dashed border-border rounded-lg text-center">
+                    <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground mb-1">暂无原文正文内容</p>
+                    <p className="text-xs text-muted-foreground/70">
+                      {c.sourceUrl
+                        ? "可在管理后台使用「重新抓取原文」功能自动填充，或手动编辑内容"
+                        : "请在编辑页面填写原文链接后，使用 AI 提取功能自动抓取"}
                     </p>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-10 border border-dashed border-border rounded-lg text-center">
-                  <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground mb-1">暂无原文正文内容</p>
-                  <p className="text-xs text-muted-foreground/70">
-                    {c.sourceUrl
-                      ? "可在管理后台使用「重新抓取原文」功能自动填充，或手动编辑内容"
-                      : "请在编辑页面填写原文链接后，使用 AI 提取功能自动抓取"}
-                  </p>
-                  {c.sourceUrl && (
-                    <a
-                      href={c.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 mt-3 text-xs text-primary hover:underline"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      前往原文链接查看
-                    </a>
-                  )}
-                </div>
-              )}
+                    {c.sourceUrl && (
+                      <a
+                        href={c.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 mt-3 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        前往原文链接查看
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Fallback if no content */}

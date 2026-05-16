@@ -863,6 +863,100 @@ export const appRouter = router({
         return { total: pending.length, successCount, failCount, results };
       }),
 
+    // ── Translate full text to Chinese (bilingual paragraph pairs) ────────────────────────────────
+    translateFullText: publicProcedure
+      .input(z.object({
+        caseId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not available' });
+
+        // Fetch the case
+        const rows = await db.select({ fullText: cases.fullText, title: cases.title })
+          .from(cases)
+          .where(eq(cases.id, input.caseId))
+          .limit(1);
+        if (!rows.length || !rows[0].fullText) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '未找到原文内容，请先导入原文正文' });
+        }
+
+        const fullText = rows[0].fullText;
+
+        // Split into paragraphs (double newline)
+        const paragraphs = fullText
+          .split(/\n{2,}/)
+          .map((p: string) => p.trim())
+          .filter((p: string) => p.length > 0);
+
+        if (paragraphs.length === 0) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '原文内容为空，无法翻译' });
+        }
+
+        // Translate in batches of 10 paragraphs to avoid token limits
+        const BATCH_SIZE = 10;
+        const translatedParagraphs: string[] = [];
+
+        for (let i = 0; i < paragraphs.length; i += BATCH_SIZE) {
+          const batch = paragraphs.slice(i, i + BATCH_SIZE);
+          const numberedText = batch.map((p: string, idx: number) => `[${idx + 1}] ${p}`).join('\n\n');
+
+          const llmResp = await invokeLLM({
+            messages: [
+              {
+                role: 'system',
+                content: `你是一名专业的法律文件翻译专家，精通将英文、法文、德文、日文等语言的法律文件准确翻译为中文。
+
+翻译要求：
+1. 严格按照原文段落编号顺序翻译，每段译文前保留原编号格式 [N]
+2. 保持法律术语的准确性和专业性，使用规范的中文法律表达
+3. 保留原文的段落结构，不合并或拆分段落
+4. 对专有名词（机构名、法规名）首次出现时保留原文并附中文译名，格式：中文译名（原文）
+5. 数字、日期、引用编号保持原格式不变
+6. 仅输出译文，不添加任何解释或注释`,
+              },
+              {
+                role: 'user',
+                content: `请将以下法律文件段落翻译为中文：\n\n${numberedText}`,
+              },
+            ],
+          });
+
+          const translatedBatch = (llmResp.choices?.[0]?.message?.content as string) ?? '';
+
+          // Parse numbered paragraphs from response
+          const batchLines = translatedBatch.split(/\n{1,}/);
+          const batchTranslations: string[] = [];
+          let current = '';
+
+          for (const line of batchLines) {
+            const match = line.match(/^\[(\d+)\]\s*(.*)/);
+            if (match) {
+              if (current.trim()) batchTranslations.push(current.trim());
+              current = match[2] || '';
+            } else if (line.trim()) {
+              current += (current ? '\n' : '') + line.trim();
+            }
+          }
+          if (current.trim()) batchTranslations.push(current.trim());
+
+          // Pad with empty strings if parsing missed some
+          while (batchTranslations.length < batch.length) {
+            batchTranslations.push('');
+          }
+
+          translatedParagraphs.push(...batchTranslations.slice(0, batch.length));
+        }
+
+        // Return paragraph pairs
+        const pairs = paragraphs.map((original: string, idx: number) => ({
+          original,
+          translated: translatedParagraphs[idx] ?? '',
+        }));
+
+        return { pairs, totalParagraphs: paragraphs.length };
+      }),
+
     // ── Check duplicate (title similarity + sourceUrl exact match) ─────────────────────────────────
     checkDuplicate: adminProcedure
       .input(z.object({
