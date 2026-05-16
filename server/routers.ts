@@ -5,7 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb, listUsers, updateUserRole, updateUserStatus, deleteUser, createAdminInvite, listAdminInvites, getAdminInviteByToken, consumeAdminInvite, revokeAdminInvite } from "./db";
 import { randomBytes } from "crypto";
-import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users, adminInvites, platformRules, ruleAttachments } from "../drizzle/schema";
+import { cases, platforms, topics, jurisdictions, apiSettings, caseAttachments, siteSettings, users, adminInvites } from "../drizzle/schema";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import bcrypt from "bcryptjs";
@@ -314,9 +314,6 @@ export const appRouter = router({
           updatedAt: cases.updatedAt,
           // Lightweight flag instead of returning the full text content
           hasFullText: sql<number>`CASE WHEN ${cases.fullText} IS NOT NULL AND ${cases.fullText} != '' THEN 1 ELSE 0 END`,
-          // Flag: has PDF uploaded but no fullText yet (pending AI parse)
-          hasPdf: sql<number>`CASE WHEN ${cases.fullTextPdfUrl} IS NOT NULL AND ${cases.fullTextPdfUrl} != '' THEN 1 ELSE 0 END`,
-          pendingPdfParse: sql<number>`CASE WHEN ${cases.fullTextPdfUrl} IS NOT NULL AND ${cases.fullTextPdfUrl} != '' AND (${cases.fullText} IS NULL OR ${cases.fullText} = '') THEN 1 ELSE 0 END`,
         };
         const [items, countResult] = await Promise.all([
           db.select(selectFields).from(cases).where(where).orderBy(desc(cases.createdAt)).limit(pageSize).offset(offset),
@@ -725,16 +722,15 @@ export const appRouter = router({
             messages: [
               {
                 role: "system",
-                content: `你是一个文本整理专家。你的任务是清洗从 PDF 提取的原始文本，严格保留原文的段落结构和排版，输出整理后的完整正文。
-
-核心要求（必须严格遵守）：
-1. 【严禁合并段落】绝对不得将不同段落合并为一段。每个自然段落之间必须保留一个空行（即 \n\n）
-2. 【严格保留段落分隔】原文中的每一个段落分隔（包括条款、款项、项之间的分隔）必须在输出中保留为空行
-3. 修复明显的 OCR 识别错误（如错误的字符替换、断词），但不得改变句子结构
-4. 删除页眉、页脚、页码等非正文内容，但保留条款编号、标题等结构性内容
-5. 保留原始语言（中文输出中文，英文输出英文，不得翻译）
-6. 不得添加任何总结、评论、解释或前言后记
-7. 直接输出整理后的正文，段落之间用空行（\n\n）分隔`,
+                content: `你是一个文本整理尓手。你的任务是清洗和整理从 PDF 提取的原始文本，输出整理后的完整正文。
+要求：
+1. 保留所有实质内容，不得删除任何正文段落
+2. 修复 OCR 识别错误（如分词、字符替换错误）
+3. 删除页眉、页脚、页码、目录等非正文内容
+4. 合并被换行断开的段落，恢复自然段落结构
+5. 保留原始语言（中文就输出中文，英文就输出英文）
+6. 不要添加任何总结、评论或额外解释
+7. 直接输出整理后的正文，不要加入任何前言或后记`,
               },
               {
                 role: "user",
@@ -751,18 +747,10 @@ export const appRouter = router({
         // 5. Save to fullText field
         await db.update(cases).set({ fullText: cleanedText }).where(eq(cases.id, input.caseId));
 
-        // Paragraph integrity check
-        const paragraphCount = cleanedText
-          ? cleanedText.split(/\n{2,}/).filter((p: string) => p.trim().length > 0).length
-          : 0;
-        const _paragraphWarning = cleanedText.length > 500 && paragraphCount <= 1;
-
         return {
           success: true,
           numPages,
           charCount: cleanedText.length,
-          paragraphCount,
-          _paragraphWarning,
           preview: cleanedText.slice(0, 300),
         };
       }),
@@ -829,16 +817,15 @@ export const appRouter = router({
                 messages: [
                   {
                     role: "system",
-                    content: `你是一个文本整理专家。你的任务是清洗从 PDF 提取的原始文本，严格保留原文的段落结构和排版，输出整理后的完整正文。
-
-核心要求（必须严格遵守）：
-1. 【严禁合并段落】绝对不得将不同段落合并为一段。每个自然段落之间必须保留一个空行（即 \n\n）
-2. 【严格保留段落分隔】原文中的每一个段落分隔（包括条款、款项、项之间的分隔）必须在输出中保留为空行
-3. 修复明显的 OCR 识别错误（如错误的字符替换、断词），但不得改变句子结构
-4. 删除页眉、页脚、页码等非正文内容，但保留条款编号、标题等结构性内容
-5. 保留原始语言（中文输出中文，英文输出英文，不得翻译）
-6. 不得添加任何总结、评论、解释或前言后记
-7. 直接输出整理后的正文，段落之间用空行（\n\n）分隔`,
+                    content: `你是一个文本整理小手。你的任务是清洗和整理从 PDF 提取的原始文本，输出整理后的完整正文。
+要求：
+1. 保留所有实质内容，不得删除任何正文段落
+2. 修复 OCR 识别错误（如分词、字符替换错误）
+3. 删除页眉、页脚、页码、目录等非正文内容
+4. 合并被换行断开的段落，恢复自然段落结构
+5. 保留原始语言（中文就输出中文，英文就输出英文）
+6. 不要添加任何总结、评论或额外解释
+7. 直接输出整理后的正文，不要加入任何前言或后记`,
                   },
                   {
                     role: "user",
@@ -861,101 +848,6 @@ export const appRouter = router({
         const successCount = results.filter(r => r.success).length;
         const failCount = results.filter(r => !r.success).length;
         return { total: pending.length, successCount, failCount, results };
-      }),
-
-    // ── Translate full text to Chinese (bilingual paragraph pairs) ────────────────────────────────
-    translateFullText: publicProcedure
-      .input(z.object({
-        caseId: z.number(),
-      }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not available' });
-
-        // Fetch the case
-        const rows = await db.select({ fullText: cases.fullText, title: cases.title })
-          .from(cases)
-          .where(eq(cases.id, input.caseId))
-          .limit(1);
-        if (!rows.length || !rows[0].fullText) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: '未找到原文内容，请先导入原文正文' });
-        }
-
-        const fullText = rows[0].fullText;
-
-        // Split into paragraphs (double newline)
-        const paragraphs = fullText
-          .split(/\n{2,}/)
-          .map((p: string) => p.trim())
-          .filter((p: string) => p.length > 0);
-
-        if (paragraphs.length === 0) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: '原文内容为空，无法翻译' });
-        }
-
-        // Translate in batches of 10 paragraphs to avoid token limits
-        const BATCH_SIZE = 10;
-        const translatedParagraphs: string[] = [];
-
-        for (let i = 0; i < paragraphs.length; i += BATCH_SIZE) {
-          const batch = paragraphs.slice(i, i + BATCH_SIZE);
-          const numberedText = batch.map((p: string, idx: number) => `[${idx + 1}] ${p}`).join('\n\n');
-
-          const llmResp = await invokeLLM({
-            messages: [
-              {
-                role: 'system',
-                content: `你是一名专业的法律文件翻译专家，精通将英文、法文、德文、日文等语言的法律文件准确翻译为中文。
-
-翻译要求：
-1. 严格按照原文段落编号顺序翻译，每段译文前保留原编号格式 [N]
-2. 保持法律术语的准确性和专业性，使用规范的中文法律表达
-3. 保留原文的段落结构，不合并或拆分段落
-4. 对专有名词（机构名、法规名）首次出现时保留原文并附中文译名，格式：中文译名（原文）
-5. 数字、日期、引用编号保持原格式不变
-6. 仅输出译文，不添加任何解释或注释`,
-              },
-              {
-                role: 'user',
-                content: `请将以下法律文件段落翻译为中文：\n\n${numberedText}`,
-              },
-            ],
-          });
-
-          const translatedBatch = (llmResp.choices?.[0]?.message?.content as string) ?? '';
-
-          // Parse numbered paragraphs from response
-          const batchLines = translatedBatch.split(/\n{1,}/);
-          const batchTranslations: string[] = [];
-          let current = '';
-
-          for (const line of batchLines) {
-            const match = line.match(/^\[(\d+)\]\s*(.*)/);
-            if (match) {
-              if (current.trim()) batchTranslations.push(current.trim());
-              current = match[2] || '';
-            } else if (line.trim()) {
-              current += (current ? '\n' : '') + line.trim();
-            }
-          }
-          if (current.trim()) batchTranslations.push(current.trim());
-
-          // Pad with empty strings if parsing missed some
-          while (batchTranslations.length < batch.length) {
-            batchTranslations.push('');
-          }
-
-          translatedParagraphs.push(...batchTranslations.slice(0, batch.length));
-        }
-
-        // Return paragraph pairs
-        const pairs = paragraphs.map((original: string, idx: number) => ({
-          original,
-          translated: translatedParagraphs[idx] ?? '',
-        }));
-
-        const totalBatches = Math.ceil(paragraphs.length / BATCH_SIZE);
-        return { pairs, totalParagraphs: paragraphs.length, totalBatches };
       }),
 
     // ── Check duplicate (title similarity + sourceUrl exact match) ─────────────────────────────────
@@ -1452,9 +1344,6 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const rows = await db.select().from(apiSettings);
-        const get = (key: string) => rows.find((r) => r.key === key)?.value ?? undefined;
-
-        // ── Step 1: LLM fills basic info (WITHOUT rules – those will be scraped) ──
         const systemPrompt = `You are a senior research analyst specializing in internet platform governance, digital regulation, and platform economics. Given a platform name or keyword, extract comprehensive information about the platform from your knowledge. Return a JSON object with ALL of the following fields:
 
 ## Basic Info
@@ -1481,12 +1370,19 @@ export const appRouter = router({
 - portrait_openness: string (openness level: 开放平台 | 半开放 | 封闭生态)
 - portrait_crossBorder: string (cross-border presence: 全球化运营 | 区域性平台 | 本土平台 | 出海扩张中)
 
+## Rules (major regulatory documents/policies, up to 5 most important)
+- rules: array of objects, each with:
+  - date: string (YYYY-MM-DD or YYYY-MM or YYYY)
+  - title: string (document title in Chinese)
+  - type: string (one of: privacy_policy | terms_of_service | community_guidelines | transparency_report | other)
+  - url: string (direct URL to the document)
+
 ## Timeline (key development milestones, 5-10 items)
 - timeline: array of objects, each with:
   - date: string (YYYY-MM-DD or YYYY-MM or YYYY)
   - event: string (milestone description in Chinese, 30-80 chars)
 
-Return ONLY valid JSON, no markdown, no explanation.`;
+Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real and verifiable.`;
         const response = await routeLlmForTask(rows, "PLATFORM_FILL", {
           messages: [
             { role: "system", content: systemPrompt },
@@ -1520,6 +1416,20 @@ Return ONLY valid JSON, no markdown, no explanation.`;
                   portrait_businessModel: { type: "array", items: { type: "string" } },
                   portrait_openness: { type: "string" },
                   portrait_crossBorder: { type: "string" },
+                  rules: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        date: { type: "string" },
+                        title: { type: "string" },
+                        type: { type: "string" },
+                        url: { type: "string" },
+                      },
+                      required: ["date", "title", "type", "url"],
+                      additionalProperties: false,
+                    },
+                  },
                   timeline: {
                     type: "array",
                     items: {
@@ -1533,140 +1443,14 @@ Return ONLY valid JSON, no markdown, no explanation.`;
                     },
                   },
                 },
-                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory", "portrait_types", "portrait_structure", "portrait_contentSource", "portrait_networkEffect", "portrait_businessModel", "portrait_openness", "portrait_crossBorder", "timeline"],
+                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory", "portrait_types", "portrait_structure", "portrait_contentSource", "portrait_networkEffect", "portrait_businessModel", "portrait_openness", "portrait_crossBorder", "rules", "timeline"],
                 additionalProperties: false,
               },
             },
           },
         });
         const content = response.choices[0].message.content;
-        const platformData = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
-
-        // ── Step 2: Scrape official website to discover real rule document URLs ──
-        let rules: Array<{ date: string; title: string; type: string; url: string }> = [];
-        const websiteUrl: string = platformData.website || "";
-        if (websiteUrl) {
-          try {
-            // Scrape the official website homepage to find links to legal/policy pages
-            const scraped = await scrapeUrl(websiteUrl, {
-              firecrawlKey: get("FIRECRAWL_API_KEY"),
-              jinaKey: get("JINA_API_KEY"),
-              scrapingbeeKey: get("SCRAPINGBEE_API_KEY"),
-            });
-
-            // Ask LLM to extract real rule document URLs from the scraped page
-            const rulesPrompt = `You are analyzing the homepage content of ${platformData.nameEn} (${websiteUrl}).
-From the following scraped page content, identify and extract URLs for the platform's official legal/policy documents such as:
-- Privacy Policy
-- Terms of Service / Terms of Use
-- Community Guidelines / Community Standards
-- Transparency Report
-- Cookie Policy
-- Advertising Policy
-- Content Policy
-
-For each document found, return its direct URL (absolute URL). If a relative URL is found (e.g. /privacy), convert it to absolute using the base domain ${websiteUrl}.
-
-Scraped content:
-${scraped.markdown.slice(0, 8000)}
-
-Return a JSON array. Each item must have:
-- title: string (document name in Chinese, e.g. "隐私政策", "服务条款", "社区准则")
-- type: one of privacy_policy | terms_of_service | community_guidelines | transparency_report | other
-- url: string (the real, absolute URL found in the page)
-- date: string (use "" if unknown)
-
-Only include URLs that are clearly present in the scraped content. Do NOT invent or guess URLs. Return empty array if none found.`;
-
-            const rulesResp = await routeLlmForTask(rows, "PLATFORM_FILL", {
-              messages: [
-                { role: "system", content: rulesPrompt },
-                { role: "user", content: `Extract rule document URLs for ${platformData.nameEn}` },
-              ],
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: "platform_rules",
-                  strict: true,
-                  schema: {
-                    type: "object",
-                    properties: {
-                      rules: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            date: { type: "string" },
-                            title: { type: "string" },
-                            type: { type: "string" },
-                            url: { type: "string" },
-                          },
-                          required: ["date", "title", "type", "url"],
-                          additionalProperties: false,
-                        },
-                      },
-                    },
-                    required: ["rules"],
-                    additionalProperties: false,
-                  },
-                },
-              },
-            });
-            const rulesContent = rulesResp.choices[0].message.content;
-            const parsed = JSON.parse(typeof rulesContent === "string" ? rulesContent : JSON.stringify(rulesContent));
-            rules = (parsed.rules || []).filter((r: { url: string }) => r.url && r.url.startsWith("http"));
-          } catch (e) {
-            console.warn("[extractPlatformByKeyword] Failed to scrape rules from website:", e instanceof Error ? e.message : e);
-          }
-
-          // ── Step 2b: If scraping homepage didn't yield enough rules, try common policy paths ──
-          if (rules.length < 2) {
-            const baseUrl = websiteUrl.replace(/\/$/, "");
-            // Try to scrape common policy page paths in parallel
-            const policyPaths = [
-              { path: "/privacy", type: "privacy_policy", title: "隐私政策" },
-              { path: "/legal/privacy", type: "privacy_policy", title: "隐私政策" },
-              { path: "/privacy-policy", type: "privacy_policy", title: "隐私政策" },
-              { path: "/terms", type: "terms_of_service", title: "服务条款" },
-              { path: "/legal/terms", type: "terms_of_service", title: "服务条款" },
-              { path: "/terms-of-service", type: "terms_of_service", title: "服务条款" },
-              { path: "/community-guidelines", type: "community_guidelines", title: "社区准则" },
-              { path: "/guidelines", type: "community_guidelines", title: "社区准则" },
-            ];
-
-            // Check which paths exist by doing HEAD requests (fast, no body needed)
-            const headChecks = await Promise.allSettled(
-              policyPaths.map(async (p) => {
-                const url = `${baseUrl}${p.path}`;
-                const res = await fetch(url, {
-                  method: "HEAD",
-                  signal: AbortSignal.timeout(5000),
-                  headers: { "User-Agent": "Mozilla/5.0 (compatible; CyberGovDB/1.0)" },
-                });
-                if (res.ok || res.status === 405) {
-                  // 405 = Method Not Allowed but URL exists
-                  return { ...p, url };
-                }
-                throw new Error(`HTTP ${res.status}`);
-              })
-            );
-
-            const existingPaths = headChecks
-              .map((r, i) => r.status === "fulfilled" ? r.value : null)
-              .filter((r): r is NonNullable<typeof r> => r !== null);
-
-            // Merge with already-found rules, avoiding duplicates by type
-            const existingTypes = new Set(rules.map((r) => r.type));
-            for (const p of existingPaths) {
-              if (!existingTypes.has(p.type)) {
-                rules.push({ date: "", title: p.title, type: p.type, url: p.url });
-                existingTypes.add(p.type);
-              }
-            }
-          }
-        }
-
-        return { ...platformData, rules };
+        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
       }),
 
     // Extract case info from URL
@@ -1762,35 +1546,8 @@ Return ONLY valid JSON, no markdown, no explanation.`;
         if (!validTopicIds.includes(parsed.topicId)) parsed.topicId = "";
         if (!validJurisdictionIds.includes(parsed.jurisdictionId)) parsed.jurisdictionId = "";
         // Always prefer scraped full text over LLM-generated content
-        // Clean Markdown artifacts from scraped content to preserve paragraph structure
         if (scrapedFullText) {
-          const cleanedScraped = scrapedFullText
-            // Remove Markdown headings (## Title → Title)
-            .replace(/^#{1,6}\s+/gm, '')
-            // Remove bold/italic markers (**text** → text, *text* → text)
-            .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
-            // Remove inline code backticks
-            .replace(/`([^`]+)`/g, '$1')
-            // Remove Markdown links [text](url) → text
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-            // Remove horizontal rules
-            .replace(/^[-*_]{3,}\s*$/gm, '')
-            // Normalize multiple blank lines to double newline
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-          parsed.fullText = cleanedScraped.slice(0, 15000);
-        }
-        // Paragraph integrity check: warn if fullText has no paragraph breaks
-        const paragraphCount = parsed.fullText
-          ? parsed.fullText.split(/\n\n+/).filter((p: string) => p.trim().length > 0).length
-          : 0;
-        if (parsed.fullText && parsed.fullText.length > 500 && paragraphCount <= 1) {
-          // Flag for frontend to show warning
-          parsed._paragraphWarning = true;
-          parsed._paragraphCount = paragraphCount;
-        } else {
-          parsed._paragraphWarning = false;
-          parsed._paragraphCount = paragraphCount;
+          parsed.fullText = scrapedFullText.slice(0, 15000);
         }
         // Validate AI analysis depth — if too short, append a note for the editor
         if (parsed.aiAnalysis && parsed.aiAnalysis.length < 400) {
@@ -1937,350 +1694,7 @@ Return ONLY valid JSON, no explanation.`;
       }),
    }),
 
-  // ── Platform Rules Router ──────────────────────────────────────────────
-  platformRules: router({
-    // List all rules for a platform (public)
-    list: publicProcedure
-      .input(z.object({ platformId: z.string(), latestOnly: z.boolean().optional() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        const conditions: any[] = [eq(platformRules.platformId, input.platformId)];
-        if (input.latestOnly) conditions.push(eq(platformRules.isLatest, true));
-        return db.select().from(platformRules)
-          .where(and(...conditions))
-          .orderBy(asc(platformRules.sortOrder), desc(platformRules.createdAt));
-      }),
-
-    // List all versions of a specific rule (by title similarity)
-    listVersions: publicProcedure
-      .input(z.object({ ruleId: z.number() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        const current = await db.select().from(platformRules)
-          .where(eq(platformRules.id, input.ruleId)).limit(1);
-        if (!current[0]) return [];
-        const { platformId, title } = current[0];
-        const kw = title.slice(0, Math.min(20, title.length));
-        return db.select().from(platformRules)
-          .where(and(
-            eq(platformRules.platformId, platformId),
-            like(platformRules.title, `%${kw}%`)
-          ))
-          .orderBy(desc(platformRules.createdAt));
-      }),
-
-    // Create a new rule
-    create: adminProcedure
-      .input(z.object({
-        platformId: z.string(),
-        title: z.string().min(1),
-        type: z.string().default("policy"),
-        url: z.string().optional(),
-        date: z.string().optional(),
-        fullText: z.string().optional(),
-        versionLabel: z.string().optional(),
-        versionDate: z.string().optional(),
-        sortOrder: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const result = await db.insert(platformRules).values({
-          platformId: input.platformId,
-          title: input.title,
-          type: input.type,
-          url: input.url,
-          date: input.date,
-          fullText: input.fullText,
-          versionLabel: input.versionLabel,
-          versionDate: input.versionDate,
-          isLatest: true,
-          sortOrder: input.sortOrder ?? 0,
-        });
-        return { success: true, id: Number((result as any).insertId) };
-      }),
-
-    // Update a rule
-    update: adminProcedure
-      .input(z.object({
-        id: z.number(),
-        title: z.string().optional(),
-        type: z.string().optional(),
-        url: z.string().optional(),
-        date: z.string().optional(),
-        fullText: z.string().optional(),
-        versionLabel: z.string().optional(),
-        versionDate: z.string().optional(),
-        isLatest: z.boolean().optional(),
-        sortOrder: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const { id, ...rest } = input;
-        await db.update(platformRules).set(rest).where(eq(platformRules.id, id));
-        return { success: true };
-      }),
-
-    // Delete a rule
-    delete: adminProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.delete(ruleAttachments).where(eq(ruleAttachments.ruleId, input.id));
-        await db.delete(platformRules).where(eq(platformRules.id, input.id));
-        return { success: true };
-      }),
-
-    // Add a new version of an existing rule
-    addVersion: adminProcedure
-      .input(z.object({
-        parentRuleId: z.number(),
-        title: z.string().min(1),
-        type: z.string().default("policy"),
-        url: z.string().optional(),
-        date: z.string().optional(),
-        fullText: z.string().optional(),
-        versionLabel: z.string().optional(),
-        versionDate: z.string().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const parent = await db.select().from(platformRules)
-          .where(eq(platformRules.id, input.parentRuleId)).limit(1);
-        if (!parent[0]) throw new TRPCError({ code: "NOT_FOUND", message: "父规则不存在" });
-        const kw = parent[0].title.slice(0, Math.min(20, parent[0].title.length));
-        await db.update(platformRules)
-          .set({ isLatest: false })
-          .where(and(
-            eq(platformRules.platformId, parent[0].platformId),
-            like(platformRules.title, `%${kw}%`)
-          ));
-        const result = await db.insert(platformRules).values({
-          platformId: parent[0].platformId,
-          title: input.title,
-          type: input.type,
-          url: input.url,
-          date: input.date,
-          fullText: input.fullText,
-          versionLabel: input.versionLabel,
-          versionDate: input.versionDate,
-          parentRuleId: input.parentRuleId,
-          isLatest: true,
-          sortOrder: parent[0].sortOrder,
-        });
-        await db.update(platformRules)
-          .set({ newVersionHint: null })
-          .where(eq(platformRules.id, input.parentRuleId));
-        return { success: true, id: Number((result as any).insertId) };
-      }),
-
-    // AI: check if a new version exists for a rule
-    checkNewVersion: adminProcedure
-      .input(z.object({ ruleId: z.number() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const rule = await db.select().from(platformRules)
-          .where(eq(platformRules.id, input.ruleId)).limit(1);
-        if (!rule[0]) throw new TRPCError({ code: "NOT_FOUND" });
-        const r = rule[0];
-        if (!r.url) throw new TRPCError({ code: "BAD_REQUEST", message: "该规则文件无 URL，无法检测新版本" });
-        let currentContent = "";
-        try {
-          const scrapeRows = await db.select().from(apiSettings);
-          const getScrape = (key: string) => scrapeRows.find((row) => row.key === key)?.value ?? undefined;
-          const scraped = await scrapeUrl(r.url, {
-            firecrawlKey: getScrape("FIRECRAWL_API_KEY"),
-            jinaKey: getScrape("JINA_API_KEY"),
-            scrapingbeeKey: getScrape("SCRAPINGBEE_API_KEY"),
-          });
-          currentContent = scraped.markdown;
-        } catch (e: any) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `抓取失败: ${e.message}` });
-        }
-        const llmRows = await db.select().from(apiSettings);
-        const llmResp = await routeLlmForTask(llmRows, "RULE_CHECK", {
-          messages: [
-            {
-              role: "system",
-              content: `你是平台政策监测专家。判断规则文件是否有新版本。返回 JSON: {"hasNewVersion":boolean,"newVersionDate":string|null,"newVersionLabel":string|null,"summary":string,"confidence":string}`,
-            },
-            {
-              role: "user",
-              content: `标题：${r.title}\n已知版本：${r.versionLabel ?? "未知"}\n已知日期：${r.date ?? "未知"}\n\n网页内容（前 3000 字）：\n${currentContent.slice(0, 3000)}`,
-            },
-          ],
-        });
-        const content = llmResp.choices?.[0]?.message?.content as string;
-        let result: any = { hasNewVersion: false, summary: "检测完成", confidence: "low" };
-        try { result = JSON.parse(content); } catch { /* use default */ }
-        const hint = result.hasNewVersion
-          ? `检测到新版本：${result.newVersionLabel ?? ""}（${result.newVersionDate ?? ""}）- ${result.summary}`
-          : null;
-        await db.update(platformRules)
-          .set({ newVersionHint: hint, newVersionCheckedAt: new Date() })
-          .where(eq(platformRules.id, input.ruleId));
-        return { ...result, hint };
-      }),
-
-    // AI: batch check new versions for all latest rules of a platform
-    batchCheckNewVersion: adminProcedure
-      .input(z.object({ platformId: z.string() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const rules = await db.select().from(platformRules)
-          .where(and(
-            eq(platformRules.platformId, input.platformId),
-            eq(platformRules.isLatest, true),
-            isNotNull(platformRules.url)
-          ));
-        const results: Array<{ id: number; title: string; hasNewVersion: boolean; hint: string | null; error?: string }> = [];
-        for (const rule of rules) {
-          try {
-            let currentContent = "";
-            try {
-              const scrapeRows = await db.select().from(apiSettings);
-              const getScrape = (key: string) => scrapeRows.find((row) => row.key === key)?.value ?? undefined;
-              const scraped = await scrapeUrl(rule.url!, {
-                firecrawlKey: getScrape("FIRECRAWL_API_KEY"),
-                jinaKey: getScrape("JINA_API_KEY"),
-                scrapingbeeKey: getScrape("SCRAPINGBEE_API_KEY"),
-              });
-              currentContent = scraped.markdown;
-            } catch { /* skip */ }
-            if (!currentContent) { results.push({ id: rule.id, title: rule.title, hasNewVersion: false, hint: null, error: "无法抓取页面" }); continue; }
-            const llmRows = await db.select().from(apiSettings);
-            const llmResp = await routeLlmForTask(llmRows, "RULE_CHECK", {
-              messages: [
-                { role: "system", content: `判断规则文件是否有新版本。返回 JSON: {"hasNewVersion":boolean,"newVersionDate":string|null,"newVersionLabel":string|null,"summary":string,"confidence":string}` },
-                { role: "user", content: `标题：${rule.title}\n已知版本：${rule.versionLabel ?? "未知"}\n已知日期：${rule.date ?? "未知"}\n\n网页内容：\n${currentContent.slice(0, 2000)}` },
-              ],
-            });
-            const c = llmResp.choices?.[0]?.message?.content as string;
-            let rv: any = { hasNewVersion: false, summary: "" };
-            try { rv = JSON.parse(c); } catch { /* use default */ }
-            const hint = rv.hasNewVersion ? `检测到新版本：${rv.newVersionLabel ?? ""}（${rv.newVersionDate ?? ""}）- ${rv.summary}` : null;
-            await db.update(platformRules).set({ newVersionHint: hint, newVersionCheckedAt: new Date() }).where(eq(platformRules.id, rule.id));
-            results.push({ id: rule.id, title: rule.title, hasNewVersion: rv.hasNewVersion, hint });
-          } catch (e: any) {
-            results.push({ id: rule.id, title: rule.title, hasNewVersion: false, hint: null, error: e.message });
-          }
-        }
-        return { total: rules.length, results };
-      }),
-
-    // AI: extract full text for a single rule
-    extractFullText: adminProcedure
-      .input(z.object({ ruleId: z.number() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const rule = await db.select().from(platformRules)
-          .where(eq(platformRules.id, input.ruleId)).limit(1);
-        if (!rule[0]) throw new TRPCError({ code: "NOT_FOUND" });
-        if (!rule[0].url) throw new TRPCError({ code: "BAD_REQUEST", message: "该规则文件无 URL" });
-        const scrapeRows = await db.select().from(apiSettings);
-        const getScrape = (key: string) => scrapeRows.find((row) => row.key === key)?.value ?? undefined;
-        const scraped = await scrapeUrl(rule[0].url, {
-          firecrawlKey: getScrape("FIRECRAWL_API_KEY"),
-          jinaKey: getScrape("JINA_API_KEY"),
-          scrapingbeeKey: getScrape("SCRAPINGBEE_API_KEY"),
-        });
-        const text = scraped.markdown;
-        if (!text || text.trim().length < 50) throw new TRPCError({ code: "UNPROCESSABLE_CONTENT", message: "抓取内容过少" });
-        await db.update(platformRules).set({ fullText: text }).where(eq(platformRules.id, input.ruleId));
-        return { success: true, charCount: text.length };
-      }),
-
-    // AI: batch extract full text for all rules without fullText
-    batchExtractFullText: adminProcedure
-      .input(z.object({ platformId: z.string() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const pending = await db.select().from(platformRules)
-          .where(and(
-            eq(platformRules.platformId, input.platformId),
-            isNotNull(platformRules.url),
-            or(isNull(platformRules.fullText), eq(platformRules.fullText, ""))
-          ));
-        const results: Array<{ id: number; title: string; success: boolean; charCount?: number; error?: string }> = [];
-        for (const rule of pending) {
-          try {
-            const scrapeRows2 = await db.select().from(apiSettings);
-            const getScrape2 = (key: string) => scrapeRows2.find((row) => row.key === key)?.value ?? undefined;
-            const scraped = await scrapeUrl(rule.url!, {
-              firecrawlKey: getScrape2("FIRECRAWL_API_KEY"),
-              jinaKey: getScrape2("JINA_API_KEY"),
-              scrapingbeeKey: getScrape2("SCRAPINGBEE_API_KEY"),
-            });
-            const text = scraped.markdown;
-            if (!text || text.trim().length < 50) { results.push({ id: rule.id, title: rule.title, success: false, error: "内容过少" }); continue; }
-            await db.update(platformRules).set({ fullText: text }).where(eq(platformRules.id, rule.id));
-            results.push({ id: rule.id, title: rule.title, success: true, charCount: text.length });
-          } catch (e: any) {
-            results.push({ id: rule.id, title: rule.title, success: false, error: e.message });
-          }
-        }
-        return { total: pending.length, successCount: results.filter(r => r.success).length, failCount: results.filter(r => !r.success).length, results };
-      }),
-
-    // Upload attachment for a rule
-    uploadAttachment: adminProcedure
-      .input(z.object({
-        ruleId: z.number(),
-        filename: z.string(),
-        fileBase64: z.string(),
-        mimeType: z.string().optional(),
-        fileSize: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const buf = Buffer.from(input.fileBase64, "base64");
-        const ext = input.filename.split(".").pop() ?? "bin";
-        const key = `rule-attachments/${input.ruleId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { url } = await storagePut(key, buf, input.mimeType ?? "application/octet-stream");
-        await db.insert(ruleAttachments).values({
-          ruleId: input.ruleId,
-          filename: input.filename,
-          fileKey: key,
-          fileUrl: url,
-          fileSize: input.fileSize,
-          mimeType: input.mimeType,
-        });
-        return { success: true, url, key };
-      }),
-
-    // List attachments for a rule
-    listAttachments: publicProcedure
-      .input(z.object({ ruleId: z.number() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        return db.select().from(ruleAttachments)
-          .where(eq(ruleAttachments.ruleId, input.ruleId))
-          .orderBy(desc(ruleAttachments.createdAt));
-      }),
-
-    // Delete attachment
-    deleteAttachment: adminProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.delete(ruleAttachments).where(eq(ruleAttachments.id, input.id));
-        return { success: true };
-      }),
-  }),
-
-   // ── Admin Users ──────────────────────────────
+  // ── Users Router ──────────────────────────────────────────────
   users: router({
     list: protectedProcedure
       .use(({ ctx, next }) => {
@@ -2294,6 +1708,7 @@ Return ONLY valid JSON, no explanation.`;
       .query(async ({ input }) => {
         return listUsers({ page: input?.page, pageSize: input?.pageSize });
       }),
+
     updateRole: protectedProcedure
       .use(({ ctx, next }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

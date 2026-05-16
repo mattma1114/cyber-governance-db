@@ -21,8 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft, Building2, MapPin, Calendar, Globe, ExternalLink,
-  LayoutGrid, Clock, FileText, Scale, Network, ChevronRight, Download, Loader2, ChevronDown,
-  History, Paperclip, CheckCircle2
+  LayoutGrid, Clock, FileText, Scale, Network, ChevronRight, Download, Loader2, ChevronDown
 } from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
 
@@ -134,24 +133,6 @@ export default function PlatformDetail() {
   const { data: p, isLoading } = trpc.platforms.getById.useQuery({ id: id ?? "" }, { enabled: !!id });
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: topics } = trpc.topics.list.useQuery();
-
-  // DB-driven platform rules
-  const { data: dbRulesData } = trpc.platformRules.list.useQuery(
-    { platformId: id ?? "" },
-    { enabled: !!id && activeTab === "rules" }
-  );
-  const dbRules = (dbRulesData ?? []) as any[];
-
-  // Selected rule for version history / attachments
-  const [selectedDbRuleId, setSelectedDbRuleId] = useState<number | null>(null);
-  const { data: dbRuleVersions } = trpc.platformRules.listVersions.useQuery(
-    { ruleId: selectedDbRuleId ?? 0 },
-    { enabled: !!selectedDbRuleId }
-  );
-  const { data: dbRuleAttachments } = trpc.platformRules.listAttachments.useQuery(
-    { ruleId: selectedDbRuleId ?? 0 },
-    { enabled: !!selectedDbRuleId }
-  );
 
   const relatedCaseIds: string[] = (() => {
     if (!p?.relatedCaseIds) return [];
@@ -272,147 +253,108 @@ export default function PlatformDetail() {
         );
 
       case "rules":
-        return (
+        return rules.length > 0 ? (
           <div>
             <div className="flex items-center gap-2 mb-6">
               <FileText className="w-4 h-4 text-primary" />
               <h2 className="text-base font-semibold">规则文件</h2>
-              {dbRules.length > 0 && (
-                <span className="text-xs text-muted-foreground ml-1">({dbRules.length} 条)</span>
-              )}
             </div>
 
-            {dbRules.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-8">暂无规则文件</p>
-            ) : (
-              <div className="space-y-4">
-                {/* Rule cards */}
-                {dbRules.map((rule: any) => {
-                  const isSelected = selectedDbRuleId === rule.id;
-                  const versions = isSelected ? (dbRuleVersions ?? []) as any[] : [];
-                  const attachments = isSelected ? (dbRuleAttachments ?? []) as any[] : [];
-                  return (
-                    <div key={rule.id} className="rounded-lg border border-border overflow-hidden">
-                      {/* Rule header */}
-                      <div className="flex items-start justify-between gap-3 p-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm">{rule.title}</span>
-                            {rule.type && <Badge variant="outline" className="text-xs">{rule.type}</Badge>}
-                            {rule.versionLabel && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{rule.versionLabel}</span>
-                            )}
-                            {rule.date && <span className="text-xs text-muted-foreground">{rule.date}</span>}
-                            {rule.fullText && (
-                              <span className="text-xs text-emerald-600 flex items-center gap-0.5">
-                                <CheckCircle2 className="w-3 h-3" />全文已提取
-                              </span>
-                            )}
-                          </div>
-                          {rule.changeNote && (
-                            <p className="text-xs text-muted-foreground mt-1">{rule.changeNote}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {rule.url && (
-                            <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-xs">
-                              <a href={rule.url} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
-                            </Button>
-                          )}
-                          <Button
-                            size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                            title="版本历史 / 附件"
-                            onClick={() => setSelectedDbRuleId(isSelected ? null : rule.id)}
-                          >
-                            <History className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
+            {/* Protocol selector row */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {ruleTitles.map((title) => (
+                <button
+                  key={title}
+                  onClick={() => {
+                    setSelectedRuleTitle(title);
+                    setSelectedRuleVersion("");
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                    activeRuleTitle === title
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted text-foreground"
+                  )}
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
 
-                      {/* Expandable: version history + attachments */}
-                      {isSelected && (
-                        <div className="border-t border-border bg-muted/30 p-4 space-y-4">
-                          {/* Version history timeline */}
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">版本历史</p>
-                            {versions.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">暂无历史版本</p>
-                            ) : (
-                              <div className="relative pl-4">
-                                <div className="absolute left-1.5 top-0 bottom-0 w-px bg-border" />
-                                {versions.map((v: any, vi: number) => (
-                                  <div key={v.id} className="relative mb-3 last:mb-0">
-                                    <div className="absolute -left-2.5 top-1 w-2 h-2 rounded-full bg-primary" />
-                                    <div className="pl-3">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        {v.versionLabel && (
-                                          <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{v.versionLabel}</span>
-                                        )}
-                                        {v.date && <span className="text-xs text-muted-foreground">{v.date}</span>}
-                                        {vi === 0 && <span className="text-xs text-emerald-600 font-medium">最新</span>}
-                                      </div>
-                                      {v.changeNote && <p className="text-xs text-muted-foreground mt-0.5">{v.changeNote}</p>}
-                                      {v.url && (
-                                        <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-0.5 inline-flex items-center gap-1">
-                                          <ExternalLink className="w-3 h-3" />查看该版本
-                                        </a>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+            {/* Version selector */}
+            {sortedVersions.length > 1 && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-5 pb-4 border-b border-border">
+                <span className="text-xs text-muted-foreground shrink-0">版本 / 日期</span>
+                <Select
+                  value={activeVersion}
+                  onValueChange={(v) => setSelectedRuleVersion(v)}
+                >
+                  <SelectTrigger className="h-8 text-xs w-full sm:w-52">
+                    <SelectValue placeholder="选择版本" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedVersions.map((r, i) => {
+                      const vLabel = r.date ?? r.version ?? `版本 ${i + 1}`;
+                      return (
+                        <SelectItem key={i} value={vLabel} className="text-xs">
+                          {vLabel}{r.version && r.date ? ` (${r.version})` : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-                          {/* Attachments */}
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">相关附件</p>
-                            {attachments.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">暂无附件</p>
-                            ) : (
-                              <div className="space-y-1.5">
-                                {attachments.map((att: any) => (
-                                  <a
-                                    key={att.id}
-                                    href={att.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 rounded border px-3 py-2 text-xs hover:bg-muted transition-colors"
-                                  >
-                                    <Paperclip className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                                    <span className="flex-1 truncate">{att.filename}</span>
-                                    {att.fileSize && <span className="text-muted-foreground shrink-0">{(att.fileSize / 1024).toFixed(0)} KB</span>}
-                                    <Download className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                                  </a>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+            {/* Active rule metadata */}
+            {activeRule && (
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-border">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {activeRule.type && (
+                      <Badge variant="outline" className="text-xs">{activeRule.type}</Badge>
+                    )}
+                    {activeRule.date && (
+                      <span className="text-xs text-muted-foreground">{activeRule.date}</span>
+                    )}
+                    {activeRule.version && (
+                      <span className="text-xs text-muted-foreground">版本：{activeRule.version}</span>
+                    )}
+                  </div>
+                  {activeRule.url && (
+                    <Button size="sm" variant="ghost" asChild className="gap-1.5 text-xs h-7">
+                      <a href={activeRule.url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="w-3 h-3" />
+                        查看原文
+                      </a>
+                    </Button>
+                  )}
+                </div>
 
-                          {/* Full text */}
-                          {rule.fullText && (
-                            <div>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">规则全文</p>
-                              <FullTextSection fullText={rule.fullText} />
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Full text (always visible if not expanded) */}
-                      {!isSelected && rule.fullText && (
-                        <div className="border-t border-border px-4 pb-4">
-                          <FullTextSection fullText={rule.fullText} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {/* Full text */}
+                {activeRule.fullText ? (
+                  <FullTextSection fullText={activeRule.fullText} />
+                ) : (
+                  <div className="pt-5 text-sm text-muted-foreground">
+                    <p>暂无全文内容。</p>
+                    {activeRule.url && (
+                      <a
+                        href={activeRule.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-xs mt-1 inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        前往原始链接查看
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
+        ) : (
+          <p className="text-muted-foreground text-sm py-8">暂无规则文件</p>
         );
 
       case "cases":

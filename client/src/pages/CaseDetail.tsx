@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,12 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, ExternalLink, Calendar, Building2, Tag, BookOpen,
   Scale, FileText, Gavel, Quote, Copy, Check, ChevronDown, ChevronUp,
-  Download, Loader2, MapPin, Layers, Paperclip, FileDown, Languages, AlignLeft, AlignJustify, Columns2
+  Download, Loader2, MapPin, Layers, Paperclip, FileDown
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS, formatDate } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
 import { FilePreviewModal, canPreview, type PreviewFile } from "@/components/FilePreviewModal";
 import { toast } from "sonner";
 
@@ -321,119 +320,6 @@ export default function CaseDetail() {
     onError: (err) => { toast.error(`Word 生成失败：${err.message}`); },
   });
 
-  // ── Translation state + localStorage cache + progress ─────────────────────────────────────────────────────────────────────────────────────
-  type TranslationPair = { original: string; translated: string };
-  type ViewMode = "original" | "translated" | "bilingual";
-  type TranslationCache = {
-    pairs: TranslationPair[];
-    viewMode: ViewMode;
-    fullTextLength: number; // used to detect stale cache when fullText changes
-  };
-
-  const CACHE_KEY = `cgdb_translation_${caseId}`;
-
-  // Start with null; restore from localStorage once case data is loaded (see useEffect below)
-  const [translationPairs, setTranslationPairs] = useState<TranslationPair[] | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("bilingual");
-  const cacheRestoredRef = useRef(false);
-
-  // Restore translation cache once case data has loaded (so fullTextLength comparison is valid)
-  useEffect(() => {
-    if (!c || cacheRestoredRef.current) return;
-    cacheRestoredRef.current = true;
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return;
-      const cached: TranslationCache = JSON.parse(raw);
-      // Invalidate if fullText has changed since last translation
-      if (cached.fullTextLength !== (c.fullText?.length ?? 0)) return;
-      setTranslationPairs(cached.pairs);
-      setViewMode(cached.viewMode);
-    } catch {
-      // ignore parse errors
-    }
-  }, [c?.id, c?.fullText?.length]);
-
-  // Progress state: 0-100 (estimated)
-  const [translateProgress, setTranslateProgress] = useState(0);
-  const [translateBatchLabel, setTranslateBatchLabel] = useState("");
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Helper: write translation result to localStorage
-  const saveTranslationCache = useCallback((pairs: TranslationPair[], mode: ViewMode) => {
-    try {
-      const cache: TranslationCache = {
-        pairs,
-        viewMode: mode,
-        fullTextLength: c?.fullText?.length ?? 0,
-      };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    } catch {
-      // localStorage may be unavailable (private browsing, quota exceeded)
-    }
-  }, [CACHE_KEY, c?.fullText?.length]);
-
-  // Keep viewMode in cache in sync when user switches tabs
-  useEffect(() => {
-    if (!translationPairs) return;
-    saveTranslationCache(translationPairs, viewMode);
-  }, [viewMode]);
-
-  const translateMutation = trpc.cases.translateFullText.useMutation({
-    onMutate: () => {
-      setIsTranslating(true);
-      setTranslateProgress(5);
-      setTranslateBatchLabel("正在准备翻译…");
-      // Simulate gradual progress while waiting for the backend
-      // We advance to ~85% over ~30s; the final jump to 100% happens onSuccess.
-      let tick = 0;
-      progressTimerRef.current = setInterval(() => {
-        tick++;
-        // Slow logarithmic growth: fast at start, plateaus near 85
-        const next = Math.min(85, 5 + Math.round(80 * (1 - Math.exp(-tick / 12))));
-        setTranslateProgress(next);
-        // Update batch label based on estimated progress
-        if (next < 30) setTranslateBatchLabel("正在翻译第 1 批…");
-        else if (next < 55) setTranslateBatchLabel("正在翻译中间段落…");
-        else if (next < 75) setTranslateBatchLabel("即将完成，正在整理结果…");
-        else setTranslateBatchLabel("翻译即将完成…");
-      }, 2500);
-    },
-    onSuccess: (data) => {
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-      setTranslateProgress(100);
-      const totalB = data.totalBatches ?? 1;
-      setTranslateBatchLabel(`共 ${data.totalParagraphs} 个段落，${totalB} 个批次`);
-      setTimeout(() => {
-        setIsTranslating(false);
-        setTranslateProgress(0);
-        setTranslateBatchLabel("");
-      }, 600);
-      setTranslationPairs(data.pairs);
-      setViewMode("bilingual");
-      saveTranslationCache(data.pairs, "bilingual");
-      toast.success(`翻译完成！共 ${data.totalParagraphs} 个段落`);
-    },
-    onError: (err) => {
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-      setIsTranslating(false);
-      setTranslateProgress(0);
-      setTranslateBatchLabel("");
-      toast.error(`翻译失败：${err.message}`);
-    },
-  });
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => { if (progressTimerRef.current) clearInterval(progressTimerRef.current); };
-  }, []);
-
-  const handleTranslate = useCallback(() => {
-    if (!caseId) return;
-    translateMutation.mutate({ caseId });
-  }, [caseId]);
-
   if (isLoading) {
     return (
       <div className="container py-8 max-w-6xl">
@@ -470,16 +356,39 @@ export default function CaseDetail() {
     c.type === "regulatory" ? <Scale className="w-3.5 h-3.5" /> :
     <FileText className="w-3.5 h-3.5" />;
 
-  // Split fullText into paragraphs strictly by double-newline (\n\n).
-  // We do NOT fall back to single-newline or sentence-boundary splitting,
-  // as that would destroy the original document's paragraph structure.
+  // Split fullText into paragraphs for better readability
+  // Strategy: try double-newline split first; if result has <=3 segments (common for
+  // legislative texts with single newlines), fall back to single-newline split.
   const fullTextParagraphs = c.fullText
     ? (() => {
         const raw = c.fullText!;
-        // Strict: only split on double (or more) newlines — preserves original layout.
-        // Do NOT fall back to single-newline or sentence-boundary splitting,
-        // as that would destroy the original document's paragraph structure.
-        return raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+        // Try double-newline split first
+        let segs = raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+        // If too few segments (whole text is one blob), try single newline
+        if (segs.length <= 3 && raw.includes('\n')) {
+          segs = raw.split(/\n/).map((p) => p.trim()).filter(Boolean);
+        }
+        // If still one giant blob (no newlines at all), split by sentence boundaries
+        if (segs.length <= 1 && raw.length > 1000) {
+          const chunks: string[] = [];
+          let remaining = raw.trim();
+          while (remaining.length > 600) {
+            // Find a sentence boundary near the 500-char mark
+            let cutAt = 500;
+            for (let i = 400; i < Math.min(700, remaining.length); i++) {
+              const ch = remaining[i];
+              if (ch === '\u3002' || ch === '.' || ch === '!' || ch === '?') {
+                cutAt = i + 1;
+                break;
+              }
+            }
+            chunks.push(remaining.slice(0, cutAt).trim());
+            remaining = remaining.slice(cutAt).trim();
+          }
+          if (remaining) chunks.push(remaining);
+          segs = chunks.filter(Boolean);
+        }
+        return segs;
       })()
     : [];
 
@@ -722,216 +631,88 @@ export default function CaseDetail() {
 
             {/* Full Text – always visible, most important */}
             <div className="pt-4">
-              <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" />
-                    原文正文
-                  </h2>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                      本处配置为自动翻译，可能并不准确
-                    </p>
-                    {/* AI Translate button – only shown when there is text content */}
-                    {fullTextParagraphs.length > 0 && (
-                      <button
-                        onClick={handleTranslate}
-                        disabled={isTranslating}
-                        className="inline-flex items-center gap-1 text-[11px] text-primary/70 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 font-medium"
-                      >
-                        {isTranslating ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            AI 翻译中…
-                          </>
-                        ) : (
-                          <>
-                            <Languages className="w-3 h-3" />
-                            {translationPairs ? '重新翻译' : '一键 AI 翻译'}
-                          </>
-                        )}
-                      </button>
-                    )}
-                    {/* Cached indicator */}
-                    {translationPairs && !isTranslating && (
-                      <span className="text-[10px] text-muted-foreground/50 shrink-0">已缓存</span>
-                    )}
-                  </div>
-                  {/* Progress bar – shown while translating */}
-                  {isTranslating && (
-                    <div className="mt-2 space-y-1">
-                      <Progress value={translateProgress} className="h-1.5" />
-                      <p className="text-[10px] text-muted-foreground/60">
-                        {translateBatchLabel} {translateProgress > 0 && translateProgress < 100 ? `${translateProgress}%` : ''}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* View mode toggle – only shown when translation is available */}
-                  {translationPairs && (
-                    <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                      <button
-                        onClick={() => setViewMode('original')}
-                        title="仅原文"
-                        className={cn(
-                          "p-1 rounded transition-colors",
-                          viewMode === 'original' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        <AlignLeft className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode('bilingual')}
-                        title="双语对照"
-                        className={cn(
-                          "p-1 rounded transition-colors",
-                          viewMode === 'bilingual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        <Columns2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode('translated')}
-                        title="仅译文"
-                        className={cn(
-                          "p-1 rounded transition-colors",
-                          viewMode === 'translated' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        <AlignJustify className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  {/* PDF download link */}
-                  {(c as any).fullTextPdfUrl && (
-                    <a
-                      href={(c as any).fullTextPdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Download className="w-3 h-3" />
-                      下载 PDF
-                    </a>
-                  )}
-                </div>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" />
+                  原文正文
+                </h2>
+                {/* Show PDF download link if PDF is available */}
+                {(c as any).fullTextPdfUrl && (
+                  <a
+                    href={(c as any).fullTextPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    下载 PDF
+                  </a>
+                )}
               </div>
 
               {/* PDF Reader: shown when fullTextPdfUrl exists */}
-{/* Helper: render text paragraphs according to viewMode */}
-              {(() => {
-                // Render a single text-only block (original / translated / bilingual)
-                const renderTextBlock = () => {
-                  if (!translationPairs) {
-                    // No translation yet – show original paragraphs
-                    return (
-                      <div className="space-y-4">
+              {(c as any).fullTextPdfUrl ? (
+                <div className="space-y-3">
+                  <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/20">
+                    <iframe
+                      src={`${(c as any).fullTextPdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                      className="w-full"
+                      style={{ height: "800px", border: "none" }}
+                      title="原文 PDF 阅读器"
+                    />
+                  </div>
+                  {/* Fallback text if also has text content */}
+                  {fullTextParagraphs.length > 0 && (
+                    <details className="mt-4">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-2">
+                        查看文本版原文
+                      </summary>
+                      <div className="prose prose-sm max-w-none space-y-4 mt-3 pt-3 border-t border-border">
                         {fullTextParagraphs.map((para, i) => (
-                          <p key={i} className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line">
+                          <p
+                            key={i}
+                            className="text-[15px] leading-[1.9] text-foreground/90 indent-[2em] first:indent-0"
+                          >
                             {para}
                           </p>
                         ))}
                       </div>
-                    );
-                  }
-                  if (viewMode === 'original') {
-                    return (
-                      <div className="space-y-4">
-                        {translationPairs.map((pair, i) => (
-                          <p key={i} className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line">
-                            {pair.original}
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  }
-                  if (viewMode === 'translated') {
-                    return (
-                      <div className="space-y-4">
-                        {translationPairs.map((pair, i) => (
-                          <p key={i} className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line">
-                            {pair.translated}
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  }
-                  // bilingual mode
-                  return (
-                    <div className="space-y-0">
-                      {translationPairs.map((pair, i) => (
-                        <div key={i} className="py-3 border-b border-border/40 last:border-b-0 space-y-1.5">
-                          <p className="text-[13px] leading-[1.75] text-muted-foreground whitespace-pre-line">
-                            {pair.original}
-                          </p>
-                          <p className="text-[15px] leading-[1.85] text-foreground whitespace-pre-line">
-                            {pair.translated}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                };
-
-                // PDF mode
-                if ((c as any).fullTextPdfUrl) {
-                  return (
-                    <div className="space-y-3">
-                      <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/20">
-                        <iframe
-                          src={`${(c as any).fullTextPdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-                          className="w-full"
-                          style={{ height: "800px", border: "none" }}
-                          title="原文 PDF 阅读器"
-                        />
-                      </div>
-                      {/* Text version (collapsible) – supports translation view */}
-                      {fullTextParagraphs.length > 0 && (
-                        <details className="mt-4">
-                          <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-2">
-                            {translationPairs
-                              ? '译文视图已启用，展开文本区域查看对照'
-                              : '查看文本版原文'}
-                          </summary>
-                          <div className="mt-3 pt-3 border-t border-border">
-                            {renderTextBlock()}
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  );
-                }
-
-                // Text-only mode
-                if (fullTextParagraphs.length > 0) {
-                  return renderTextBlock();
-                }
-
-                // Empty state
-                return (
-                  <div className="py-10 border border-dashed border-border rounded-lg text-center">
-                    <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground mb-1">暂无原文正文内容</p>
-                    <p className="text-xs text-muted-foreground/70">
-                      {c.sourceUrl
-                        ? "可在管理后台使用「重新抓取原文」功能自动填充，或手动编辑内容"
-                        : "请在编辑页面填写原文链接后，使用 AI 提取功能自动抓取"}
+                    </details>
+                  )}
+                </div>
+              ) : fullTextParagraphs.length > 0 ? (
+                <div className="prose prose-sm max-w-none space-y-4">
+                  {fullTextParagraphs.map((para, i) => (
+                    <p
+                      key={i}
+                      className="text-[15px] leading-[1.9] text-foreground/90 indent-[2em] first:indent-0"
+                    >
+                      {para}
                     </p>
-                    {c.sourceUrl && (
-                      <a
-                        href={c.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 mt-3 text-xs text-primary hover:underline"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        前往原文链接查看
-                      </a>
-                    )}
-                  </div>
-                );
-              })()}
+                  ))}
+                </div>
+              ) : (
+                <div className="py-10 border border-dashed border-border rounded-lg text-center">
+                  <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground mb-1">暂无原文正文内容</p>
+                  <p className="text-xs text-muted-foreground/70">
+                    {c.sourceUrl
+                      ? "可在管理后台使用「重新抓取原文」功能自动填充，或手动编辑内容"
+                      : "请在编辑页面填写原文链接后，使用 AI 提取功能自动抓取"}
+                  </p>
+                  {c.sourceUrl && (
+                    <a
+                      href={c.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-3 text-xs text-primary hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      前往原文链接查看
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Fallback if no content */}

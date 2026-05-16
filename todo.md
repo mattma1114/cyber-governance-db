@@ -307,11 +307,11 @@
 - [x] LLM 返回每条候选的相似度得分（0-100）和判断理由
 - [x] 前端去重警告横幅升级：显示相似度得分（高/中/低风险标识）和 LLM 判断理由
 
-## 批量 AI 解析 PDF 全文（旧描述，已完成）
-- [x] 后端新增 cases.batchParsePdf 路由：查询已上传 PDF 但 fullText 为空的条目，逐条调用 PDF 提取 + LLM 清洗逻辑，返回进度和结果汇总
-- [x] 前端管理后台内容列表页顶部添加「批量 AI 解析」按钮，展示待解析数量
-- [x] 批量解析进度弹窗：完成后展示汇总报告（成功/失败计数）
-- [x] 39 个测试全部通过
+## 批量 AI 解析 PDF 全文（当前迭代）
+- [ ] 后端新增 cases.batchParsePdf 路由：查询已上传 PDF 但 fullText 为空的条目，逐条调用 PDF 提取 + LLM 清洗逻辑，返回进度和结果汇总
+- [ ] 前端管理后台内容列表页顶部添加「批量 AI 解析」按钮（仅对有待解析条目时显示），展示待解析数量
+- [ ] 批量解析进度弹窗：实时显示当前处理进度（X/N）、成功/失败计数，完成后展示汇总报告
+- [ ] 39 个测试全部通过
 
 ## 批量 AI 解析 PDF 全文（当前迭代）
 - [x] 后端新增 cases.batchParsePdf 路由：查询已上传 PDF 但 fullText 为空的条目，逐条调用 PDF 提取 + LLM 清洗，返回进度和结果汇总
@@ -322,54 +322,3 @@
 - [x] siteSettings 新增 dupCheckThreshold 字段（默认 60），存储去重相似度阈值
 - [x] checkDuplicate 路由读取阈值，低于阈值的候选不返回给前端
 - [x] API 配置页新增阈值滑块（0-100，步长 5，默认 60），实时预览效果说明
-
-## 规则文件多版本管理 + AI 检测 + 批量提取 + 附件（当前迭代）
-- [x] Schema：新建 platform_rules 表（支持 parentRuleId 关联历史版本、versionLabel、changeNote）和 rule_attachments 表，执行数据库迁移
-- [x] 后端：platformRules 路由：list、create、update、delete、addVersion、listVersions、checkNewVersion（AI）、batchCheckNewVersion、extractFullText（AI）、batchExtract、listAttachments、uploadAttachment、deleteAttachment
-- [x] 管理后台 PlatformEditor.tsx 规则文件 Tab 升级：DB 驱动列表、版本管理弹窗、AI 检测新版本按钮（单条/批量）、批量 AI 提取全文按钮、附件上传区域
-- [x] 前台 PlatformDetail.tsx 规则文件 Tab 升级：卡片展示、点击展开版本历史时间轴 + 附件列表
-
-## 原文正文排版修复 + 导入校验 + 语言提示（已完成）
-- [x] 分析 fullText 存储格式和前端渲染方式，找出段落丢失的根本原因
-- [x] 后端：修复 AI 提取/LLM 清洗时的段落保留逻辑（严格保留 \n\n 段落分隔符）
-- [x] 后端：新增导入时段落完整性检查（字符数、段落数校验，不满足条件时返回警告）
-- [x] 前端 CaseDetail.tsx：修复正文渲染（保留换行/段落，使用 whitespace-pre-wrap 或逐段渲染）
-- [x] 前端 CaseDetail.tsx：原文正文区域右方添加语言提示小字「本处仅展示原语言内容，请自行根据需要配置翻译」
-- [x] 管理后台 CaseEditor.tsx：导入/AI 提取后展示段落预检结果（段落数、字符数、是否通过校验）
-
-## 原文正文一键 AI 翻译（当前迭代）
-- [x] 后端新增 cases.translateFullText 路由：接收 caseId，读取 fullText，调用 LLM 分段翻译为中文，返回段落对照数组
-- [x] 前端 CaseDetail.tsx：提示语旁添加「一键 AI 翻译」按鈕，翻译中显示进度，完成后以双语对照形式（原文段 / 译文段）展示
-- [x] 双语对照支持「切换视图」（仅原文 / 仅译文 / 双语对照），翻译结果缓存在前端 state 避免重复调用
-
-## 翻译结果 localStorage 缓存（已在下方迭代中完成）
-- [x] CaseDetail.tsx：翻译完成后将结果写入 localStorage（key: `translation_cache_{caseId}`）
-- [x] CaseDetail.tsx：页面加载时从 localStorage 读取缓存，自动恢复 translationPairs 和 viewMode
-- [x] 「重新翻译」时覆盖写入 localStorage，保持缓存最新
-- [x] 缓存结构包含版本标识（fullText 长度/哈希），正文更新后自动失效旧缓存
-
-## 翻译进度条 + localStorage 缓存（当前迭代）
-- [x] 后端 translateFullText 路由：返回 totalBatches 字段，支持前端计算批次进度
-- [x] 前端 CaseDetail.tsx：翻译中显示进度条（预估进度 + 「正在翻译第 X/N 批…」文字）
-- [x] 前端 CaseDetail.tsx：翻译完成后将结果写入 localStorage（key: `cgdb_translation_{caseId}`）
-- [x] 前端 CaseDetail.tsx：页面加载时从 localStorage 读取缓存，自动恢复 translationPairs 和 viewMode
-- [x] 「重新翻译」时覆盖写入 localStorage，保持缓存最新
-- [x] 缓存结构包含 fullTextLength 字段，正文更新后自动失效旧缓存
-
-## 正文「文本输入」与「上传 PDF」并存（当前迭代）
-- [x] CaseEditor.tsx：移除「文本输入/上传 PDF」互斥切换 Tab，改为两个独立区域同时显示
-- [x] 文本输入区域：始终可见，可直接编辑 fullText，支持 AI 提取/手动填写
-- [x] PDF 上传区域：始终可见，可独立上传 PDF，支持 AI 解析并填充到文本区域
-- [x] 两者共存时，保存时以文本区域内容为准（fullText），PDF 仅作为附件/来源
-
-## 平台规则文件 URL 真实爬取（当前迭代）
-- [x] 分析当前平台 AI 爬取路由，定位规则文件字段的处理逻辑
-- [x] 升级后端：专项搜索平台服务条款、隐私政策、社区准则等页面，返回真实 URL 列表
-- [x] 前端 PlatformEditor.tsx：规则文件字段预置爬取到的真实 URL，用户可编辑/删除
-
-## 管理员后台「开发日志」页面（当前迭代）
-- [x] 新建 DevChangelog.tsx：按 v1~v5 版本（时间倒序）展示历次迭代记录，每版本含多个功能模块分组
-- [x] 每条记录带类别标签（后端/前端/AI/修复/性能/安全），支持按类别筛选
-- [x] 版本卡片和模块分组均支持折叠/展开，默认展开最新版本
-- [x] Admin.tsx「用户管理」Tab 后面新增「开发日志」Tab（GitCommit 图标）
-- [x] 39 个测试全部通过

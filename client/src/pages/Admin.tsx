@@ -21,9 +21,8 @@ import {
   Database, LayoutGrid, ChevronLeft, ChevronRight, LogIn, AlertTriangle,
   Tag, Globe, X, Settings, Key, Save, Loader2, CheckCircle2, XCircle, FlaskConical,
   RefreshCw, FileText, MoreHorizontal, EyeOff as Unpublish, CheckSquare, Square, MinusSquare, Bot, ChevronDown, ChevronUp, Info,
-  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy, Sparkles, GitCommit} from "lucide-react";
+  Users, ShieldOff, Crown, Lock, Unlock, Link2, Copy, Sparkles} from "lucide-react";
 import { cn, TYPE_BADGE_CLASS, TYPE_LABELS } from "@/lib/utils";
-import DevChangelog from "@/pages/DevChangelog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -1244,7 +1243,7 @@ function UsersTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((u, idx: number) => {
+                  {items.map((u, idx) => {
                     const isMe = currentUser?.id === u.id;
                     const isAdmin = u.role === "admin";
                     const isFrozen = (u as any).status === "frozen";
@@ -1843,10 +1842,6 @@ export default function Admin() {
               <Users className="w-3.5 h-3.5" />
               用户管理
             </TabsTrigger>
-            <TabsTrigger value="changelog" className="gap-1.5">
-              <GitCommit className="w-3.5 h-3.5" />
-              开发日志
-            </TabsTrigger>
           </TabsList>
 
           {/* Cases Tab */}
@@ -1877,25 +1872,19 @@ export default function Admin() {
                 </SelectContent>
               </Select>
               <div className="flex-1" />
-              {(() => {
-                const pendingCount = (casesData?.items ?? []).filter((c: any) => c.pendingPdfParse === 1 || c.pendingPdfParse === true).length;
-                return (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5"
-                    disabled={batchParsePdfMutation.isPending}
-                    onClick={() => {
-                      setBatchParseDialog({ open: true, status: "running", total: 0, successCount: 0, failCount: 0, results: [] });
-                      batchParsePdfMutation.mutate();
-                    }}
-                    title="对全库已上传 PDF 但尚无全文的条目进行 AI 解析"
-                  >
-                    {batchParsePdfMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    批量 AI 解析{pendingCount > 0 ? ` (${pendingCount})` : ""}
-                  </Button>
-                );
-              })()}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5"
+                disabled={batchParsePdfMutation.isPending}
+                onClick={() => {
+                  setBatchParseDialog({ open: true, status: "running", total: 0, successCount: 0, failCount: 0, results: [] });
+                  batchParsePdfMutation.mutate();
+                }}
+              >
+                {batchParsePdfMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                批量 AI 解析
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -2265,10 +2254,6 @@ export default function Admin() {
           {/* Users Tab */}
           <TabsContent value="users">
             <UsersTab />
-          </TabsContent>
-          {/* Changelog Tab */}
-          <TabsContent value="changelog">
-            <DevChangelog />
           </TabsContent>
         </Tabs>
       </div>

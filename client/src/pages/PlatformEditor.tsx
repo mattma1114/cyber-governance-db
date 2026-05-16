@@ -29,16 +29,7 @@ import {
   Sparkles,
   FileText,
   CheckCircle2,
-  History,
-  Bell,
-  Upload,
-  Paperclip,
-  Download,
-  RefreshCw,
-  AlertTriangle,
-  X,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 // ── AI loading steps for platform extraction ─────────────────────────────────
 const PLATFORM_AI_STEPS = [
@@ -333,151 +324,6 @@ export default function PlatformEditor() {
       setAiStep(0);
     }
   };
-
-  // ── Platform Rules (new table-based) ──────────────────────────────────────
-  const { data: platformRulesData, refetch: refetchPlatformRules } = trpc.platformRules.list.useQuery(
-    { platformId: platformId! },
-    { enabled: !!platformId }
-  );
-  const platformRules = (platformRulesData ?? []) as any[];
-
-  // Version management dialog
-  const [versionDialogRule, setVersionDialogRule] = useState<any | null>(null);
-  const { data: ruleVersionsData, refetch: refetchVersions } = trpc.platformRules.listVersions.useQuery(
-    { ruleId: versionDialogRule?.id ?? 0 },
-    { enabled: !!versionDialogRule }
-  );
-  const ruleVersions = (ruleVersionsData ?? []) as any[];
-
-  // Add version dialog
-  const [addVersionDialogRule, setAddVersionDialogRule] = useState<any | null>(null);
-  const [newVersionForm, setNewVersionForm] = useState({ versionLabel: "", date: "", url: "", changeNote: "" });
-
-  const addVersionMutation = trpc.platformRules.addVersion.useMutation({
-    onSuccess: () => {
-      toast.success("新版本已添加");
-      refetchPlatformRules();
-      if (versionDialogRule) refetchVersions();
-      setAddVersionDialogRule(null);
-      setNewVersionForm({ versionLabel: "", date: "", url: "", changeNote: "" });
-    },
-    onError: (e) => toast.error(`添加失败：${e.message}`),
-  });
-
-  // AI check new version
-  const [checkingVersionRuleId, setCheckingVersionRuleId] = useState<number | null>(null);
-  const [batchCheckingVersions, setBatchCheckingVersions] = useState(false);
-  const [versionCheckResults, setVersionCheckResults] = useState<Record<number, { hasNew: boolean; summary: string }>>({});
-
-  const checkNewVersionMutation = trpc.platformRules.checkNewVersion.useMutation({
-    onSuccess: (data, variables) => {
-      setVersionCheckResults((prev) => ({ ...prev, [variables.ruleId]: data }));
-      setCheckingVersionRuleId(null);
-      if (data.hasNew) {
-        toast.success(`检测到新版本：${data.summary}`);
-      } else {
-        toast.info("未检测到新版本");
-      }
-    },
-    onError: (e) => {
-      toast.error(`检测失败：${e.message}`);
-      setCheckingVersionRuleId(null);
-    },
-  });
-
-  const batchCheckNewVersionMutation = trpc.platformRules.batchCheckNewVersion.useMutation({
-    onSuccess: (data) => {
-      const results: Record<number, { hasNew: boolean; summary: string }> = {};
-      data.results.forEach((r: any) => { results[r.ruleId] = { hasNew: r.hasNew, summary: r.summary }; });
-      setVersionCheckResults(results);
-      setBatchCheckingVersions(false);
-      const newCount = data.results.filter((r: any) => r.hasNew).length;
-      toast.success(`批量检测完成：${newCount} 条规则有新版本`);
-    },
-    onError: (e) => { toast.error(`批量检测失败：${e.message}`); setBatchCheckingVersions(false); },
-  });
-
-  // Batch extract full text
-  const [batchExtractingRules, setBatchExtractingRules] = useState(false);
-  const [extractingRuleId, setExtractingRuleId] = useState<number | null>(null);
-
-  const extractFullTextMutation = trpc.platformRules.extractFullText.useMutation({
-    onSuccess: (data, variables) => {
-      toast.success(`全文已提取（${data.charCount} 字符）`);
-      refetchPlatformRules();
-      setExtractingRuleId(null);
-    },
-    onError: (e) => { toast.error(`提取失败：${e.message}`); setExtractingRuleId(null); },
-  });
-
-  const batchExtractFullTextMutation = trpc.platformRules.batchExtractFullText.useMutation({
-    onSuccess: (data) => {
-      setBatchExtractingRules(false);
-      refetchPlatformRules();
-      toast.success(`批量提取完成：成功 ${data.successCount} 条，失败 ${data.failCount} 条`);
-    },
-    onError: (e) => { toast.error(`批量提取失败：${e.message}`); setBatchExtractingRules(false); },
-  });
-
-  // Rule attachments
-  const [attachmentRuleId, setAttachmentRuleId] = useState<number | null>(null);
-  const { data: ruleAttachmentsData, refetch: refetchRuleAttachments } = trpc.platformRules.listAttachments.useQuery(
-    { ruleId: attachmentRuleId ?? 0 },
-    { enabled: !!attachmentRuleId }
-  );
-  const ruleAttachments = (ruleAttachmentsData ?? []) as any[];
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-
-  const deleteAttachmentMutation = trpc.platformRules.deleteAttachment.useMutation({
-    onSuccess: () => { toast.success("附件已删除"); refetchRuleAttachments(); },
-    onError: (e: any) => toast.error(`删除失败：${e.message}`),
-  });
-
-  const uploadAttachmentMutation = trpc.platformRules.uploadAttachment.useMutation({
-    onSuccess: () => { toast.success("附件已上传"); refetchRuleAttachments(); setUploadingAttachment(false); },
-    onError: (e: any) => { toast.error(`上传失败：${e.message}`); setUploadingAttachment(false); },
-  });
-
-  const handleUploadRuleAttachment = async (ruleId: number, file: File) => {
-    setUploadingAttachment(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64 = (ev.target?.result as string).split(",")[1];
-        await uploadAttachmentMutation.mutateAsync({
-          ruleId,
-          filename: file.name,
-          mimeType: file.type || "application/octet-stream",
-          fileBase64: base64,
-        });
-      };
-      reader.readAsDataURL(file);
-    } catch (e: any) {
-      toast.error(`上传失败：${e.message}`);
-      setUploadingAttachment(false);
-    }
-  };
-
-  // Add new rule to DB
-  const createRuleMutation = trpc.platformRules.create.useMutation({
-    onSuccess: () => { toast.success("规则文件已添加"); refetchPlatformRules(); },
-    onError: (e) => toast.error(`添加失败：${e.message}`),
-  });
-
-  const updateRuleDbMutation = trpc.platformRules.update.useMutation({
-    onSuccess: () => { toast.success("已保存"); refetchPlatformRules(); },
-    onError: (e) => toast.error(`保存失败：${e.message}`),
-  });
-
-  const deleteRuleDbMutation = trpc.platformRules.delete.useMutation({
-    onSuccess: () => { toast.success("规则文件已删除"); refetchPlatformRules(); },
-    onError: (e) => toast.error(`删除失败：${e.message}`),
-  });
-
-  // Inline edit state for DB rules
-  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
-  const [editingRuleForm, setEditingRuleForm] = useState<any>({});
 
   const [scrapingRuleIdx, setScrapingRuleIdx] = useState<number | null>(null);
   const scrapeUrlMutation = trpc.scraper.scrapeUrl.useMutation({
@@ -924,73 +770,60 @@ export default function PlatformEditor() {
           </div>
         )}
 
-        {/* ── Rules Tab (DB-driven) ── */}
+        {/* ── Rules Tab ── */}
         {activeTab === "rules" && (
-          <div className="max-w-4xl space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-3">
+          <div className="max-w-3xl space-y-4">
+            <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-medium">规则文件</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {isEdit ? `共 ${platformRules.length} 条规则文件，支持多版本管理、AI 检测新版本、批量提取全文` : "保存平台后可管理规则文件"}
+                  手动添加平台规则文件，或使用 Firecrawl 抓取（需配置 API Key）
                 </p>
               </div>
-              {isEdit && (
-                <div className="flex items-center gap-2">
-                  {/* Batch AI check new version */}
-                  <Button
-                    size="sm" variant="outline"
-                    disabled={batchCheckingVersions || platformRules.length === 0}
-                    onClick={() => {
-                      setBatchCheckingVersions(true);
-                      batchCheckNewVersionMutation.mutate({ platformId: platformId! });
-                    }}
-                  >
-                    {batchCheckingVersions ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Bell className="w-3.5 h-3.5 mr-1.5" />}
-                    批量检测新版本
-                  </Button>
-                  {/* Batch extract full text */}
-                  <Button
-                    size="sm" variant="outline"
-                    disabled={batchExtractingRules || platformRules.length === 0}
-                    onClick={() => {
-                      setBatchExtractingRules(true);
-                      batchExtractFullTextMutation.mutate({ platformId: platformId! });
-                    }}
-                  >
-                    {batchExtractingRules ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
-                    一键批量提取全文
-                  </Button>
-                  {/* Add new rule */}
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setEditingRuleId(-1);
-                      setEditingRuleForm({ title: "", type: "policy", date: "", url: "", version: "", changeNote: "" });
-                    }}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />添加规则
-                  </Button>
-                </div>
-              )}
+              <Button size="sm" variant="outline" onClick={addRule}>
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
+                添加规则
+              </Button>
             </div>
 
-            {/* New rule inline form */}
-            {editingRuleId === -1 && (
-              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            {form.rules.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-lg">
+                暂无规则文件，点击「添加规则」手动录入
+              </div>
+            )}
+
+            {form.rules.map((rule, idx) => (
+              <div key={idx} className="rounded-lg border border-border p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-primary">新增规则文件</span>
-                  <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setEditingRuleId(null)}><X className="w-3.5 h-3.5" /></Button>
+                  <span className="text-xs font-medium text-muted-foreground">规则 #{idx + 1}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-7 h-7 text-destructive hover:text-destructive"
+                    onClick={() => removeRule(idx)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">标题 *</Label>
-                    <Input className="h-8 text-sm" value={editingRuleForm.title} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, title: e.target.value }))} placeholder="规则文件标题" />
+                    <Label className="text-xs">标题</Label>
+                    <Input
+                      className="h-8 text-sm"
+                      value={rule.title}
+                      onChange={(e) => updateRule(idx, "title", e.target.value)}
+                      placeholder="规则文件标题"
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">类型</Label>
-                    <Select value={editingRuleForm.type || "policy"} onValueChange={(v) => setEditingRuleForm((p: any) => ({ ...p, type: v }))}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <Select
+                      value={rule.type || "policy"}
+                      onValueChange={(v) => updateRule(idx, "type", v)}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="policy">平台政策</SelectItem>
                         <SelectItem value="terms">服务条款</SelectItem>
@@ -1001,361 +834,79 @@ export default function PlatformEditor() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">日期</Label>
-                    <Input className="h-8 text-sm" type="date" value={editingRuleForm.date} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, date: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">版本号</Label>
-                    <Input className="h-8 text-sm" value={editingRuleForm.version} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, version: e.target.value }))} placeholder="如 v1.0、2024版" />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">URL</Label>
-                    <Input className="h-8 text-sm" value={editingRuleForm.url} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, url: e.target.value }))} placeholder="https://..." />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">变更说明</Label>
-                    <Input className="h-8 text-sm" value={editingRuleForm.changeNote} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, changeNote: e.target.value }))} placeholder="本版本主要变更说明（可空）" />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setEditingRuleId(null)}>取消</Button>
-                  <Button size="sm" disabled={createRuleMutation.isPending} onClick={() => {
-                    if (!editingRuleForm.title.trim()) { toast.error("请填写标题"); return; }
-                    createRuleMutation.mutate({ platformId: platformId!, ...editingRuleForm });
-                    setEditingRuleId(null);
-                  }}>
-                    {createRuleMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}保存
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Not in edit mode: show AI-prefilled rules from form.rules */}
-            {!isEdit && form.rules.length === 0 && (
-              <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-lg">
-                AI 填充后将自动预置规则文件链接，保存平台后可进行管理
-              </div>
-            )}
-            {!isEdit && form.rules.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">以下规则文件链接由 AI 自动爬取预置，保存后将导入数据库，可删除不需要的条目</p>
-                {form.rules.map((rule, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/20">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium">{rule.title || "未命名规则"}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{rule.type}</span>
-                        {rule.date && <span className="text-xs text-muted-foreground">{rule.date}</span>}
-                      </div>
-                      {rule.url && (
-                        <a href={rule.url} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline truncate block mt-0.5">
-                          {rule.url}
-                        </a>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
-                      title="删除此条规则"
-                      onClick={() => handleChange("rules", form.rules.filter((_, i) => i !== idx))}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* DB-driven rules list */}
-            {isEdit && platformRules.length === 0 && editingRuleId !== -1 && (
-              <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-lg">
-                暂无规则文件，点击「添加规则」手动录入
-              </div>
-            )}
-
-            {isEdit && platformRules.map((rule: any) => {
-              const checkResult = versionCheckResults[rule.id];
-              const isEditingThis = editingRuleId === rule.id;
-              const isShowingAttachments = attachmentRuleId === rule.id;
-              return (
-                <div key={rule.id} className={`rounded-lg border p-4 space-y-3 transition-colors ${
-                  checkResult?.hasNew ? "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20" : "border-border"
-                }`}>
-                  {/* Rule header */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium truncate">{rule.title}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{rule.type}</span>
-                        {rule.version && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{rule.version}</span>}
-                        {rule.date && <span className="text-xs text-muted-foreground">{rule.date}</span>}
-                        {rule.fullText && <span className="text-xs text-emerald-600 flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" />全文已提取</span>}
-                      </div>
-                      {rule.url && (
-                        <a href={rule.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block mt-0.5">{rule.url}</a>
-                      )}
-                      {checkResult?.hasNew && (
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-700 dark:text-amber-400">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                          <span>检测到新版本：{checkResult.summary}</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* AI check new version */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                        disabled={!rule.url || checkingVersionRuleId === rule.id}
-                        title="AI 检测新版本"
-                        onClick={() => {
-                          setCheckingVersionRuleId(rule.id);
-                          checkNewVersionMutation.mutate({ ruleId: rule.id });
-                        }}
-                      >
-                        {checkingVersionRuleId === rule.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
-                      </Button>
-                      {/* Extract full text */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                        disabled={!rule.url || extractingRuleId === rule.id}
-                        title="提取全文"
-                        onClick={() => {
-                          setExtractingRuleId(rule.id);
-                          extractFullTextMutation.mutate({ ruleId: rule.id });
-                        }}
-                      >
-                        {extractingRuleId === rule.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                      </Button>
-                      {/* Version history */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                        title="版本历史"
-                        onClick={() => setVersionDialogRule(rule)}
-                      >
-                        <History className="w-3.5 h-3.5" />
-                      </Button>
-                      {/* Attachments */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                        title="附件管理"
-                        onClick={() => setAttachmentRuleId(isShowingAttachments ? null : rule.id)}
-                      >
-                        <Paperclip className="w-3.5 h-3.5" />
-                      </Button>
-                      {/* Edit */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                        onClick={() => {
-                          if (isEditingThis) { setEditingRuleId(null); return; }
-                          setEditingRuleId(rule.id);
-                          setEditingRuleForm({ title: rule.title, type: rule.type, date: rule.date || "", url: rule.url || "", version: rule.version || "", changeNote: rule.changeNote || "" });
-                        }}
-                      >
-                        {isEditingThis ? <X className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
-                      </Button>
-                      {/* Delete */}
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                        onClick={() => { if (confirm(`确认删除「${rule.title}」？`)) deleteRuleDbMutation.mutate({ id: rule.id }); }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Inline edit form */}
-                  {isEditingThis && (
-                    <div className="border-t pt-3 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">标题</Label>
-                          <Input className="h-8 text-sm" value={editingRuleForm.title} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, title: e.target.value }))} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">类型</Label>
-                          <Select value={editingRuleForm.type || "policy"} onValueChange={(v) => setEditingRuleForm((p: any) => ({ ...p, type: v }))}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="policy">平台政策</SelectItem>
-                              <SelectItem value="terms">服务条款</SelectItem>
-                              <SelectItem value="privacy">隐私政策</SelectItem>
-                              <SelectItem value="community">社区准则</SelectItem>
-                              <SelectItem value="transparency">透明度报告</SelectItem>
-                              <SelectItem value="other">其他</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">日期</Label>
-                          <Input className="h-8 text-sm" type="date" value={editingRuleForm.date} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, date: e.target.value }))} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">版本号</Label>
-                          <Input className="h-8 text-sm" value={editingRuleForm.version} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, version: e.target.value }))} placeholder="如 v1.0" />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-xs">URL</Label>
-                          <Input className="h-8 text-sm" value={editingRuleForm.url} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, url: e.target.value }))} />
-                        </div>
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-xs">变更说明</Label>
-                          <Input className="h-8 text-sm" value={editingRuleForm.changeNote} onChange={(e) => setEditingRuleForm((p: any) => ({ ...p, changeNote: e.target.value }))} placeholder="本版本主要变更说明" />
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setEditingRuleId(null)}>取消</Button>
-                        <Button size="sm" disabled={updateRuleDbMutation.isPending} onClick={() => {
-                          updateRuleDbMutation.mutate({ id: rule.id, ...editingRuleForm });
-                          setEditingRuleId(null);
-                        }}>保存更改</Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Attachments panel */}
-                  {isShowingAttachments && (
-                    <div className="border-t pt-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium">附件（{ruleAttachments.length}）</span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            ref={attachmentInputRef}
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleUploadRuleAttachment(rule.id, file);
-                              e.target.value = "";
-                            }}
-                          />
-                          <Button size="sm" variant="outline" className="h-7 text-xs"
-                            disabled={uploadingAttachment}
-                            onClick={() => attachmentInputRef.current?.click()}
-                          >
-                            {uploadingAttachment ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1" />}
-                            上传附件
-                          </Button>
-                        </div>
-                      </div>
-                      {ruleAttachments.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2">暂无附件</p>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {ruleAttachments.map((att: any) => (
-                            <div key={att.id} className="flex items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Paperclip className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                                <span className="truncate">{att.filename}</span>
-                                {att.fileSize && <span className="text-muted-foreground shrink-0">{(att.fileSize / 1024).toFixed(0)} KB</span>}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
-                                  <Button size="icon" variant="ghost" className="w-6 h-6"><Download className="w-3 h-3" /></Button>
-                                </a>
-                                <Button size="icon" variant="ghost" className="w-6 h-6 text-destructive hover:text-destructive"
-                                  onClick={() => deleteAttachmentMutation.mutate({ id: att.id })}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Full text preview */}
-                  {rule.fullText && (
-                    <div className="border-t pt-3">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-xs text-emerald-600 font-medium">全文已提取 ({rule.fullText.length.toLocaleString()} 字符)</span>
-                      </div>
-                      <div className="rounded border border-emerald-200 bg-emerald-50/30 dark:border-emerald-900 dark:bg-emerald-950/20 p-3 text-xs text-muted-foreground max-h-40 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                        {rule.fullText.slice(0, 600)}{rule.fullText.length > 600 ? `\n\n…（共 ${rule.fullText.length.toLocaleString()} 字符）` : ""}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Version history dialog */}
-            <Dialog open={!!versionDialogRule} onOpenChange={(o) => { if (!o) setVersionDialogRule(null); }}>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>版本历史：{versionDialogRule?.title}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {ruleVersions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">暂无历史版本</p>
-                  ) : (
-                    ruleVersions.map((v: any) => (
-                      <div key={v.id} className="rounded border p-3 space-y-1">
-                        <div className="flex items-center gap-2">
-                          {v.version && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{v.version}</span>}
-                          {v.date && <span className="text-xs text-muted-foreground">{v.date}</span>}
-                        </div>
-                        {v.changeNote && <p className="text-xs text-muted-foreground">{v.changeNote}</p>}
-                        {v.url && <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline block truncate">{v.url}</a>}
-                      </div>
-                    ))
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button size="sm" variant="outline"
-                    onClick={() => {
-                      setAddVersionDialogRule(versionDialogRule);
-                      setVersionDialogRule(null);
-                    }}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />添加新版本
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setVersionDialogRule(null)}>关闭</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {/* Add version dialog */}
-            <Dialog open={!!addVersionDialogRule} onOpenChange={(o) => { if (!o) setAddVersionDialogRule(null); }}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>添加新版本：{addVersionDialogRule?.title}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">版本号</Label>
-                    <Input className="h-8 text-sm" value={newVersionForm.versionLabel} onChange={(e) => setNewVersionForm((p) => ({ ...p, versionLabel: e.target.value }))} placeholder="如 v2.0、2025版" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">日期</Label>
-                    <Input className="h-8 text-sm" type="date" value={newVersionForm.date} onChange={(e) => setNewVersionForm((p) => ({ ...p, date: e.target.value }))} />
+                    <Input
+                      className="h-8 text-sm"
+                      type="date"
+                      value={rule.date}
+                      onChange={(e) => updateRule(idx, "date", e.target.value)}
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">URL</Label>
-                    <Input className="h-8 text-sm" value={newVersionForm.url} onChange={(e) => setNewVersionForm((p) => ({ ...p, url: e.target.value }))} placeholder="https://..." />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">变更说明</Label>
-                    <Input className="h-8 text-sm" value={newVersionForm.changeNote} onChange={(e) => setNewVersionForm((p) => ({ ...p, changeNote: e.target.value }))} placeholder="本版本主要变更内容" />
+                    <div className="flex gap-2">
+                      <Input
+                        className="h-8 text-sm flex-1"
+                        placeholder="https://..."
+                        value={rule.url}
+                        onChange={(e) => updateRule(idx, "url", e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-8 shrink-0 gap-1.5 text-xs px-3 whitespace-nowrap"
+                        disabled={!rule.url || scrapingRuleIdx === idx || scrapeUrlMutation.isPending}
+                        onClick={() => {
+                          if (!rule.url) { toast.error("请先填写规则文件 URL"); return; }
+                          setScrapingRuleIdx(idx);
+                          scrapeUrlMutation.mutate({ url: rule.url });
+                        }}
+                        title="自动抓取该 URL 的规则全文（支持 Firecrawl / Jina / ScrapingBee）"
+                      >
+                        {scrapingRuleIdx === idx ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" />获取中…</>
+                        ) : (
+                          <><Zap className="w-3.5 h-3.5" />一键获取</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button size="sm" variant="outline" onClick={() => setAddVersionDialogRule(null)}>取消</Button>
-                  <Button size="sm" disabled={addVersionMutation.isPending}
-                    onClick={() => {
-                      if (!addVersionDialogRule) return;
-                      addVersionMutation.mutate({
-                        parentRuleId: addVersionDialogRule.id,
-                        title: addVersionDialogRule.title,
-                        type: addVersionDialogRule.type,
-                        ...newVersionForm,
-                      });
-                    }}
-                  >
-                    {addVersionMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}添加版本
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                {/* Full text preview */}
+                {rule.fullText ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                          <Zap className="w-3 h-3" />
+                          全文已获取
+                        </span>
+                        <span className="text-muted-foreground font-normal">（{rule.fullText.length.toLocaleString()} 字符）</span>
+                      </Label>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => updateRule(idx, "fullText" as any, "")}
+                      >
+                        清除全文
+                      </Button>
+                    </div>
+                    <div className="rounded border border-emerald-200 bg-emerald-50/30 dark:border-emerald-900 dark:bg-emerald-950/20 p-3 text-xs text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                      {rule.fullText.slice(0, 800)}{rule.fullText.length > 800 ? `\n\n…（共 ${rule.fullText.length.toLocaleString()} 字符，保存后在平台详情页查看完整内容）` : ""}
+                    </div>
+                  </div>
+                ) : scrapingRuleIdx === idx ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 pl-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    正在抓取全文，请稍候…
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
         )}
 
