@@ -283,3 +283,15 @@
 
 ## AI 分析模块排版修复
 - [x] CaseEditor.tsx：AI 分析字段改为「编辑/预览」双模式，预览时渲染 Markdown 段落、去除 ** 符号、优化段间距
+
+## PDF 全文上传 + 在线阅读器（当前迭代）
+- [x] cases 表添加 fullTextPdfUrl/fullTextPdfKey 字段，生成迁移 SQL
+- [x] 后端新增 cases.uploadFullTextPdf 接口（S3 存储，返回 URL）
+- [x] CaseEditor.tsx「原文全文」添加文本/PDF 切换模式，支持 PDF 上传
+- [x] CaseDetail.tsx「原文正文」区域嵌入 PDF 阅读器（iframe），支持文本和 PDF 两种展示方式
+
+## 超长文本导入修复 + 去重检测（当前迭代）
+- [x] 将 fullText/abstract/aiAnalysis/aiSummary 字段改为 MEDIUMTEXT（支持最大 16MB）
+- [x] 修复前端正文内容显示错乱问题（超长文本渲染优化）
+- [x] 后端新增 cases.checkDuplicate 路由（标题相似度 + sourceUrl 重复检测）
+- [x] 管理后台新增内容时在标题/URL 输入后自动触发去重检测，展示疑似重复提示

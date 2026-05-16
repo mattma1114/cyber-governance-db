@@ -357,8 +357,39 @@ export default function CaseDetail() {
     <FileText className="w-3.5 h-3.5" />;
 
   // Split fullText into paragraphs for better readability
+  // Strategy: try double-newline split first; if result has <=3 segments (common for
+  // legislative texts with single newlines), fall back to single-newline split.
   const fullTextParagraphs = c.fullText
-    ? c.fullText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    ? (() => {
+        const raw = c.fullText!;
+        // Try double-newline split first
+        let segs = raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+        // If too few segments (whole text is one blob), try single newline
+        if (segs.length <= 3 && raw.includes('\n')) {
+          segs = raw.split(/\n/).map((p) => p.trim()).filter(Boolean);
+        }
+        // If still one giant blob (no newlines at all), split by sentence boundaries
+        if (segs.length <= 1 && raw.length > 1000) {
+          const chunks: string[] = [];
+          let remaining = raw.trim();
+          while (remaining.length > 600) {
+            // Find a sentence boundary near the 500-char mark
+            let cutAt = 500;
+            for (let i = 400; i < Math.min(700, remaining.length); i++) {
+              const ch = remaining[i];
+              if (ch === '\u3002' || ch === '.' || ch === '!' || ch === '?') {
+                cutAt = i + 1;
+                break;
+              }
+            }
+            chunks.push(remaining.slice(0, cutAt).trim());
+            remaining = remaining.slice(cutAt).trim();
+          }
+          if (remaining) chunks.push(remaining);
+          segs = chunks.filter(Boolean);
+        }
+        return segs;
+      })()
     : [];
 
   // 彻底去除所有 Markdown 符号（**bold** / *italic* / # heading / `code` 等）
@@ -600,11 +631,56 @@ export default function CaseDetail() {
 
             {/* Full Text – always visible, most important */}
             <div className="pt-4">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-2">
-                <FileText className="w-3.5 h-3.5" />
-                原文正文
-              </h2>
-              {fullTextParagraphs.length > 0 ? (
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" />
+                  原文正文
+                </h2>
+                {/* Show PDF download link if PDF is available */}
+                {(c as any).fullTextPdfUrl && (
+                  <a
+                    href={(c as any).fullTextPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    下载 PDF
+                  </a>
+                )}
+              </div>
+
+              {/* PDF Reader: shown when fullTextPdfUrl exists */}
+              {(c as any).fullTextPdfUrl ? (
+                <div className="space-y-3">
+                  <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/20">
+                    <iframe
+                      src={`${(c as any).fullTextPdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                      className="w-full"
+                      style={{ height: "800px", border: "none" }}
+                      title="原文 PDF 阅读器"
+                    />
+                  </div>
+                  {/* Fallback text if also has text content */}
+                  {fullTextParagraphs.length > 0 && (
+                    <details className="mt-4">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-2">
+                        查看文本版原文
+                      </summary>
+                      <div className="prose prose-sm max-w-none space-y-4 mt-3 pt-3 border-t border-border">
+                        {fullTextParagraphs.map((para, i) => (
+                          <p
+                            key={i}
+                            className="text-[15px] leading-[1.9] text-foreground/90 indent-[2em] first:indent-0"
+                          >
+                            {para}
+                          </p>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ) : fullTextParagraphs.length > 0 ? (
                 <div className="prose prose-sm max-w-none space-y-4">
                   {fullTextParagraphs.map((para, i) => (
                     <p

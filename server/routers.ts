@@ -623,6 +623,81 @@ export const appRouter = router({
         };
       }),
 
+    // ── Upload full-text PDF (S3) ─────────────────────────────────────────
+    uploadFullTextPdf: adminProcedure
+      .input(z.object({
+        caseId: z.number(),
+        filename: z.string().max(512),
+        dataBase64: z.string(), // base64 encoded PDF content
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
+        const buffer = Buffer.from(input.dataBase64, "base64");
+        const ext = input.filename.split('.').pop()?.toLowerCase() ?? 'pdf';
+        const safeExt = /^[a-z0-9]+$/.test(ext) ? `.${ext}` : '.pdf';
+        const uuid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const safeFilename = `${uuid}${safeExt}`;
+        const fileKey = `full-text-pdf/${input.caseId}/${safeFilename}`;
+        const { key, url } = await storagePut(fileKey, buffer, "application/pdf");
+        await db.update(cases).set({
+          fullTextPdfUrl: url,
+          fullTextPdfKey: key,
+        }).where(eq(cases.id, input.caseId));
+        return { success: true, url, key, filename: input.filename };
+      }),
+
+    // ── Delete full-text PDF ──────────────────────────────────────────────
+    deleteFullTextPdf: adminProcedure
+      .input(z.object({ caseId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "数据库未连接" });
+        await db.update(cases).set({
+          fullTextPdfUrl: null,
+          fullTextPdfKey: null,
+        }).where(eq(cases.id, input.caseId));
+        return { success: true };
+      }),
+
+    // ── Check duplicate (title similarity + sourceUrl exact match) ────────
+    checkDuplicate: adminProcedure
+      .input(z.object({
+        title: z.string().optional(),
+        sourceUrl: z.string().optional(),
+        excludeId: z.number().optional(), // exclude current case when editing
+      }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        if (!input.title && !input.sourceUrl) return [];
+        const conditions: any[] = [];
+        if (input.sourceUrl && input.sourceUrl.trim().length > 0) {
+          conditions.push(like(cases.sourceUrl, `%${input.sourceUrl.trim()}%`));
+        }
+        if (input.title && input.title.trim().length >= 4) {
+          // Use first 10 chars as keyword for fuzzy match
+          const keyword = input.title.trim().slice(0, 10);
+          conditions.push(like(cases.title, `%${keyword}%`));
+        }
+        if (conditions.length === 0) return [];
+        const rows = await db.select({
+          id: cases.id,
+          title: cases.title,
+          status: cases.status,
+          date: cases.date,
+          sourceUrl: cases.sourceUrl,
+          createdAt: cases.createdAt,
+        }).from(cases)
+          .where(or(...conditions))
+          .orderBy(desc(cases.createdAt))
+          .limit(5);
+        // Exclude current case when editing
+        return input.excludeId
+          ? rows.filter(r => r.id !== input.excludeId)
+          : rows;
+      }),
+
     // ── Refetch fullText for existing cases ───────────────────────────────
     refetchFullText: adminProcedure
       .input(z.object({

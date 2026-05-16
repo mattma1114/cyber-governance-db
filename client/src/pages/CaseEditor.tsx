@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles, Paperclip, Trash2, Eye } from "lucide-react";
+import { ArrowLeft, Loader2, Wand2, Link2, X, Plus, CheckCircle2, Globe, FileText, Sparkles, Paperclip, Trash2, Eye, Upload, FileUp, AlertCircle } from "lucide-react";
 import { FilePreviewModal, canPreview, type PreviewFile } from "@/components/FilePreviewModal";
 
 const CASE_TYPES = [
@@ -189,6 +189,29 @@ export default function CaseEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
+  // PDF full-text upload state
+  const [fullTextMode, setFullTextMode] = useState<"text" | "pdf">("text");
+  const [pdfFilename, setPdfFilename] = useState<string | null>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Duplicate detection state (debounced)
+  const [dupTitle, setDupTitle] = useState("");
+  const [dupUrl, setDupUrl] = useState("");
+  const dupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { data: dupResults } = trpc.cases.checkDuplicate.useQuery(
+    { title: dupTitle || undefined, sourceUrl: dupUrl || undefined, excludeId: caseId ?? undefined },
+    { enabled: (dupTitle.trim().length >= 4 || dupUrl.trim().length > 0) }
+  );
+
+  const triggerDupCheck = (title: string, url: string) => {
+    if (dupTimerRef.current) clearTimeout(dupTimerRef.current);
+    dupTimerRef.current = setTimeout(() => {
+      setDupTitle(title);
+      setDupUrl(url);
+    }, 600);
+  };
+
   const { data: topics } = trpc.topics.list.useQuery();
   const { data: jurisdictions } = trpc.jurisdictions.list.useQuery();
   const { data: existingCase, isLoading: caseLoading } = trpc.cases.getById.useQuery(
@@ -257,6 +280,23 @@ export default function CaseEditor() {
       toast.error(`AI 提取失败：${e.message}`);
     },
   });
+
+  // Sync PDF state from existing case
+  useEffect(() => {
+    if (existingCase) {
+      const pdfUrl = (existingCase as any).fullTextPdfUrl;
+      if (pdfUrl) {
+        setFullTextMode("pdf");
+        // Extract filename from URL or key
+        const key = (existingCase as any).fullTextPdfKey ?? "";
+        const name = key.split("/").pop() ?? "已上传的PDF文件.pdf";
+        setPdfFilename(name);
+      } else {
+        setFullTextMode("text");
+        setPdfFilename(null);
+      }
+    }
+  }, [existingCase]);
 
   useEffect(() => {
     if (existingCase) {
@@ -339,6 +379,29 @@ export default function CaseEditor() {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   // Attachments
+  // PDF full-text mutations
+  const uploadFullTextPdf = trpc.cases.uploadFullTextPdf.useMutation({
+    onSuccess: (data) => {
+      toast.success("PDF 已上传");
+      setPdfFilename(data.filename);
+      setIsUploadingPdf(false);
+      utils.cases.getById.invalidate({ id: caseId! });
+    },
+    onError: (e) => {
+      toast.error(`PDF 上传失败：${e.message}`);
+      setIsUploadingPdf(false);
+    },
+  });
+
+  const deleteFullTextPdf = trpc.cases.deleteFullTextPdf.useMutation({
+    onSuccess: () => {
+      toast.success("PDF 已删除");
+      setPdfFilename(null);
+      utils.cases.getById.invalidate({ id: caseId! });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const { data: attachments, refetch: refetchAttachments } = trpc.attachments.listByCaseId.useQuery(
     { caseId: caseId! },
     { enabled: !!caseId }
@@ -361,6 +424,31 @@ export default function CaseEditor() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const handlePdfSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !caseId) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error("请选择 PDF 文件");
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("PDF 文件大小不能超过 50MB");
+      return;
+    }
+    setIsUploadingPdf(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      uploadFullTextPdf.mutate({
+        caseId,
+        filename: file.name,
+        dataBase64: base64,
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -489,6 +577,39 @@ export default function CaseEditor() {
           </div>
         </div>
 
+        {/* Duplicate detection warning banner */}
+        {dupResults && dupResults.length > 0 && (
+          <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">注意：此内容可能已存在</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">检测到以下疑似重复内容，请确认是否为新内容：</p>
+              <ul className="mt-2 space-y-1">
+                {dupResults.map((dup) => (
+                  <li key={dup.id} className="flex items-center gap-2 text-xs">
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      dup.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" :
+                      dup.status === "draft" ? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" :
+                      "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                    }`}>
+                      {dup.status === "published" ? "已发布" : dup.status === "draft" ? "草稿" : "已下架"}
+                    </span>
+                    <a
+                      href={`/cases/${dup.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-800 dark:text-amber-300 hover:underline truncate"
+                    >
+                      {dup.title}
+                    </a>
+                    <span className="text-amber-600/60 dark:text-amber-500/60 shrink-0">{dup.date}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
         {/* Section: 基本信息 */}
         <section className="space-y-6">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">基本信息</h2>
@@ -526,7 +647,10 @@ export default function CaseEditor() {
               className={ulInput + " text-base font-medium"}
               placeholder="请输入内容标题"
               value={form.title}
-              onChange={(e) => handleChange("title", e.target.value)}
+              onChange={(e) => {
+                handleChange("title", e.target.value);
+                triggerDupCheck(e.target.value, form.sourceUrl);
+              }}
             />
           </div>
 
@@ -596,7 +720,10 @@ export default function CaseEditor() {
                 className={ulInput}
                 placeholder="https://..."
                 value={form.sourceUrl}
-                onChange={(e) => handleChange("sourceUrl", e.target.value)}
+                onChange={(e) => {
+                  handleChange("sourceUrl", e.target.value);
+                  triggerDupCheck(form.title, e.target.value);
+                }}
               />
             </div>
           </div>
@@ -674,18 +801,139 @@ export default function CaseEditor() {
 
         {/* Section: 原文全文 — main content area */}
         <section className="space-y-4">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">原文全文</h2>
-            <span className="text-xs text-muted-foreground">
-              AI 提取后自动填充，也可手动粘贴判决书、执法决定、法规全文等
-            </span>
+            {/* Mode toggle */}
+            <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (fullTextMode === "pdf" && pdfFilename) {
+                    if (!confirm("切换到文本模式将清除已上传的 PDF，确定继续？")) return;
+                    if (caseId) deleteFullTextPdf.mutate({ caseId });
+                    else setPdfFilename(null);
+                  }
+                  setFullTextMode("text");
+                }}
+                className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                  fullTextMode === "text"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                文本输入
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (fullTextMode === "text" && form.fullText.trim()) {
+                    if (!confirm("切换到 PDF 模式将清除已填写的文本内容，确定继续？")) return;
+                    handleChange("fullText", "");
+                  }
+                  setFullTextMode("pdf");
+                }}
+                className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                  fullTextMode === "pdf"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                上传 PDF
+              </button>
+            </div>
           </div>
-          <textarea
-            className="w-full bg-transparent border-b border-border rounded-none px-0 py-3 text-sm font-mono focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/40 transition-colors resize-none min-h-[400px]"
-            placeholder="AI 提取后将自动填充原文内容，也可在此手动粘贴…"
-            value={form.fullText}
-            onChange={(e) => handleChange("fullText", e.target.value)}
-          />
+
+          {fullTextMode === "text" ? (
+            <textarea
+              className="w-full bg-transparent border-b border-border rounded-none px-0 py-3 text-sm font-mono focus:outline-none focus:ring-0 focus:border-foreground placeholder:text-muted-foreground/40 transition-colors resize-none min-h-[400px]"
+              placeholder="AI 提取后将自动填充原文内容，也可在此手动粘贴…"
+              value={form.fullText}
+              onChange={(e) => handleChange("fullText", e.target.value)}
+            />
+          ) : (
+            <div className="border-b border-border pb-4">
+              {pdfFilename ? (
+                /* PDF already uploaded */
+                <div className="flex items-center gap-3 py-3 px-4 bg-muted/40 rounded-lg">
+                  <FileText className="w-8 h-8 text-red-500/80 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{pdfFilename}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">PDF 原文已上传，前台将显示在线阅读器</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isEdit && (existingCase as any)?.fullTextPdfUrl && (
+                      <a
+                        href={(existingCase as any).fullTextPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        预览
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                      onClick={() => pdfInputRef.current?.click()}
+                    >
+                      <Upload className="w-3 h-3" />
+                      替换
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs text-destructive/70 hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
+                      onClick={() => {
+                        if (confirm(`确定删除已上传的 PDF？`)) {
+                          if (caseId) deleteFullTextPdf.mutate({ caseId });
+                          else setPdfFilename(null);
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Upload area */
+                <div
+                  className="flex flex-col items-center justify-center gap-3 py-10 border border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => {
+                    if (!isEdit) {
+                      toast.error("请先保存内容后再上传 PDF");
+                      return;
+                    }
+                    pdfInputRef.current?.click();
+                  }}
+                >
+                  {isUploadingPdf ? (
+                    <>
+                      <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+                      <p className="text-sm text-muted-foreground">正在上传 PDF…</p>
+                    </>
+                  ) : (
+                    <>
+                      <FileUp className="w-8 h-8 text-muted-foreground" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium">
+                          {isEdit ? "点击上传 PDF 文件" : "请先保存内容后再上传 PDF"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">支持 PDF 格式，最大 50MB</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              <input
+                ref={pdfInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf"
+                onChange={handlePdfSelect}
+              />
+            </div>
+          )}
         </section>
 
         {/* Section: 相关文件 */}
