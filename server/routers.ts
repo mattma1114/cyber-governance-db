@@ -725,15 +725,16 @@ export const appRouter = router({
             messages: [
               {
                 role: "system",
-                content: `你是一个文本整理尓手。你的任务是清洗和整理从 PDF 提取的原始文本，输出整理后的完整正文。
-要求：
-1. 保留所有实质内容，不得删除任何正文段落
-2. 修复 OCR 识别错误（如分词、字符替换错误）
-3. 删除页眉、页脚、页码、目录等非正文内容
-4. 合并被换行断开的段落，恢复自然段落结构
-5. 保留原始语言（中文就输出中文，英文就输出英文）
-6. 不要添加任何总结、评论或额外解释
-7. 直接输出整理后的正文，不要加入任何前言或后记`,
+                content: `你是一个文本整理专家。你的任务是清洗从 PDF 提取的原始文本，严格保留原文的段落结构和排版，输出整理后的完整正文。
+
+核心要求（必须严格遵守）：
+1. 【严禁合并段落】绝对不得将不同段落合并为一段。每个自然段落之间必须保留一个空行（即 \n\n）
+2. 【严格保留段落分隔】原文中的每一个段落分隔（包括条款、款项、项之间的分隔）必须在输出中保留为空行
+3. 修复明显的 OCR 识别错误（如错误的字符替换、断词），但不得改变句子结构
+4. 删除页眉、页脚、页码等非正文内容，但保留条款编号、标题等结构性内容
+5. 保留原始语言（中文输出中文，英文输出英文，不得翻译）
+6. 不得添加任何总结、评论、解释或前言后记
+7. 直接输出整理后的正文，段落之间用空行（\n\n）分隔`,
               },
               {
                 role: "user",
@@ -750,10 +751,18 @@ export const appRouter = router({
         // 5. Save to fullText field
         await db.update(cases).set({ fullText: cleanedText }).where(eq(cases.id, input.caseId));
 
+        // Paragraph integrity check
+        const paragraphCount = cleanedText
+          ? cleanedText.split(/\n{2,}/).filter((p: string) => p.trim().length > 0).length
+          : 0;
+        const _paragraphWarning = cleanedText.length > 500 && paragraphCount <= 1;
+
         return {
           success: true,
           numPages,
           charCount: cleanedText.length,
+          paragraphCount,
+          _paragraphWarning,
           preview: cleanedText.slice(0, 300),
         };
       }),
@@ -820,15 +829,16 @@ export const appRouter = router({
                 messages: [
                   {
                     role: "system",
-                    content: `你是一个文本整理小手。你的任务是清洗和整理从 PDF 提取的原始文本，输出整理后的完整正文。
-要求：
-1. 保留所有实质内容，不得删除任何正文段落
-2. 修复 OCR 识别错误（如分词、字符替换错误）
-3. 删除页眉、页脚、页码、目录等非正文内容
-4. 合并被换行断开的段落，恢复自然段落结构
-5. 保留原始语言（中文就输出中文，英文就输出英文）
-6. 不要添加任何总结、评论或额外解释
-7. 直接输出整理后的正文，不要加入任何前言或后记`,
+                    content: `你是一个文本整理专家。你的任务是清洗从 PDF 提取的原始文本，严格保留原文的段落结构和排版，输出整理后的完整正文。
+
+核心要求（必须严格遵守）：
+1. 【严禁合并段落】绝对不得将不同段落合并为一段。每个自然段落之间必须保留一个空行（即 \n\n）
+2. 【严格保留段落分隔】原文中的每一个段落分隔（包括条款、款项、项之间的分隔）必须在输出中保留为空行
+3. 修复明显的 OCR 识别错误（如错误的字符替换、断词），但不得改变句子结构
+4. 删除页眉、页脚、页码等非正文内容，但保留条款编号、标题等结构性内容
+5. 保留原始语言（中文输出中文，英文输出英文，不得翻译）
+6. 不得添加任何总结、评论、解释或前言后记
+7. 直接输出整理后的正文，段落之间用空行（\n\n）分隔`,
                   },
                   {
                     role: "user",
@@ -1549,8 +1559,35 @@ Return ONLY valid JSON, no markdown, no explanation.`;
         if (!validTopicIds.includes(parsed.topicId)) parsed.topicId = "";
         if (!validJurisdictionIds.includes(parsed.jurisdictionId)) parsed.jurisdictionId = "";
         // Always prefer scraped full text over LLM-generated content
+        // Clean Markdown artifacts from scraped content to preserve paragraph structure
         if (scrapedFullText) {
-          parsed.fullText = scrapedFullText.slice(0, 15000);
+          const cleanedScraped = scrapedFullText
+            // Remove Markdown headings (## Title → Title)
+            .replace(/^#{1,6}\s+/gm, '')
+            // Remove bold/italic markers (**text** → text, *text* → text)
+            .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+            // Remove inline code backticks
+            .replace(/`([^`]+)`/g, '$1')
+            // Remove Markdown links [text](url) → text
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            // Remove horizontal rules
+            .replace(/^[-*_]{3,}\s*$/gm, '')
+            // Normalize multiple blank lines to double newline
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+          parsed.fullText = cleanedScraped.slice(0, 15000);
+        }
+        // Paragraph integrity check: warn if fullText has no paragraph breaks
+        const paragraphCount = parsed.fullText
+          ? parsed.fullText.split(/\n\n+/).filter((p: string) => p.trim().length > 0).length
+          : 0;
+        if (parsed.fullText && parsed.fullText.length > 500 && paragraphCount <= 1) {
+          // Flag for frontend to show warning
+          parsed._paragraphWarning = true;
+          parsed._paragraphCount = paragraphCount;
+        } else {
+          parsed._paragraphWarning = false;
+          parsed._paragraphCount = paragraphCount;
         }
         // Validate AI analysis depth — if too short, append a note for the editor
         if (parsed.aiAnalysis && parsed.aiAnalysis.length < 400) {

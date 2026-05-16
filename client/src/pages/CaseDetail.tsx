@@ -356,39 +356,16 @@ export default function CaseDetail() {
     c.type === "regulatory" ? <Scale className="w-3.5 h-3.5" /> :
     <FileText className="w-3.5 h-3.5" />;
 
-  // Split fullText into paragraphs for better readability
-  // Strategy: try double-newline split first; if result has <=3 segments (common for
-  // legislative texts with single newlines), fall back to single-newline split.
+  // Split fullText into paragraphs strictly by double-newline (\n\n).
+  // We do NOT fall back to single-newline or sentence-boundary splitting,
+  // as that would destroy the original document's paragraph structure.
   const fullTextParagraphs = c.fullText
     ? (() => {
         const raw = c.fullText!;
-        // Try double-newline split first
-        let segs = raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-        // If too few segments (whole text is one blob), try single newline
-        if (segs.length <= 3 && raw.includes('\n')) {
-          segs = raw.split(/\n/).map((p) => p.trim()).filter(Boolean);
-        }
-        // If still one giant blob (no newlines at all), split by sentence boundaries
-        if (segs.length <= 1 && raw.length > 1000) {
-          const chunks: string[] = [];
-          let remaining = raw.trim();
-          while (remaining.length > 600) {
-            // Find a sentence boundary near the 500-char mark
-            let cutAt = 500;
-            for (let i = 400; i < Math.min(700, remaining.length); i++) {
-              const ch = remaining[i];
-              if (ch === '\u3002' || ch === '.' || ch === '!' || ch === '?') {
-                cutAt = i + 1;
-                break;
-              }
-            }
-            chunks.push(remaining.slice(0, cutAt).trim());
-            remaining = remaining.slice(cutAt).trim();
-          }
-          if (remaining) chunks.push(remaining);
-          segs = chunks.filter(Boolean);
-        }
-        return segs;
+        // Strict: only split on double (or more) newlines — preserves original layout.
+        // Do NOT fall back to single-newline or sentence-boundary splitting,
+        // as that would destroy the original document's paragraph structure.
+        return raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
       })()
     : [];
 
@@ -631,18 +608,23 @@ export default function CaseDetail() {
 
             {/* Full Text – always visible, most important */}
             <div className="pt-4">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" />
-                  原文正文
-                </h2>
+              <div className="flex items-start justify-between mb-5 gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    原文正文
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">
+                    本处仅展示原语言内容，请自行根据需要配置翻译
+                  </p>
+                </div>
                 {/* Show PDF download link if PDF is available */}
                 {(c as any).fullTextPdfUrl && (
                   <a
                     href={(c as any).fullTextPdfUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                   >
                     <Download className="w-3 h-3" />
                     下载 PDF
@@ -667,11 +649,11 @@ export default function CaseDetail() {
                       <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-2">
                         查看文本版原文
                       </summary>
-                      <div className="prose prose-sm max-w-none space-y-4 mt-3 pt-3 border-t border-border">
+                      <div className="space-y-4 mt-3 pt-3 border-t border-border">
                         {fullTextParagraphs.map((para, i) => (
                           <p
                             key={i}
-                            className="text-[15px] leading-[1.9] text-foreground/90 indent-[2em] first:indent-0"
+                            className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line"
                           >
                             {para}
                           </p>
@@ -681,11 +663,11 @@ export default function CaseDetail() {
                   )}
                 </div>
               ) : fullTextParagraphs.length > 0 ? (
-                <div className="prose prose-sm max-w-none space-y-4">
+                <div className="space-y-4">
                   {fullTextParagraphs.map((para, i) => (
                     <p
                       key={i}
-                      className="text-[15px] leading-[1.9] text-foreground/90 indent-[2em] first:indent-0"
+                      className="text-[15px] leading-[1.85] text-foreground/90 whitespace-pre-line"
                     >
                       {para}
                     </p>

@@ -328,3 +328,11 @@
 - [x] 后端：platformRules 路由：list、create、update、delete、addVersion、listVersions、checkNewVersion（AI）、batchCheckNewVersion、extractFullText（AI）、batchExtract、listAttachments、uploadAttachment、deleteAttachment
 - [x] 管理后台 PlatformEditor.tsx 规则文件 Tab 升级：DB 驱动列表、版本管理弹窗、AI 检测新版本按钮（单条/批量）、批量 AI 提取全文按钮、附件上传区域
 - [x] 前台 PlatformDetail.tsx 规则文件 Tab 升级：卡片展示、点击展开版本历史时间轴 + 附件列表
+
+## 原文正文排版修复 + 导入校验 + 语言提示（已完成）
+- [x] 分析 fullText 存储格式和前端渲染方式，找出段落丢失的根本原因
+- [x] 后端：修复 AI 提取/LLM 清洗时的段落保留逻辑（严格保留 \n\n 段落分隔符）
+- [x] 后端：新增导入时段落完整性检查（字符数、段落数校验，不满足条件时返回警告）
+- [x] 前端 CaseDetail.tsx：修复正文渲染（保留换行/段落，使用 whitespace-pre-wrap 或逐段渲染）
+- [x] 前端 CaseDetail.tsx：原文正文区域右方添加语言提示小字「本处仅展示原语言内容，请自行根据需要配置翻译」
+- [x] 管理后台 CaseEditor.tsx：导入/AI 提取后展示段落预检结果（段落数、字符数、是否通过校验）

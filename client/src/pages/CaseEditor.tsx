@@ -198,6 +198,13 @@ export default function CaseEditor() {
   // Duplicate detection state (debounced)
   const [dupTitle, setDupTitle] = useState("");
   const [dupUrl, setDupUrl] = useState("");
+  // Paragraph integrity check state (shown after URL import or PDF parse)
+  const [paragraphCheck, setParagraphCheck] = useState<{
+    show: boolean;
+    paragraphCount: number;
+    charCount: number;
+    hasWarning: boolean;
+  } | null>(null);
   const dupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: dupResults } = trpc.cases.checkDuplicate.useQuery(
     { title: dupTitle || undefined, sourceUrl: dupUrl || undefined, excludeId: caseId ?? undefined },
@@ -271,6 +278,13 @@ export default function CaseEditor() {
           fullText: (data as any).fullText || prev.fullText,
           sourceUrl: urlInput.trim() || prev.sourceUrl,
         }));
+
+      // Paragraph integrity check
+      const ft = (data as any).fullText || "";
+      const pCount = ft ? ft.split(/\n{2,}/).filter((p: string) => p.trim().length > 0).length : 0;
+      const cCount = ft.length;
+      const hasWarn = (data as any)._paragraphWarning === true;
+      setParagraphCheck({ show: true, paragraphCount: pCount, charCount: cCount, hasWarning: hasWarn });
 
       setIsAiLoading(false);
       toast.success("AI 已自动提取并填充所有字段，请核对后保存");
@@ -407,15 +421,17 @@ export default function CaseEditor() {
     onMutate: () => setIsParsing(true),
     onSuccess: (data) => {
       setIsParsing(false);
-      // Directly fill fullText from the returned preview is not enough;
-      // invalidate triggers re-fetch which updates existingCase, then the useEffect syncs form.
-      // But we also explicitly set form.fullText here for immediate feedback.
       if (data.preview) {
-        // The backend saved the full text; we need to fetch it.
-        // We optimistically switch to text mode; the useEffect will fill in the full text after invalidation.
         setFullTextMode("text");
       }
       utils.cases.getById.invalidate({ id: caseId! });
+      // Show paragraph integrity check result
+      setParagraphCheck({
+        show: true,
+        paragraphCount: (data as any).paragraphCount ?? 0,
+        charCount: data.charCount,
+        hasWarning: (data as any)._paragraphWarning === true,
+      });
       toast.success(`AI 解析完成！共 ${data.numPages} 页，提取 ${data.charCount.toLocaleString()} 字符，已自动填充到文本字段`);
     },
     onError: (e) => {
@@ -883,6 +899,35 @@ export default function CaseEditor() {
               </button>
             </div>
           </div>
+
+          {/* Paragraph integrity check banner — shown after URL import or PDF parse */}
+          {paragraphCheck?.show && fullTextMode === "text" && (
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-lg text-sm border ${
+              paragraphCheck.hasWarning
+                ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300"
+                : "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300"
+            }`}>
+              <span className="text-base mt-0.5">{paragraphCheck.hasWarning ? "⚠️" : "✅"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">
+                  {paragraphCheck.hasWarning
+                    ? "段落检查警告：正文可能未分段"
+                    : "段落检查通过"}
+                </p>
+                <p className="text-xs mt-0.5 opacity-80">
+                  共 {paragraphCheck.charCount.toLocaleString()} 字符，检测到 {paragraphCheck.paragraphCount} 个段落
+                  {paragraphCheck.hasWarning && "（段落数过少，建议检查原文是否正确分段，可手动编辑正文内容添加空行分隔）"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setParagraphCheck(null)}
+                className="text-xs opacity-60 hover:opacity-100 transition-opacity shrink-0"
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           {fullTextMode === "text" ? (
             <textarea
