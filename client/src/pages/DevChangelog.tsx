@@ -45,7 +45,7 @@ const VERSIONS: Version[] = [
     id: "v5",
     label: "v5.0",
     subtitle: "AI 智能增强与内容质量提升",
-    period: "2025年4月下旬 – 2025年5月",
+    period: "2026年5月5日 – 2026年5月16日",
     color: "border-l-amber-500",
     sections: [
       {
@@ -97,7 +97,7 @@ const VERSIONS: Version[] = [
     id: "v4",
     label: "v4.0",
     subtitle: "性能优化、批量操作与文件管理",
-    period: "2025年3月中旬 – 2025年4月中旬",
+    period: "2026年5月3日 – 2026年5月4日",
     color: "border-l-green-500",
     sections: [
       {
@@ -156,7 +156,7 @@ const VERSIONS: Version[] = [
     id: "v3",
     label: "v3.0",
     subtitle: "AI 能力深化与管理后台完善",
-    period: "2025年2月中旬 – 2025年3月中旬",
+    period: "2026年5月2日 – 2026年5月2日",
     color: "border-l-blue-500",
     sections: [
       {
@@ -204,7 +204,7 @@ const VERSIONS: Version[] = [
     id: "v2",
     label: "v2.0",
     subtitle: "平台画像深化与三 API 梯级抓取",
-    period: "2025年1月中旬 – 2025年2月中旬",
+    period: "2026年4月30日 – 2026年5月1日",
     color: "border-l-violet-500",
     sections: [
       {
@@ -251,7 +251,7 @@ const VERSIONS: Version[] = [
     id: "v1",
     label: "v1.0",
     subtitle: "核心数据库与基础功能搭建",
-    period: "2024年12月 – 2025年1月中旬",
+    period: "2026年4月30日",
     color: "border-l-slate-500",
     sections: [
       {
