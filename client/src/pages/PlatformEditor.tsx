@@ -1031,10 +1031,40 @@ export default function PlatformEditor() {
               </div>
             )}
 
-            {/* Not in edit mode: show legacy rules from form.rules */}
+            {/* Not in edit mode: show AI-prefilled rules from form.rules */}
             {!isEdit && form.rules.length === 0 && (
               <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-lg">
-                保存平台后可在此管理规则文件
+                AI 填充后将自动预置规则文件链接，保存平台后可进行管理
+              </div>
+            )}
+            {!isEdit && form.rules.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">以下规则文件链接由 AI 自动爬取预置，保存后将导入数据库，可删除不需要的条目</p>
+                {form.rules.map((rule, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/20">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium">{rule.title || "未命名规则"}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{rule.type}</span>
+                        {rule.date && <span className="text-xs text-muted-foreground">{rule.date}</span>}
+                      </div>
+                      {rule.url && (
+                        <a href={rule.url} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline truncate block mt-0.5">
+                          {rule.url}
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
+                      title="删除此条规则"
+                      onClick={() => handleChange("rules", form.rules.filter((_, i) => i !== idx))}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 

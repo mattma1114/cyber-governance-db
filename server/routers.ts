@@ -1452,6 +1452,9 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const rows = await db.select().from(apiSettings);
+        const get = (key: string) => rows.find((r) => r.key === key)?.value ?? undefined;
+
+        // ── Step 1: LLM fills basic info (WITHOUT rules – those will be scraped) ──
         const systemPrompt = `You are a senior research analyst specializing in internet platform governance, digital regulation, and platform economics. Given a platform name or keyword, extract comprehensive information about the platform from your knowledge. Return a JSON object with ALL of the following fields:
 
 ## Basic Info
@@ -1478,19 +1481,12 @@ export const appRouter = router({
 - portrait_openness: string (openness level: 开放平台 | 半开放 | 封闭生态)
 - portrait_crossBorder: string (cross-border presence: 全球化运营 | 区域性平台 | 本土平台 | 出海扩张中)
 
-## Rules (major regulatory documents/policies, up to 5 most important)
-- rules: array of objects, each with:
-  - date: string (YYYY-MM-DD or YYYY-MM or YYYY)
-  - title: string (document title in Chinese)
-  - type: string (one of: privacy_policy | terms_of_service | community_guidelines | transparency_report | other)
-  - url: string (direct URL to the document)
-
 ## Timeline (key development milestones, 5-10 items)
 - timeline: array of objects, each with:
   - date: string (YYYY-MM-DD or YYYY-MM or YYYY)
   - event: string (milestone description in Chinese, 30-80 chars)
 
-Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real and verifiable.`;
+Return ONLY valid JSON, no markdown, no explanation.`;
         const response = await routeLlmForTask(rows, "PLATFORM_FILL", {
           messages: [
             { role: "system", content: systemPrompt },
@@ -1524,20 +1520,6 @@ Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real an
                   portrait_businessModel: { type: "array", items: { type: "string" } },
                   portrait_openness: { type: "string" },
                   portrait_crossBorder: { type: "string" },
-                  rules: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        date: { type: "string" },
-                        title: { type: "string" },
-                        type: { type: "string" },
-                        url: { type: "string" },
-                      },
-                      required: ["date", "title", "type", "url"],
-                      additionalProperties: false,
-                    },
-                  },
                   timeline: {
                     type: "array",
                     items: {
@@ -1551,14 +1533,140 @@ Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real an
                     },
                   },
                 },
-                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory", "portrait_types", "portrait_structure", "portrait_contentSource", "portrait_networkEffect", "portrait_businessModel", "portrait_openness", "portrait_crossBorder", "rules", "timeline"],
+                required: ["name", "nameEn", "website", "wikipediaUrl", "crunchbaseUrl", "description", "descriptionEn", "founded", "headquarters", "category", "tags", "profileFeatures", "developmentHistory", "portrait_types", "portrait_structure", "portrait_contentSource", "portrait_networkEffect", "portrait_businessModel", "portrait_openness", "portrait_crossBorder", "timeline"],
                 additionalProperties: false,
               },
             },
           },
         });
         const content = response.choices[0].message.content;
-        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+        const platformData = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+
+        // ── Step 2: Scrape official website to discover real rule document URLs ──
+        let rules: Array<{ date: string; title: string; type: string; url: string }> = [];
+        const websiteUrl: string = platformData.website || "";
+        if (websiteUrl) {
+          try {
+            // Scrape the official website homepage to find links to legal/policy pages
+            const scraped = await scrapeUrl(websiteUrl, {
+              firecrawlKey: get("FIRECRAWL_API_KEY"),
+              jinaKey: get("JINA_API_KEY"),
+              scrapingbeeKey: get("SCRAPINGBEE_API_KEY"),
+            });
+
+            // Ask LLM to extract real rule document URLs from the scraped page
+            const rulesPrompt = `You are analyzing the homepage content of ${platformData.nameEn} (${websiteUrl}).
+From the following scraped page content, identify and extract URLs for the platform's official legal/policy documents such as:
+- Privacy Policy
+- Terms of Service / Terms of Use
+- Community Guidelines / Community Standards
+- Transparency Report
+- Cookie Policy
+- Advertising Policy
+- Content Policy
+
+For each document found, return its direct URL (absolute URL). If a relative URL is found (e.g. /privacy), convert it to absolute using the base domain ${websiteUrl}.
+
+Scraped content:
+${scraped.markdown.slice(0, 8000)}
+
+Return a JSON array. Each item must have:
+- title: string (document name in Chinese, e.g. "隐私政策", "服务条款", "社区准则")
+- type: one of privacy_policy | terms_of_service | community_guidelines | transparency_report | other
+- url: string (the real, absolute URL found in the page)
+- date: string (use "" if unknown)
+
+Only include URLs that are clearly present in the scraped content. Do NOT invent or guess URLs. Return empty array if none found.`;
+
+            const rulesResp = await routeLlmForTask(rows, "PLATFORM_FILL", {
+              messages: [
+                { role: "system", content: rulesPrompt },
+                { role: "user", content: `Extract rule document URLs for ${platformData.nameEn}` },
+              ],
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "platform_rules",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      rules: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            date: { type: "string" },
+                            title: { type: "string" },
+                            type: { type: "string" },
+                            url: { type: "string" },
+                          },
+                          required: ["date", "title", "type", "url"],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["rules"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            });
+            const rulesContent = rulesResp.choices[0].message.content;
+            const parsed = JSON.parse(typeof rulesContent === "string" ? rulesContent : JSON.stringify(rulesContent));
+            rules = (parsed.rules || []).filter((r: { url: string }) => r.url && r.url.startsWith("http"));
+          } catch (e) {
+            console.warn("[extractPlatformByKeyword] Failed to scrape rules from website:", e instanceof Error ? e.message : e);
+          }
+
+          // ── Step 2b: If scraping homepage didn't yield enough rules, try common policy paths ──
+          if (rules.length < 2) {
+            const baseUrl = websiteUrl.replace(/\/$/, "");
+            // Try to scrape common policy page paths in parallel
+            const policyPaths = [
+              { path: "/privacy", type: "privacy_policy", title: "隐私政策" },
+              { path: "/legal/privacy", type: "privacy_policy", title: "隐私政策" },
+              { path: "/privacy-policy", type: "privacy_policy", title: "隐私政策" },
+              { path: "/terms", type: "terms_of_service", title: "服务条款" },
+              { path: "/legal/terms", type: "terms_of_service", title: "服务条款" },
+              { path: "/terms-of-service", type: "terms_of_service", title: "服务条款" },
+              { path: "/community-guidelines", type: "community_guidelines", title: "社区准则" },
+              { path: "/guidelines", type: "community_guidelines", title: "社区准则" },
+            ];
+
+            // Check which paths exist by doing HEAD requests (fast, no body needed)
+            const headChecks = await Promise.allSettled(
+              policyPaths.map(async (p) => {
+                const url = `${baseUrl}${p.path}`;
+                const res = await fetch(url, {
+                  method: "HEAD",
+                  signal: AbortSignal.timeout(5000),
+                  headers: { "User-Agent": "Mozilla/5.0 (compatible; CyberGovDB/1.0)" },
+                });
+                if (res.ok || res.status === 405) {
+                  // 405 = Method Not Allowed but URL exists
+                  return { ...p, url };
+                }
+                throw new Error(`HTTP ${res.status}`);
+              })
+            );
+
+            const existingPaths = headChecks
+              .map((r, i) => r.status === "fulfilled" ? r.value : null)
+              .filter((r): r is NonNullable<typeof r> => r !== null);
+
+            // Merge with already-found rules, avoiding duplicates by type
+            const existingTypes = new Set(rules.map((r) => r.type));
+            for (const p of existingPaths) {
+              if (!existingTypes.has(p.type)) {
+                rules.push({ date: "", title: p.title, type: p.type, url: p.url });
+                existingTypes.add(p.type);
+              }
+            }
+          }
+        }
+
+        return { ...platformData, rules };
       }),
 
     // Extract case info from URL
