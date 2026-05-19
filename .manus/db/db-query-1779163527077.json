@@ -1,0 +1,66 @@
+{
+  "query": "DESCRIBE jurisdictions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute DESCRIBE jurisdictions;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "varchar(64)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "label",
+      "Type": "varchar(128)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "labelEn",
+      "Type": "varchar(128)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "flag",
+      "Type": "varchar(16)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "color",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "sortOrder",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tvarchar(64)\tNO\tPRI\tNULL\t\nlabel\tvarchar(128)\tNO\t\tNULL\t\nlabelEn\tvarchar(128)\tYES\t\tNULL\t\nflag\tvarchar(16)\tYES\t\tNULL\t\ncolor\tvarchar(64)\tYES\t\tNULL\t\nsortOrder\tint\tYES\t\t0\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\n",
+  "stderr": "",
+  "execution_time_ms": 1778
+}

@@ -1,0 +1,30 @@
+{
+  "query": "\nSELECT \n  j.id,\n  j.label,\n  COUNT(DISTINCT p.id) as platform_count\nFROM jurisdictions j\nLEFT JOIN platforms p ON JSON_CONTAINS(p.jurisdiction, JSON_QUOTE(j.id)) AND p.status = 'published'\nGROUP BY j.id, j.label\nORDER BY j.sortOrder;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute \nSELECT \n  j.id,\n  j.label,\n  COUNT(DISTINCT p.id) as platform_count\nFROM jurisdictions j\nLEFT JOIN platforms p ON JSON_CONTAINS(p.jurisdiction, JSON_QUOTE(j.id)) AND p.status = 'published'\nGROUP BY j.id, j.label\nORDER BY j.sortOrder;\n",
+  "rows": [
+    {
+      "id": "cn",
+      "label": "中国",
+      "platform_count": "2"
+    },
+    {
+      "id": "eu",
+      "label": "欧盟",
+      "platform_count": "4"
+    },
+    {
+      "id": "us",
+      "label": "美国",
+      "platform_count": "4"
+    },
+    {
+      "id": "other",
+      "label": "其他",
+      "platform_count": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tlabel\tplatform_count\ncn\t中国\t2\neu\t欧盟\t4\nus\t美国\t4\nother\t其他\t0\n",
+  "stderr": "",
+  "execution_time_ms": 1776
+}

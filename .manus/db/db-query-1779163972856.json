@@ -1,0 +1,112 @@
+{
+  "query": "SELECT id, name, hq, jurisdiction FROM platforms WHERE status = 'published' AND jurisdiction NOT LIKE '%cn%' AND jurisdiction NOT LIKE '%us%' AND jurisdiction NOT LIKE '%eu%' AND jurisdiction NOT LIKE '%other%' ORDER BY id LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT id, name, hq, jurisdiction FROM platforms WHERE status = 'published' AND jurisdiction NOT LIKE '%cn%' AND jurisdiction NOT LIKE '%us%' AND jurisdiction NOT LIKE '%eu%' AND jurisdiction NOT LIKE '%other%' ORDER BY id LIMIT 20;",
+  "rows": [
+    {
+      "id": "hugging-face",
+      "name": "Hugging Face",
+      "hq": "纽约，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "kakao",
+      "name": "Kakao",
+      "hq": "济州岛，韩国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "linkedin01",
+      "name": "领英",
+      "hq": "桑尼维尔，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "mistral-ai",
+      "name": "Mistral AI",
+      "hq": "巴黎，法国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "modelbest",
+      "name": "魔搭社区",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "moonshot-ai",
+      "name": "月之暗面",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "naver",
+      "name": "Naver",
+      "hq": "城南市，韩国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "netease",
+      "name": "网易",
+      "hq": "杭州，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "pdd",
+      "name": "拼多多",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "perplexity-ai",
+      "name": "Perplexity AI",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "rakuten",
+      "name": "乐天",
+      "hq": "东京，日本",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "sea-limited",
+      "name": "冬海集团",
+      "hq": "新加坡，新加坡",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "shein",
+      "name": "希音",
+      "hq": "新加坡，新加坡",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "xai",
+      "name": "xAI",
+      "hq": "大西雅图地区，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "xiaohongshu",
+      "name": "小红书",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "zhipu-ai",
+      "name": "智谱AI",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\thq\tjurisdiction\nhugging-face\tHugging Face\t纽约，美国\t[]\nkakao\tKakao\t济州岛，韩国\t[]\nlinkedin01\t领英\t桑尼维尔，美国\t[]\nminimax\tMiniMax\t上海，中国\t[]\nmistral-ai\tMistral AI\t巴黎，法国\t[]\nmodelbest\t魔搭社区\t上海，中国\t[]\nmoonshot-ai\t月之暗面\t北京，中国\t[]\nnaver\tNaver\t城南市，韩国\t[]\nnetease\t网易\t杭州，中国\t[]\npdd\t拼多多\t上海，中国\t[]\nperplexity-ai\tPerplexity AI\t旧金山，美国\t[]\nrakuten\t乐天\t东京，日本\t[]\nsea-limited\t冬海集团\t新加坡，新加坡\t[]\nshein\t希音\t新加坡，新加坡\t[]\nxai\txAI\t大西雅图地区，美国\t[]\nxiaohongshu\t小红书\t上海，中国\t[]\nzhipu-ai\t智谱AI\t北京，中国\t[]\n",
+  "stderr": "",
+  "execution_time_ms": 1759
+}

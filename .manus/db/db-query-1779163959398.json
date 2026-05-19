@@ -1,0 +1,38 @@
+{
+  "query": "SELECT \n  CASE \n    WHEN jurisdiction LIKE '%\"cn\"%' AND jurisdiction LIKE '%\"us\"%' THEN 'cn+us'\n    WHEN jurisdiction LIKE '%\"us\"%' AND jurisdiction LIKE '%\"eu\"%' THEN 'us+eu'\n    WHEN jurisdiction LIKE '%\"cn\"%' THEN 'cn'\n    WHEN jurisdiction LIKE '%\"us\"%' THEN 'us'\n    WHEN jurisdiction LIKE '%\"eu\"%' THEN 'eu'\n    WHEN jurisdiction LIKE '%\"other\"%' THEN 'other'\n    ELSE 'empty'\n  END as juris_group,\n  COUNT(*) as count\nFROM platforms\nWHERE status = 'published'\nGROUP BY juris_group\nORDER BY count DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT \n  CASE \n    WHEN jurisdiction LIKE '%\"cn\"%' AND jurisdiction LIKE '%\"us\"%' THEN 'cn+us'\n    WHEN jurisdiction LIKE '%\"us\"%' AND jurisdiction LIKE '%\"eu\"%' THEN 'us+eu'\n    WHEN jurisdiction LIKE '%\"cn\"%' THEN 'cn'\n    WHEN jurisdiction LIKE '%\"us\"%' THEN 'us'\n    WHEN jurisdiction LIKE '%\"eu\"%' THEN 'eu'\n    WHEN jurisdiction LIKE '%\"other\"%' THEN 'other'\n    ELSE 'empty'\n  END as juris_group,\n  COUNT(*) as count\nFROM platforms\nWHERE status = 'published'\nGROUP BY juris_group\nORDER BY count DESC;",
+  "rows": [
+    {
+      "juris_group": "empty",
+      "count": "17"
+    },
+    {
+      "juris_group": "cn",
+      "count": "11"
+    },
+    {
+      "juris_group": "us",
+      "count": "8"
+    },
+    {
+      "juris_group": "us+eu",
+      "count": "4"
+    },
+    {
+      "juris_group": "other",
+      "count": "3"
+    },
+    {
+      "juris_group": "eu",
+      "count": "1"
+    },
+    {
+      "juris_group": "cn+us",
+      "count": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "juris_group\tcount\nempty\t17\ncn\t11\nus\t8\nus+eu\t4\nother\t3\neu\t1\ncn+us\t1\n",
+  "stderr": "",
+  "execution_time_ms": 1767
+}

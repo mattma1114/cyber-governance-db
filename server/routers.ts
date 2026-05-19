@@ -1255,6 +1255,29 @@ export const appRouter = router({
         return { success: true, count: input.ids.length };
       }),
 
+    // Batch fill jurisdiction for platforms with empty jurisdiction
+    batchFillJurisdiction: adminProcedure
+      .mutation(async () => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const allPlatforms = await db.select({ id: platforms.id, name: platforms.name, hq: platforms.hq }).from(platforms);
+        const inferJurisdiction = (hq: string | null | undefined, name: string): string[] => {
+          const h = (hq || name || "").toLowerCase();
+          const result: string[] = [];
+          if (h.includes("中国") || h.includes("china") || h.includes("beijing") || h.includes("shanghai") || h.includes("shenzhen") || h.includes("hangzhou") || h.includes("北京") || h.includes("上海") || h.includes("深圳") || h.includes("杭州") || h.includes("广州") || h.includes("成都")) result.push("cn");
+          if (h.includes("germany") || h.includes("france") || h.includes("netherlands") || h.includes("ireland") || h.includes("europe") || h.includes("欧盟") || h.includes("欧洲") || h.includes("德国") || h.includes("法国") || h.includes("荷兰") || h.includes("amsterdam") || h.includes("berlin") || h.includes("paris") || h.includes("dublin")) result.push("eu");
+          if (h.includes("美国") || h.includes("united states") || h.includes("california") || h.includes("new york") || h.includes("seattle") || h.includes("san francisco") || h.includes("加利福尼亚") || h.includes("纽约") || h.includes("西雅图")) result.push("us");
+          return result.length > 0 ? result : ["other"];
+        };
+        let count = 0;
+        for (const p of allPlatforms) {
+          const juris = inferJurisdiction(p.hq, p.name);
+          await db.update(platforms).set({ jurisdiction: juris }).where(eq(platforms.id, p.id));
+          count++;
+        }
+        return { success: true, count };
+      }),
+
     // ── Export platform profile as PDF or Word ─────────────────────────
     exportProfile: publicProcedure
       .input(z.object({
@@ -1553,7 +1576,78 @@ Return ONLY valid JSON, no markdown, no explanation. Ensure all URLs are real an
           },
         });
         const content = response.choices[0].message.content;
-        return JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+        const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+
+        // Auto-generate platform ID from English name or keyword
+        const generateId = (name: string): string => {
+          return name
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+            .slice(0, 32);
+        };
+        const rawId = parsed.nameEn || input.keyword;
+        parsed.suggestedId = generateId(rawId);
+
+        // Auto-infer jurisdiction from headquarters
+        const hq = (parsed.headquarters || "").toLowerCase();
+        const inferredJurisdictions: string[] = [];
+        if (hq.includes("中国") || hq.includes("china") || hq.includes("beijing") || hq.includes("shanghai") || hq.includes("shenzhen") || hq.includes("hangzhou") || hq.includes("北京") || hq.includes("上海") || hq.includes("深圳") || hq.includes("杭州") || hq.includes("广州") || hq.includes("成都")) {
+          inferredJurisdictions.push("cn");
+        }
+        if (hq.includes("eu") || hq.includes("europe") || hq.includes("欧盟") || hq.includes("欧洲") || hq.includes("germany") || hq.includes("france") || hq.includes("netherlands") || hq.includes("ireland") || hq.includes("luxembourg") || hq.includes("德国") || hq.includes("法国") || hq.includes("荷兰") || hq.includes("爱尔兰")) {
+          inferredJurisdictions.push("eu");
+        }
+        if (hq.includes("us") || hq.includes("united states") || hq.includes("america") || hq.includes("美国") || hq.includes("california") || hq.includes("new york") || hq.includes("seattle") || hq.includes("san francisco") || hq.includes("加利福尼亚") || hq.includes("纽约") || hq.includes("西雅图")) {
+          inferredJurisdictions.push("us");
+        }
+        // Platforms operating globally or in SEA/other regions
+        if (inferredJurisdictions.length === 0) {
+          inferredJurisdictions.push("other");
+        }
+        parsed.inferredJurisdiction = inferredJurisdictions;
+
+        return parsed;
+      }),
+
+    // Batch fill jurisdiction for platforms with empty jurisdiction
+    batchFillJurisdiction: adminProcedure
+      .mutation(async () => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Get all platforms with empty jurisdiction
+        const allPlatforms = await db.select({ id: platforms.id, name: platforms.name, hq: platforms.hq, company: platforms.company }).from(platforms);
+        const emptyJurisPlatforms = allPlatforms.filter((p) => {
+          try {
+            const j = p.hq ? null : null; // we'll infer from hq
+            return true; // process all
+          } catch { return true; }
+        });
+
+        const inferJurisdiction = (hq: string | null | undefined, name: string): string[] => {
+          const h = (hq || name || "").toLowerCase();
+          const result: string[] = [];
+          if (h.includes("中国") || h.includes("china") || h.includes("beijing") || h.includes("shanghai") || h.includes("shenzhen") || h.includes("hangzhou") || h.includes("北京") || h.includes("上海") || h.includes("深圳") || h.includes("杭州") || h.includes("广州") || h.includes("成都") || h.includes("腾讯") || h.includes("阿里") || h.includes("百度") || h.includes("字节") || h.includes("华为") || h.includes("小米") || h.includes("京东") || h.includes("美团") || h.includes("滴滴") || h.includes("哔哩") || h.includes("网易") || h.includes("新浪") || h.includes("搜狐") || h.includes("微博") || h.includes("微信") || h.includes("抖音") || h.includes("快手")) {
+            result.push("cn");
+          }
+          if (h.includes("germany") || h.includes("france") || h.includes("netherlands") || h.includes("ireland") || h.includes("luxembourg") || h.includes("eu") || h.includes("europe") || h.includes("欧盟") || h.includes("欧洲") || h.includes("德国") || h.includes("法国") || h.includes("荷兰") || h.includes("爱尔兰") || h.includes("sap") || h.includes("adyen") || h.includes("booking") || h.includes("amsterdam") || h.includes("berlin") || h.includes("paris") || h.includes("dublin")) {
+            result.push("eu");
+          }
+          if (h.includes("us") || h.includes("united states") || h.includes("america") || h.includes("美国") || h.includes("california") || h.includes("new york") || h.includes("seattle") || h.includes("san francisco") || h.includes("menlo park") || h.includes("cupertino") || h.includes("mountain view") || h.includes("加利福尼亚") || h.includes("纽约") || h.includes("西雅图") || h.includes("google") || h.includes("apple") || h.includes("meta") || h.includes("amazon") || h.includes("microsoft") || h.includes("netflix") || h.includes("twitter") || h.includes("x corp") || h.includes("openai") || h.includes("anthropic") || h.includes("uber") || h.includes("airbnb") || h.includes("linkedin") || h.includes("adobe") || h.includes("salesforce") || h.includes("oracle")) {
+            result.push("us");
+          }
+          return result.length > 0 ? result : ["other"];
+        };
+
+        let updated = 0;
+        for (const p of emptyJurisPlatforms) {
+          const juris = inferJurisdiction(p.hq, p.name);
+          await db.update(platforms).set({ jurisdiction: juris }).where(eq(platforms.id, p.id));
+          updated++;
+        }
+        return { success: true, updated };
       }),
 
     // Extract case info from URL

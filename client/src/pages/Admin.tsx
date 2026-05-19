@@ -1729,6 +1729,13 @@ export default function Admin() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+  const platformBatchFillJurisdiction = trpc.platforms.batchFillJurisdiction.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(`已为 ${data.count} 个平台补全辖区信息`);
+      utils.platforms.listAdmin.invalidate();
+    },
+    onError: (e: any) => toast.error(`辖区补全失败：${e.message}`),
+  });
 
   const [refetchingFullText, setRefetchingFullText] = useState(false);
   const [batchParseDialog, setBatchParseDialog] = useState<{
@@ -2164,6 +2171,18 @@ export default function Admin() {
                   </DropdownMenu>
                 </div>
               )}
+              <Button
+                size="sm" variant="outline" className="gap-1.5 h-8"
+                disabled={platformBatchFillJurisdiction.isPending}
+                onClick={() => platformBatchFillJurisdiction.mutate()}
+                title="根据各平台总部所在地自动推断并补全辖区字段"
+              >
+                {platformBatchFillJurisdiction.isPending ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" />补全中…</>
+                ) : (
+                  <><Globe className="w-3.5 h-3.5" />补全辖区</>
+                )}
+              </Button>
               <Button size="sm" className="gap-1.5 h-8" onClick={() => navigate("/admin/platforms/new")}>
                 <Plus className="w-4 h-4" />新增平台
               </Button>

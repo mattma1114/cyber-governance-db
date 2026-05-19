@@ -1,0 +1,130 @@
+{
+  "query": "SELECT id, name, jurisdiction, status FROM platforms ORDER BY id LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT id, name, jurisdiction, status FROM platforms ORDER BY id LIMIT 20;",
+  "rows": [
+    {
+      "id": "01.ai",
+      "name": "零一万物",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "360",
+      "name": "奇虎360",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "4paradigm",
+      "name": "第四范式",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "adobe",
+      "name": "Adobe",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "adyen",
+      "name": "Adyen",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "airbnb",
+      "name": "爱彼迎",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "alibaba",
+      "name": "阿里巴巴集团",
+      "jurisdiction": "[\"cn\", \"sea\"]",
+      "status": "published"
+    },
+    {
+      "id": "ant-group",
+      "name": "蚂蚁集团",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "apple",
+      "name": "Apple（App Store / iOS）",
+      "jurisdiction": "[\"us\", \"eu\"]",
+      "status": "published"
+    },
+    {
+      "id": "baichuan-ai",
+      "name": "百川智能",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "baidu",
+      "name": "百度",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "bilibili",
+      "name": "哔哩哔哩",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "booking",
+      "name": "缤客控股",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "coreweave",
+      "name": "CoreWeave",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "coupang",
+      "name": "酷澎",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "databricks",
+      "name": "Databricks",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "deepseek2",
+      "name": "深度求索",
+      "jurisdiction": "[]",
+      "status": "published"
+    },
+    {
+      "id": "dji",
+      "name": "大疆创新",
+      "jurisdiction": "[]",
+      "status": "unpublished"
+    },
+    {
+      "id": "google",
+      "name": "Google（搜索 / YouTube / Android）",
+      "jurisdiction": "[\"us\", \"eu\", \"sea\"]",
+      "status": "published"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tjurisdiction\tstatus\n01.ai\t零一万物\t[]\tpublished\n360\t奇虎360\t[]\tunpublished\n4paradigm\t第四范式\t[]\tunpublished\nadobe\tAdobe\t[]\tpublished\nadyen\tAdyen\t[]\tunpublished\nairbnb\t爱彼迎\t[]\tpublished\nalibaba\t阿里巴巴集团\t[\"cn\", \"sea\"]\tpublished\nant-group\t蚂蚁集团\t[]\tpublished\nanthropic\tAnthropic\t[]\tpublished\napple\tApple（App Store / iOS）\t[\"us\", \"eu\"]\tpublished\nbaichuan-ai\t百川智能\t[]\tunpublished\nbaidu\t百度\t[]\tpublished\nbilibili\t哔哩哔哩\t[]\tpublished\nbooking\t缤客控股\t[]\tpublished\ncoreweave\tCoreWeave\t[]\tunpublished\ncoupang\t酷澎\t[]\tpublished\ndatabricks\tDatabricks\t[]\tunpublished\ndeepseek2\t深度求索\t[]\tpublished\ndji\t大疆创新\t[]\tunpublished\ngoogle\tGoogle（搜索 / YouTube / Android）\t[\"us\", \"eu\", \"sea\"]\tpublished\n",
+  "stderr": "",
+  "execution_time_ms": 1856
+}

@@ -1,0 +1,418 @@
+{
+  "query": "SELECT id, name, hq, jurisdiction FROM platforms ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT id, name, hq, jurisdiction FROM platforms ORDER BY id;",
+  "rows": [
+    {
+      "id": "01.ai",
+      "name": "零一万物",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "360",
+      "name": "奇虎360",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "4paradigm",
+      "name": "第四范式",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "adobe",
+      "name": "Adobe",
+      "hq": "圣何塞，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "adyen",
+      "name": "Adyen",
+      "hq": "阿姆斯特丹，荷兰",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "airbnb",
+      "name": "爱彼迎",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "alibaba",
+      "name": "阿里巴巴集团",
+      "hq": "中国浙江杭州",
+      "jurisdiction": "[\"cn\", \"sea\"]"
+    },
+    {
+      "id": "ant-group",
+      "name": "蚂蚁集团",
+      "hq": "杭州，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "apple",
+      "name": "Apple（App Store / iOS）",
+      "hq": "美国加利福尼亚州库比蒂诺",
+      "jurisdiction": "[\"us\", \"eu\"]"
+    },
+    {
+      "id": "baichuan-ai",
+      "name": "百川智能",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "baidu",
+      "name": "百度",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "bilibili",
+      "name": "哔哩哔哩",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "booking",
+      "name": "缤客控股",
+      "hq": "诺沃克，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "coreweave",
+      "name": "CoreWeave",
+      "hq": "Roseland，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "coupang",
+      "name": "酷澎",
+      "hq": "首尔，韩国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "databricks",
+      "name": "Databricks",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "deepseek2",
+      "name": "深度求索",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "dji",
+      "name": "大疆创新",
+      "hq": "深圳，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "google",
+      "name": "Google（搜索 / YouTube / Android）",
+      "hq": "美国加利福尼亚州山景城",
+      "jurisdiction": "[\"us\", \"eu\", \"sea\"]"
+    },
+    {
+      "id": "goto-group",
+      "name": "GoTo集团",
+      "hq": "雅加达，印度尼西亚",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "grab",
+      "name": "Grab",
+      "hq": "新加坡，新加坡",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "horizon",
+      "name": "地平线",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "huawei",
+      "name": "华为",
+      "hq": "深圳，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "hugging-face",
+      "name": "Hugging Face",
+      "hq": "纽约，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "iflytek",
+      "name": "科大讯飞",
+      "hq": "合肥，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "jd",
+      "name": "京东",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "kakao",
+      "name": "Kakao",
+      "hq": "济州岛，韩国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "kuaishou",
+      "name": "快手",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "lenovo",
+      "name": "联想",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "linkedin01",
+      "name": "领英",
+      "hq": "桑尼维尔，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "meituan",
+      "name": "美团",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "meta",
+      "name": "Meta（Facebook / Instagram / WhatsApp）",
+      "hq": "美国加利福尼亚州门洛帕克",
+      "jurisdiction": "[\"us\", \"eu\", \"sea\"]"
+    },
+    {
+      "id": "microsoft",
+      "name": "微软",
+      "hq": "雷德蒙德，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "mihoyo",
+      "name": "米哈游",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "mistral-ai",
+      "name": "Mistral AI",
+      "hq": "巴黎，法国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "modelbest",
+      "name": "魔搭社区",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "momenta",
+      "name": "Momenta",
+      "hq": "苏州，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "moonshot-ai",
+      "name": "月之暗面",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "naver",
+      "name": "Naver",
+      "hq": "城南市，韩国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "netease",
+      "name": "网易",
+      "hq": "杭州，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "netflix",
+      "name": "奈飞",
+      "hq": "洛斯加托斯，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "nvidia",
+      "name": "英伟达",
+      "hq": "圣克拉拉，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "oracle",
+      "name": "甲骨文公司",
+      "hq": "奥斯汀，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "pdd",
+      "name": "拼多多",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "perplexity-ai",
+      "name": "Perplexity AI",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "pony.ai",
+      "name": "小马智行",
+      "hq": "广州，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "rakuten",
+      "name": "乐天",
+      "hq": "东京，日本",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "samsung",
+      "name": "三星电子",
+      "hq": "水原市，韩国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "sea-limited",
+      "name": "冬海集团",
+      "hq": "新加坡，新加坡",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "sensetime",
+      "name": "商汤科技",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "shein",
+      "name": "希音",
+      "hq": "新加坡，新加坡",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "shopify",
+      "name": "Shopify",
+      "hq": "渥太华，加拿大",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "snowflake",
+      "name": "Snowflake",
+      "hq": "博兹曼，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "sony",
+      "name": "索尼",
+      "hq": "东京，日本",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "hq": "斯德哥尔摩，瑞典",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "tencent",
+      "name": "腾讯",
+      "hq": "深圳，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "tesla",
+      "name": "特斯拉",
+      "hq": "奥斯汀，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "tiktok",
+      "name": "TikTok / 抖音",
+      "hq": "中国北京",
+      "jurisdiction": "[\"cn\", \"us\", \"eu\", \"sea\"]"
+    },
+    {
+      "id": "uber",
+      "name": "优步",
+      "hq": "旧金山，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "ubtech",
+      "name": "优必选",
+      "hq": "深圳，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "weibo",
+      "name": "微博",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "xai",
+      "name": "xAI",
+      "hq": "大西雅图地区，美国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "xiaohongshu",
+      "name": "小红书",
+      "hq": "上海，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "xiaomi",
+      "name": "小米",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    },
+    {
+      "id": "zhipu-ai",
+      "name": "智谱AI",
+      "hq": "北京，中国",
+      "jurisdiction": "[]"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\thq\tjurisdiction\n01.ai\t零一万物\t北京，中国\t[]\n360\t奇虎360\t北京，中国\t[]\n4paradigm\t第四范式\t北京，中国\t[]\nadobe\tAdobe\t圣何塞，美国\t[]\nadyen\tAdyen\t阿姆斯特丹，荷兰\t[]\nairbnb\t爱彼迎\t旧金山，美国\t[]\nalibaba\t阿里巴巴集团\t中国浙江杭州\t[\"cn\", \"sea\"]\nant-group\t蚂蚁集团\t杭州，中国\t[]\nanthropic\tAnthropic\t旧金山，美国\t[]\napple\tApple（App Store / iOS）\t美国加利福尼亚州库比蒂诺\t[\"us\", \"eu\"]\nbaichuan-ai\t百川智能\t北京，中国\t[]\nbaidu\t百度\t北京，中国\t[]\nbilibili\t哔哩哔哩\t上海，中国\t[]\nbooking\t缤客控股\t诺沃克，美国\t[]\ncoreweave\tCoreWeave\tRoseland，美国\t[]\ncoupang\t酷澎\t首尔，韩国\t[]\ndatabricks\tDatabricks\t旧金山，美国\t[]\ndeepseek2\t深度求索\t北京，中国\t[]\ndji\t大疆创新\t深圳，中国\t[]\ngoogle\tGoogle（搜索 / YouTube / Android）\t美国加利福尼亚州山景城\t[\"us\", \"eu\", \"sea\"]\ngoto-group\tGoTo集团\t雅加达，印度尼西亚\t[]\ngrab\tGrab\t新加坡，新加坡\t[]\nhorizon\t地平线\t北京，中国\t[]\nhuawei\t华为\t深圳，中国\t[]\nhugging-face\tHugging Face\t纽约，美国\t[]\niflytek\t科大讯飞\t合肥，中国\t[]\njd\t京东\t北京，中国\t[]\nkakao\tKakao\t济州岛，韩国\t[]\nkuaishou\t快手\t北京，中国\t[]\nlenovo\t联想\t北京，中国\t[]\nlinkedin01\t领英\t桑尼维尔，美国\t[]\nmeituan\t美团\t北京，中国\t[]\nmeta\tMeta（Facebook / Instagram / WhatsApp）\t美国加利福尼亚州门洛帕克\t[\"us\", \"eu\", \"sea\"]\nmicrosoft\t微软\t雷德蒙德，美国\t[]\nmihoyo\t米哈游\t上海，中国\t[]\nminimax\tMiniMax\t上海，中国\t[]\nmistral-ai\tMistral AI\t巴黎，法国\t[]\nmodelbest\t魔搭社区\t上海，中国\t[]\nmomenta\tMomenta\t苏州，中国\t[]\nmoonshot-ai\t月之暗面\t北京，中国\t[]\nnaver\tNaver\t城南市，韩国\t[]\nnetease\t网易\t杭州，中国\t[]\nnetflix\t奈飞\t洛斯加托斯，美国\t[]\nnvidia\t英伟达\t圣克拉拉，美国\t[]\nopenai\tOpenAI\t旧金山，美国\t[]\noracle\t甲骨文公司\t奥斯汀，美国\t[]\npdd\t拼多多\t上海，中国\t[]\nperplexity-ai\tPerplexity AI\t旧金山，美国\t[]\npony.ai\t小马智行\t广州，中国\t[]\nrakuten\t乐天\t东京，日本\t[]\nsamsung\t三星电子\t水原市，韩国\t[]\nsea-limited\t冬海集团\t新加坡，新加坡\t[]\nsensetime\t商汤科技\t上海，中国\t[]\nshein\t希音\t新加坡，新加坡\t[]\nshopify\tShopify\t渥太华，加拿大\t[]\nsnowflake\tSnowflake\t博兹曼，美国\t[]\nsony\t索尼\t东京，日本\t[]\nspotify\tSpotify\t斯德哥尔摩，瑞典\t[]\ntencent\t腾讯\t深圳，中国\t[]\ntesla\t特斯拉\t奥斯汀，美国\t[]\ntiktok\tTikTok / 抖音\t中国北京\t[\"cn\", \"us\", \"eu\", \"sea\"]\nuber\t优步\t旧金山，美国\t[]\nubtech\t优必选\t深圳，中国\t[]\nweibo\t微博\t北京，中国\t[]\nxai\txAI\t大西雅图地区，美国\t[]\nxiaohongshu\t小红书\t上海，中国\t[]\nxiaomi\t小米\t北京，中国\t[]\nzhipu-ai\t智谱AI\t北京，中国\t[]\n",
+  "stderr": "",
+  "execution_time_ms": 1719
+}

@@ -1,0 +1,18 @@
+{
+  "query": "SELECT \n  COUNT(*) as total_platforms,\n  SUM(CASE WHEN jurisdiction IS NOT NULL AND jurisdiction != '[]' AND jurisdiction != '' THEN 1 ELSE 0 END) as has_jurisdiction,\n  SUM(CASE WHEN jurisdiction LIKE '%\"cn\"%' THEN 1 ELSE 0 END) as cn_count,\n  SUM(CASE WHEN jurisdiction LIKE '%\"us\"%' THEN 1 ELSE 0 END) as us_count,\n  SUM(CASE WHEN jurisdiction LIKE '%\"eu\"%' THEN 1 ELSE 0 END) as eu_count,\n  SUM(CASE WHEN jurisdiction LIKE '%\"other\"%' THEN 1 ELSE 0 END) as other_count\nFROM platforms;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2z1gdt7DDoC5w33.7125c4d7ce0b --database XAbbAijNEYDpVewPfSw4kC --execute SELECT \n  COUNT(*) as total_platforms,\n  SUM(CASE WHEN jurisdiction IS NOT NULL AND jurisdiction != '[]' AND jurisdiction != '' THEN 1 ELSE 0 END) as has_jurisdiction,\n  SUM(CASE WHEN jurisdiction LIKE '%\"cn\"%' THEN 1 ELSE 0 END) as cn_count,\n  SUM(CASE WHEN jurisdiction LIKE '%\"us\"%' THEN 1 ELSE 0 END) as us_count,\n  SUM(CASE WHEN jurisdiction LIKE '%\"eu\"%' THEN 1 ELSE 0 END) as eu_count,\n  SUM(CASE WHEN jurisdiction LIKE '%\"other\"%' THEN 1 ELSE 0 END) as other_count\nFROM platforms;",
+  "rows": [
+    {
+      "total_platforms": "68",
+      "has_jurisdiction": "68",
+      "cn_count": "25",
+      "us_count": "20",
+      "eu_count": "7",
+      "other_count": "9"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_platforms\thas_jurisdiction\tcn_count\tus_count\teu_count\tother_count\n68\t68\t25\t20\t7\t9\n",
+  "stderr": "",
+  "execution_time_ms": 1800
+}

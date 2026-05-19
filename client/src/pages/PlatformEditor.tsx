@@ -217,6 +217,7 @@ export default function PlatformEditor() {
       setForm((prev) => ({
         ...prev,
         // 基本信息
+        id: (!prev.id && data.suggestedId) ? data.suggestedId : prev.id,
         name: data.name || prev.name,
         company: data.nameEn || data.name || prev.company,
         hq: data.headquarters || prev.hq,
@@ -227,6 +228,8 @@ export default function PlatformEditor() {
         crunchbaseUrl: data.crunchbaseUrl || prev.crunchbaseUrl,
         profileFeatures: data.profileFeatures || prev.profileFeatures,
         developmentHistory: data.developmentHistory || prev.developmentHistory,
+        // 辖区（根据总部自动推断，仅在未手动设置时填充）
+        jurisdiction: (!prev.jurisdiction?.length && data.inferredJurisdiction?.length) ? data.inferredJurisdiction : prev.jurisdiction,
         // 画像特征
         portrait: {
           types: data.portrait_types?.length ? data.portrait_types : (data.tags?.slice(0, 3) || prev.portrait.types),

@@ -339,3 +339,10 @@
 - [x] 一键获取 URL 后自动将爬取的 fullContent 填充到 Textarea，用户可手工修订
 - [x] 上传文件后自动解析并填充 Textarea，用户可手工修订
 - [x] Textarea 显示字符数统计，支持清除全文按鈕
+
+## 平台辖区数量统计修复（当前迭代）
+- [x] 后端：新增 platforms.batchFillJurisdiction 路由，根据 hq 字段推断辖区并批量写入
+- [x] 后端：修复 AI 一键填充（extractPlatformByKeyword）时自动生成平台 ID（suggestedId）
+- [x] 后端： AI 填充时根据 hq 字段自动推断并填写 jurisdiction 字段（inferredJurisdiction）
+- [x] 前端 Admin.tsx：平台管理 Tab 新增「补全辖区」按鈕，触发后端批量补全
+- [x] 批量 SQL 写入 68 个现有平台的辖区数据，覆盖率 100%
