@@ -331,3 +331,11 @@
 - [x] 前端：支持全选/多选 Checkbox + 批量操作工具栏（批量发布/下架/删除）
 - [x] 前端：删除操作添加确认弹窗（单条/批量）
 - [x] 前台 Platforms.tsx：只展示 status=published 的平台
+
+## 平台规则卡片「正文内容」区域（当前迭代）
+- [x] 分析 PlatformEditor.tsx 规则卡片结构，确认 fullContent 字段是否已存在于 schema
+- [x] 后端：新增 platforms.parseRuleFile 路由，接收上传文件（PDF/Word/TXT），解析并返回文本内容
+- [x] 前端规则卡片：在 URL 行下方新增「规则正文」区域，包含文件上传按鈕（PDF/Word/TXT）和可编辑 Textarea
+- [x] 一键获取 URL 后自动将爬取的 fullContent 填充到 Textarea，用户可手工修订
+- [x] 上传文件后自动解析并填充 Textarea，用户可手工修订
+- [x] Textarea 显示字符数统计，支持清除全文按鈕

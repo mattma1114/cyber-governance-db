@@ -326,6 +326,8 @@ export default function PlatformEditor() {
   };
 
   const [scrapingRuleIdx, setScrapingRuleIdx] = useState<number | null>(null);
+  const [parsingRuleFileIdx, setParsingRuleFileIdx] = useState<number | null>(null);
+  const parseRuleFileMutation = trpc.scraper.parseRuleFile.useMutation();
   const scrapeUrlMutation = trpc.scraper.scrapeUrl.useMutation({
     onSuccess: (data, variables) => {
       // Find the rule index by matching the URL
@@ -875,36 +877,94 @@ export default function PlatformEditor() {
                     </div>
                   </div>
                 </div>
-                {/* Full text preview */}
-                {rule.fullText ? (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs flex items-center gap-1.5">
+                {/* Full text content area - always visible, editable */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs flex items-center gap-1.5">
+                      {rule.fullText ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
                           <Zap className="w-3 h-3" />
-                          全文已获取
+                          规则正文
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">规则正文</span>
+                      )}
+                      {rule.fullText && (
                         <span className="text-muted-foreground font-normal">（{rule.fullText.length.toLocaleString()} 字符）</span>
-                      </Label>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 text-xs text-muted-foreground hover:text-destructive"
-                        onClick={() => updateRule(idx, "fullText" as any, "")}
+                      )}
+                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      {/* File upload button */}
+                      <label
+                        htmlFor={`rule-file-upload-${idx}`}
+                        className="cursor-pointer inline-flex items-center gap-1 h-6 px-2 text-xs rounded border border-border bg-background hover:bg-muted transition-colors"
+                        title="上传 PDF / TXT 文件，自动解析为文本"
                       >
-                        清除全文
-                      </Button>
-                    </div>
-                    <div className="rounded border border-emerald-200 bg-emerald-50/30 dark:border-emerald-900 dark:bg-emerald-950/20 p-3 text-xs text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                      {rule.fullText.slice(0, 800)}{rule.fullText.length > 800 ? `\n\n…（共 ${rule.fullText.length.toLocaleString()} 字符，保存后在平台详情页查看完整内容）` : ""}
+                        {parsingRuleFileIdx === idx ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" />解析中…</>
+                        ) : (
+                          <><FileText className="w-3 h-3" />上传文件</>  
+                        )}
+                      </label>
+                      <input
+                        id={`rule-file-upload-${idx}`}
+                        type="file"
+                        accept=".pdf,.txt,.md,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const base64 = (reader.result as string).split(',')[1];
+                            setParsingRuleFileIdx(idx);
+                            parseRuleFileMutation.mutate({
+                              filename: file.name,
+                              dataBase64: base64,
+                              mimeType: file.type || undefined,
+                            }, {
+                              onSuccess: (data) => {
+                                updateRule(idx, "fullText" as any, data.text);
+                                setParsingRuleFileIdx(null);
+                                toast.success(`文件解析完成（${data.charCount.toLocaleString()} 字符）`);
+                              },
+                              onError: (err) => {
+                                setParsingRuleFileIdx(null);
+                                toast.error(`文件解析失败：${err.message}`);
+                              },
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                          // Reset input so same file can be re-uploaded
+                          e.target.value = '';
+                        }}
+                      />
+                      {rule.fullText && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs text-muted-foreground hover:text-destructive px-2"
+                          onClick={() => updateRule(idx, "fullText" as any, "")}
+                        >
+                          清除
+                        </Button>
+                      )}
                     </div>
                   </div>
-                ) : scrapingRuleIdx === idx ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 pl-1">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                    正在抓取全文，请稍候…
-                  </div>
-                ) : null}
+                  {scrapingRuleIdx === idx ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 pl-1">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      正在抓取全文，请稍候…
+                    </div>
+                  ) : (
+                    <Textarea
+                      className="text-xs font-mono min-h-[120px] max-h-[320px] resize-y leading-relaxed"
+                      placeholder="在此粘贴规则文本内容，或点击「上传文件」自动解析，或点击「一键获取」从 URL 抓取…"
+                      value={rule.fullText ?? ""}
+                      onChange={(e) => updateRule(idx, "fullText" as any, e.target.value)}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>

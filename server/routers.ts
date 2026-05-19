@@ -1378,6 +1378,65 @@ export const appRouter = router({
           return testScrapingBeeKey(key);
         }
       }),
+    // ── Parse rule file (PDF/TXT/Word) and extract text content ────────────────
+    parseRuleFile: adminProcedure
+      .input(z.object({
+        filename: z.string().max(512),
+        dataBase64: z.string(), // base64 encoded file content
+        mimeType: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const buffer = Buffer.from(input.dataBase64, "base64");
+        const ext = input.filename.split('.').pop()?.toLowerCase() ?? '';
+
+        // For plain text files, decode directly
+        if (ext === 'txt' || input.mimeType === 'text/plain') {
+          const text = buffer.toString('utf-8');
+          return { text, charCount: text.length };
+        }
+
+        // For PDF and Word files, use LLM with file_url
+        const { invokeLLM } = await import("./_core/llm");
+        const { storagePut } = await import("./storage");
+
+        // Upload file to storage temporarily for LLM access
+        const uuid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const safeExt = /^[a-z0-9]+$/.test(ext) ? `.${ext}` : '.pdf';
+        const fileKey = `rule-files-temp/${uuid}${safeExt}`;
+        const mimeType = input.mimeType ?? (ext === 'pdf' ? 'application/pdf' : 'application/octet-stream');
+        const { url } = await storagePut(fileKey, buffer, mimeType);
+
+        // Build absolute URL for LLM
+        const absoluteUrl = url.startsWith('http')
+          ? url
+          : `http://localhost:${process.env.PORT ?? 3000}${url}`;
+
+        const llmMimeType = ext === 'pdf' ? 'application/pdf' : 'application/pdf';
+
+        try {
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'file_url',
+                    file_url: { url: absoluteUrl, mime_type: llmMimeType as any },
+                  },
+                  {
+                    type: 'text',
+                    text: '请提取并返回这份文件的完整文本内容。保持原有段落结构，不要添加任何解释或总结，直接输出文本内容。',
+                  },
+                ],
+              },
+            ],
+          });
+          const text = response.choices?.[0]?.message?.content ?? '';
+          return { text: typeof text === 'string' ? text : JSON.stringify(text), charCount: typeof text === 'string' ? text.length : 0 };
+        } catch (err) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `文件解析失败：${(err as Error).message}` });
+        }
+      }),
   }),
   // ── AI helpers ────────────────────────────────────────────────────────
   ai: router({
